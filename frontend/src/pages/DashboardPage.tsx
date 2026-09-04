@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Flame, Target, ThermometerSun, Trophy } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { EmptyState, ErrorState } from '@/components/ui/States';
@@ -58,14 +59,9 @@ export function DashboardPage() {
         title="No leads available yet."
         description="Analyze your first lead to start building your lead intelligence."
         action={
-          <button
-            type="button"
-            className="btn-primary"
-            disabled
-            title="The Analyze Lead flow will be available in a later phase."
-          >
+          <Link to="/leads/analyze" className="btn-primary">
             Analyze New Lead
-          </button>
+          </Link>
         }
       />
     );

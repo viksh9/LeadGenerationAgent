@@ -8,13 +8,10 @@ export function QuickActions() {
     <Card>
       <CardTitle>Quick Actions</CardTitle>
       <div className="mt-4 flex flex-col gap-2">
-        {/* The Analyze Lead flow is not built yet — disabled with an explanation. */}
         <button
           type="button"
           className="btn-primary justify-start"
-          disabled
-          title="The Analyze Lead flow will be available in a later phase."
-          aria-label="Analyze New Lead (coming soon)"
+          onClick={() => navigate('/leads/analyze')}
         >
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           Analyze New Lead

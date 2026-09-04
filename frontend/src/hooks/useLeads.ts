@@ -7,7 +7,7 @@ import {
   getLeads,
   updateLead,
 } from '@/services/leads';
-import type { LeadCreate, LeadListParams, LeadUpdate } from '@/types/lead';
+import type { LeadAnalyzeRequest, LeadCreate, LeadListParams, LeadUpdate } from '@/types/lead';
 
 /**
  * TanStack Query foundation for the lead APIs. The Leads/LeadDetails pages will
@@ -48,7 +48,7 @@ export function useCreateLead() {
 export function useAnalyzeLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: analyzeLead,
+    mutationFn: (payload: LeadAnalyzeRequest) => analyzeLead(payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: leadKeys.all }),
   });
 }

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AnalyzeLeadPage } from '@/pages/AnalyzeLeadPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { CompaniesPage } from '@/pages/CompaniesPage';
 import { CompanyDetailsPage } from '@/pages/CompanyDetailsPage';
@@ -19,6 +20,7 @@ export function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/leads" element={<LeadsPage />} />
+        <Route path="/leads/analyze" element={<AnalyzeLeadPage />} />
         <Route path="/leads/:id" element={<LeadDetailsPage />} />
         <Route path="/companies" element={<CompaniesPage />} />
         <Route path="/companies/:id" element={<CompanyDetailsPage />} />

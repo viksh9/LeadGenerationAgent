@@ -127,7 +127,7 @@ describe('DashboardPage', () => {
 
     expect(await screen.findByRole('button', { name: /view all leads/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /view hot leads/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /analyze new lead/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /analyze new lead/i })).toBeEnabled();
   });
 
   it('shows the loading skeleton while fetching', () => {

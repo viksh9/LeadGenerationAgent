@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -154,15 +154,10 @@ export function LeadsPage() {
       title="Leads"
       subtitle={subtitle}
       actions={
-        <button
-          type="button"
-          className="btn-primary"
-          disabled
-          title="The Analyze Lead flow will be available in a later phase."
-        >
+        <Link to="/leads/analyze" className="btn-primary">
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           Analyze Lead
-        </button>
+        </Link>
       }
     >
       <div className="space-y-4">
