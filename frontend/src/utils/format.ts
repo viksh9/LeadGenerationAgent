@@ -20,6 +20,28 @@ export function formatScore(score: number | null | undefined): string {
   return Math.round(score).toString();
 }
 
+export function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 /** Priority band a raw 0-100 score falls into (mirrors the backend thresholds). */
 export function scoreBand(score: number): LeadPriority {
   if (score >= 80) return 'HOT';

@@ -6,9 +6,15 @@ import { LeadsPage } from './LeadsPage';
 import { AppRoutes } from '@/routes/AppRoutes';
 import type { Lead, LeadListResponse } from '@/types/lead';
 
-vi.mock('@/services/leads', () => ({ getLeads: vi.fn() }));
-import { getLeads } from '@/services/leads';
+vi.mock('@/services/leads', () => ({
+  getLeads: vi.fn(),
+  getLead: vi.fn(),
+  updateLead: vi.fn(),
+  deleteLead: vi.fn(),
+}));
+import { getLead, getLeads } from '@/services/leads';
 const getLeadsMock = vi.mocked(getLeads);
+const getLeadMock = vi.mocked(getLead);
 
 function makeLead(p: Partial<Lead> & Pick<Lead, 'id' | 'company_name'>): Lead {
   return {
@@ -144,11 +150,13 @@ describe('LeadsPage', () => {
 
   it('navigates to lead details when a row is viewed', async () => {
     getLeadsMock.mockResolvedValue(response(LEADS));
+    getLeadMock.mockResolvedValue(LEADS[0]);
     renderWithProviders(<AppRoutes />, { route: '/leads' });
 
     const view = await screen.findByRole('button', { name: /view northstar banking/i });
     await userEvent.click(view);
-    expect(await screen.findByRole('heading', { level: 2, name: /lead #1/i })).toBeInTheDocument();
+    // Landed on the real Lead Details page.
+    expect(await screen.findByRole('link', { name: /back to leads/i })).toBeInTheDocument();
   });
 
   it('has an accessible responsive table container', async () => {

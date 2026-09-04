@@ -9,9 +9,13 @@ import type { Lead, LeadListResponse } from '@/types/lead';
 // Mock the API service — tests never touch a real backend.
 vi.mock('@/services/leads', () => ({
   getLeads: vi.fn(),
+  getLead: vi.fn(),
+  updateLead: vi.fn(),
+  deleteLead: vi.fn(),
 }));
-import { getLeads } from '@/services/leads';
+import { getLead, getLeads } from '@/services/leads';
 const getLeadsMock = vi.mocked(getLeads);
+const getLeadMock = vi.mocked(getLead);
 
 const now = new Date();
 const iso = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).toISOString();
@@ -147,6 +151,7 @@ describe('DashboardPage', () => {
 
   it('navigates to lead details when a top opportunity is viewed', async () => {
     getLeadsMock.mockResolvedValue(listResponse(LEADS));
+    getLeadMock.mockResolvedValue(LEADS[0]);
     renderWithProviders(<AppRoutes />, { route: '/dashboard' });
 
     const viewButton = await screen.findByRole('button', {
@@ -154,8 +159,7 @@ describe('DashboardPage', () => {
     });
     await userEvent.click(viewButton);
 
-    expect(
-      await screen.findByRole('heading', { level: 2, name: /lead #1/i }),
-    ).toBeInTheDocument();
+    // The Lead Details page is now the real page; confirm we landed there.
+    expect(await screen.findByRole('link', { name: /back to leads/i })).toBeInTheDocument();
   });
 });
