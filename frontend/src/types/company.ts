@@ -1,4 +1,4 @@
-import type { LeadPriority } from './lead';
+import type { Lead, LeadPriority } from './lead';
 
 /**
  * A company summary derived from leads. The backend has no company entity, so
@@ -19,3 +19,20 @@ export interface CompanySummary {
 }
 
 export type CompanySortBy = 'score' | 'name' | 'leads';
+
+/** A decision-maker / point of contact surfaced across a company's leads. */
+export interface CompanyContact {
+  name: string;
+  title: string | null;
+  linkedinUrl: string | null;
+}
+
+/**
+ * The full profile for one company: the summary fields plus the underlying
+ * leads (each a signal) and de-duplicated contacts. Aggregated client-side.
+ */
+export interface CompanyDetail extends CompanySummary {
+  priorityCounts: Record<LeadPriority, number>;
+  leads: Lead[];
+  contacts: CompanyContact[];
+}

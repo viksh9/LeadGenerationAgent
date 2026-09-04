@@ -9,6 +9,11 @@ function companyLeadsPath(name: string) {
   return `/leads?search=${encodeURIComponent(name)}`;
 }
 
+/** Navigate to this company's profile page. */
+function companyDetailPath(name: string) {
+  return `/companies/${encodeURIComponent(name)}`;
+}
+
 export function CompaniesTable({ companies }: { companies: CompanySummary[] }) {
   const navigate = useNavigate();
   return (
@@ -30,7 +35,7 @@ export function CompaniesTable({ companies }: { companies: CompanySummary[] }) {
           <tr
             key={company.name}
             className="cursor-pointer hover:bg-slate-50"
-            onClick={() => navigate(companyLeadsPath(company.name))}
+            onClick={() => navigate(companyDetailPath(company.name))}
           >
             <Td>
               <span className="font-medium text-slate-900">{company.name}</span>

@@ -23,7 +23,7 @@ export function AppRoutes() {
         <Route path="/leads/analyze" element={<AnalyzeLeadPage />} />
         <Route path="/leads/:id" element={<LeadDetailsPage />} />
         <Route path="/companies" element={<CompaniesPage />} />
-        <Route path="/companies/:id" element={<CompanyDetailsPage />} />
+        <Route path="/companies/:name" element={<CompanyDetailsPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/outreach" element={<OutreachPage />} />
