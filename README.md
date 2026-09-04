@@ -13,20 +13,20 @@ AI-powered lead generation agent that discovers high-intent business opportuniti
 
 ```
 LeadGenerationAgent
-├── api/                 # FastAPI app (/health), response schemas, error handlers
+├── api/                 # FastAPI app, routes (health, leads), schemas, deps
 ├── database/            # SQLAlchemy Lead model, enums, session, repository
 ├── config/              # Settings, logging, domain errors
-├── collectors/          # Offline JSON collector          (scaffolding — later phase)
-├── processors/          # Record normalizer               (scaffolding — later phase)
-├── intelligence/        # Signals, scoring, opportunity    (scaffolding — later phase)
-├── enrichment/          # Point-of-contact ranking         (scaffolding — later phase)
-├── outreach/            # Pitch templates                  (scaffolding — later phase)
-├── tests/
+├── intelligence/        # SignalDetector, OpportunityAnalyzer, LeadScorer,
+│                        #   and the LeadAnalysisPipeline orchestrator
+├── enrichment/          # POCFinder (decision-maker role recommendation)
+├── outreach/            # PitchGenerator (deterministic multi-channel pitches)
+├── tests/               # unit + integration
 ├── docs/
-└── data/                # Local SQLite db (gitignored) + sample_lead.json
+└── data/                # Local SQLite db (gitignored)
 ```
 
-The `collectors`/`processors`/`intelligence`/`enrichment`/`outreach` packages contain self-contained building blocks for future phases; they are unit-tested but not wired into the API in Phase 1.
+The analysis pipeline (`intelligence/lead_pipeline.py`) orchestrates the engines
+end-to-end and powers `POST /leads/analyze`.
 
 ## Setup
 
@@ -113,6 +113,63 @@ curl -X DELETE localhost:8000/leads/1
 Allowed origins are configurable via `CORS_ORIGINS` (comma-separated; defaults to the
 local React dev servers `http://localhost:5173,http://localhost:3000`). **Authentication/
 authorization is not implemented in Phase 1 and must be added before production.**
+
+## Frontend (React + TypeScript)
+
+A React 18 + TypeScript + Vite SPA lives in `frontend/`. This phase ships the
+**application shell only** — layout, routing, design-system primitives, the API
+client, and the TanStack Query foundation. Feature pages are placeholders.
+
+**Stack:** Vite · Tailwind CSS · React Router · TanStack Query · Axios · Lucide;
+tests with Vitest + React Testing Library.
+
+**Structure:** `src/components/{layout,ui,common}`, `src/pages`, `src/services`
+(Axios client + lead API), `src/hooks` (query/mutation hooks), `src/types`
+(interfaces aligned to the FastAPI schemas), `src/routes`, `src/utils`.
+
+```bash
+cd frontend
+npm install
+cp .env.example .env      # VITE_API_BASE_URL=http://localhost:8000
+npm run dev               # http://localhost:5173
+npm run build             # type-check + production build
+npm run test              # Vitest
+npm run lint              # ESLint (TypeScript strict)
+```
+
+**Connecting to the backend:** the client reads `VITE_API_BASE_URL` (default
+`http://localhost:8000`) and calls the FastAPI endpoints. Run the API first
+(`uvicorn api.main:app --reload`); its CORS already allows `http://localhost:5173`.
+Only `VITE_`-prefixed vars are exposed to the browser — never put secrets there.
+
+**Routes:** `/dashboard` (root redirects here), `/leads`, `/leads/:id`,
+`/companies`, `/companies/:id`, `/opportunities`, `/contacts`, `/outreach`,
+`/analytics`, `/settings`, and a Not Found catch-all.
+
+### Dashboard
+
+`/dashboard` is data-driven (Recharts for charts). Components live in
+`src/components/dashboard/` (KPI cards, top-opportunities table, recent signals,
+signal/priority distribution charts, recent activity, quick actions) and are
+composed by `pages/DashboardPage.tsx`.
+
+**Data source & calculations:** the dashboard issues a **single** `GET /leads`
+query (`useDashboard` → `useLeads`, `page_size=100`, sorted by `lead_score` desc,
+cached by TanStack Query) and derives every metric client-side:
+
+- **Total Leads** uses the server-accurate `LeadListResponse.total`.
+- **Hot/Warm/Qualified counts, charts, tables, activity** are computed over the
+  retrieved dataset (up to 100 leads). When more leads exist than were fetched,
+  the cards show a "top N of M" note.
+- **Date range** (All / 7d / 30d) is applied client-side.
+- **Recent Activity** is derived from lead timestamps (there is no dedicated
+  activity log yet).
+
+**Current limitations:** the backend has no aggregate/analytics endpoints and no
+date filter, so cross-dataset aggregates and date filtering are dataset-limited
+and computed in the browser. Signal distribution counts each lead's single
+`signal_type` (list items expose one). "Analyze New Lead" is disabled (its flow
+is a later phase).
 
 ## Data layer
 
