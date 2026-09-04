@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ChevronsUpDown, Trash2 } from 'lucide-react';
 import { Table, Td } from '@/components/ui/Table';
 import { Badge, PriorityBadge } from '@/components/ui/Badge';
@@ -82,6 +82,10 @@ function TechList({ technologies }: { technologies: string[] }) {
 
 export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Carry the active filters so Lead Details can restore them on "Back to leads".
+  const openLead = (id: number) =>
+    navigate(`/leads/${id}`, { state: { leadsSearch: location.search } });
   return (
     <Table>
       <thead>
@@ -103,7 +107,7 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
           <tr
             key={lead.id}
             className="cursor-pointer hover:bg-slate-50"
-            onClick={() => navigate(`/leads/${lead.id}`)}
+            onClick={() => openLead(lead.id)}
           >
             <Td>
               <span className="font-medium text-slate-900">{lead.company_name}</span>
@@ -150,7 +154,7 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
                   className="btn-secondary px-2.5 py-1 text-xs"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/leads/${lead.id}`);
+                    openLead(lead.id);
                   }}
                   aria-label={`View ${lead.company_name}`}
                 >

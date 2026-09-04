@@ -77,11 +77,82 @@ describe('LeadDetailsPage', () => {
 
     expect(await screen.findByRole('heading', { level: 2, name: /northstar banking technologies/i })).toBeInTheDocument();
     expect(screen.getAllByText('88').length).toBeGreaterThan(0); // score (header + indicator)
-    expect(screen.getByText('HOT')).toBeInTheDocument();
+    expect(screen.getAllByText('HOT').length).toBeGreaterThan(0); // header + recommendation rail
     expect(screen.getByText('Large-scale, project-driven capacity ramp-up.')).toBeInTheDocument();
     expect(screen.getByText('Java')).toBeInTheDocument();
     expect(screen.getByText('Priya Raman')).toBeInTheDocument();
     expect(screen.getByText(/we noticed/i)).toBeInTheDocument(); // pitch
+  });
+
+  it('humanizes the signal and shows a signal-strength band', async () => {
+    getLeadMock.mockResolvedValue(makeLead());
+    renderDetail();
+    await screen.findByRole('heading', { level: 2, name: /northstar/i });
+
+    // Enum is humanized, not shown raw.
+    expect(screen.getByText('Project Award')).toBeInTheDocument();
+    expect(screen.queryByText('PROJECT_AWARD')).not.toBeInTheDocument();
+    // signal_confidence 90 -> STRONG band.
+    expect(screen.getByText('STRONG')).toBeInTheDocument();
+  });
+
+  it('shows estimated staffing and likely roles', async () => {
+    getLeadMock.mockResolvedValue(makeLead());
+    renderDetail();
+    await screen.findByRole('heading', { level: 2, name: /northstar/i });
+
+    expect(screen.getByText('45 engineers')).toBeInTheDocument();
+    expect(screen.getByText('Java Engineer')).toBeInTheDocument();
+  });
+
+  it('renders the evidence section', async () => {
+    getLeadMock.mockResolvedValue(makeLead());
+    renderDetail();
+    await screen.findByRole('heading', { level: 2, name: /northstar/i });
+
+    expect(screen.getByText('Evidence')).toBeInTheDocument();
+    expect(screen.getAllByText('press release').length).toBeGreaterThan(0);
+  });
+
+  it('opens external links safely in a new tab', async () => {
+    getLeadMock.mockResolvedValue(makeLead());
+    renderDetail();
+    await screen.findByRole('heading', { level: 2, name: /northstar/i });
+
+    const linkedin = screen.getByRole('link', { name: /view profile/i });
+    expect(linkedin).toHaveAttribute('href', 'https://linkedin.com/in/priya');
+    expect(linkedin).toHaveAttribute('target', '_blank');
+    expect(linkedin).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('handles missing optional fields without showing null/undefined', async () => {
+    getLeadMock.mockResolvedValue(
+      makeLead({
+        poc_name: null,
+        poc_title: null,
+        poc_linkedin_url: null,
+        public_contact: null,
+        estimated_hiring: null,
+        technologies: [],
+        hiring_roles: [],
+      }),
+    );
+    renderDetail();
+    await screen.findByRole('heading', { level: 2, name: /northstar/i });
+
+    expect(screen.getByText(/no contact identified yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/not enough information/i)).toBeInTheDocument();
+    expect(screen.queryByText(/undefined|null|NaN/)).not.toBeInTheDocument();
+  });
+
+  it('refreshes the lead by refetching', async () => {
+    getLeadMock.mockResolvedValue(makeLead());
+    renderDetail();
+    await screen.findByRole('heading', { level: 2, name: /northstar/i });
+    const callsBefore = getLeadMock.mock.calls.length;
+
+    await userEvent.click(screen.getByRole('button', { name: /refresh lead/i }));
+    await waitFor(() => expect(getLeadMock.mock.calls.length).toBeGreaterThan(callsBefore));
   });
 
   it('shows a loading skeleton', () => {
@@ -113,17 +184,20 @@ describe('LeadDetailsPage', () => {
     await waitFor(() => expect(updateLeadMock).toHaveBeenCalledWith(1, { status: 'CONTACTED' }));
   });
 
-  it('deletes the lead and navigates back to the list', async () => {
+  it('deletes the lead only after confirmation and navigates back', async () => {
     getLeadMock.mockResolvedValue(makeLead());
     deleteLeadMock.mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderDetail();
     await screen.findByRole('heading', { level: 2, name: /northstar/i });
 
-    await userEvent.click(screen.getByRole('button', { name: /delete/i }));
+    // Triggering delete opens a confirmation dialog — it must not delete yet.
+    await userEvent.click(screen.getByRole('button', { name: /delete lead/i }));
+    expect(deleteLeadMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(deleteLeadMock).toHaveBeenCalledWith(1));
     expect(await screen.findByText('Leads list page')).toBeInTheDocument();
-    confirmSpy.mockRestore();
   });
 
   it('copies the pitch to the clipboard', async () => {
