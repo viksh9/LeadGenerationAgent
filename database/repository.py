@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm import Session
 
@@ -23,8 +23,10 @@ __all__ = [
     "create_lead",
     "get_lead",
     "list_leads",
+    "query_leads",
     "update_lead",
     "delete_lead",
+    "find_duplicate_lead",
     "create_session_factory",
     "get_engine",
     "init_db",
@@ -120,6 +122,104 @@ def list_leads(
         stmt = stmt.where(Lead.lead_score >= min_score)
     stmt = stmt.order_by(Lead.updated_at.desc(), Lead.id.desc()).offset(offset).limit(limit)
     return list(session.scalars(stmt))
+
+
+# Whitelisted sort columns — never interpolate a client-supplied field name.
+_SORT_COLUMNS = {
+    "lead_score": Lead.lead_score,
+    "created_at": Lead.created_at,
+    "updated_at": Lead.updated_at,
+    "signal_date": Lead.signal_date,
+    "company_name": Lead.company_name,
+}
+
+
+def query_leads(
+    session: Session,
+    *,
+    search: str | None = None,
+    industry: str | None = None,
+    location: str | None = None,
+    signal_type: Any = None,
+    lead_priority: Any = None,
+    status: Any = None,
+    min_score: float | None = None,
+    max_score: float | None = None,
+    technology: str | None = None,
+    sort_by: str = "lead_score",
+    sort_order: str = "desc",
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[Lead], int]:
+    """Filter/search/sort/paginate leads at the database level.
+
+    Returns ``(items, total)`` where ``total`` is the unpaginated match count.
+    All filtering happens in SQL (no full-table load); sort fields are
+    whitelisted and enum filters are typed, so no arbitrary SQL is accepted.
+    """
+    conditions = []
+    if search:
+        like = f"%{search.lower()}%"
+        conditions.append(
+            or_(
+                func.lower(Lead.company_name).like(like),
+                func.lower(func.coalesce(Lead.signal_title, "")).like(like),
+                func.lower(func.coalesce(Lead.signal_description, "")).like(like),
+                func.lower(func.coalesce(Lead.project_name, "")).like(like),
+            )
+        )
+    if industry:
+        conditions.append(func.lower(Lead.industry) == industry.lower())
+    if location:
+        conditions.append(func.lower(Lead.location) == location.lower())
+    if signal_type is not None:
+        conditions.append(Lead.signal_type == signal_type)
+    if lead_priority is not None:
+        conditions.append(Lead.lead_priority == lead_priority)
+    if status is not None:
+        conditions.append(Lead.status == status)
+    if min_score is not None:
+        conditions.append(Lead.lead_score >= min_score)
+    if max_score is not None:
+        conditions.append(Lead.lead_score <= max_score)
+    if technology:
+        # technologies is a JSON array column; match the quoted value in its text.
+        conditions.append(func.lower(cast(Lead.technologies, String)).like(f"%{technology.lower()}%"))
+
+    base = select(Lead)
+    for condition in conditions:
+        base = base.where(condition)
+
+    total = session.scalar(select(func.count()).select_from(base.subquery())) or 0
+
+    column = _SORT_COLUMNS.get(sort_by, Lead.lead_score)
+    ordering = column.asc() if sort_order == "asc" else column.desc()
+    stmt = base.order_by(ordering, Lead.id.desc()).offset((page - 1) * page_size).limit(page_size)
+    return list(session.scalars(stmt)), int(total)
+
+
+def find_duplicate_lead(
+    session: Session,
+    *,
+    company_name: str,
+    signal_title: str | None = None,
+    source_url: str | None = None,
+) -> Lead | None:
+    """Find an existing lead matching the dedup key (company + signal/source).
+
+    Matching narrows on ``signal_title`` and ``source_url`` when supplied, so an
+    identical re-analysis maps to the same row instead of creating a duplicate.
+    Returns the most recent match, or ``None``.
+    """
+    if not company_name:
+        return None
+    stmt = select(Lead).where(Lead.company_name == company_name)
+    if signal_title is not None:
+        stmt = stmt.where(Lead.signal_title == signal_title)
+    if source_url is not None:
+        stmt = stmt.where(Lead.source_url == source_url)
+    stmt = stmt.order_by(Lead.id.desc())
+    return session.scalars(stmt).first()
 
 
 def update_lead(session: Session, lead_id: int, **fields: Any) -> Lead | None:

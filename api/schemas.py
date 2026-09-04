@@ -200,10 +200,13 @@ class LeadResponse(BaseModel):
 
 
 class LeadListResponse(BaseModel):
-    """A page of leads. Pagination fields can be added later without breaking."""
+    """A page of leads with pagination metadata."""
 
     items: list[LeadResponse] = Field(default_factory=list)
     total: int = 0
+    page: int = 1
+    page_size: int = 20
+    total_pages: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +268,7 @@ class HealthResponse(BaseModel):
     status: str
     app: str
     environment: str = "development"
+    version: str = "0.1.0"
 
 
 class ErrorDetail(BaseModel):

@@ -1,14 +1,11 @@
-"""Tests for the analysis pipeline and the analyze/leads endpoints."""
+"""Tests for the (legacy) processors AnalysisPipeline. API endpoint tests live
+in tests/integration/test_lead_api.py."""
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import sessionmaker
-
-from api.main import app, get_session
 from api.schemas import LeadAnalyzeResponse
 from database.models import LeadPriority, SignalType
-from database.repository import get_engine, get_lead, init_db
+from database.repository import get_lead
 from processors.analysis_pipeline import AnalysisPipeline, run_analysis
 
 pipeline = AnalysisPipeline()
@@ -92,63 +89,3 @@ def test_analyze_and_store_persists(db_session):
     assert stored.lead_priority is LeadPriority.HOT
     assert stored.lead_score >= 80
     assert stored.recommended_pitch  # pitch persisted
-
-
-# -- endpoints --------------------------------------------------------------
-def _client(tmp_path):
-    engine = get_engine(f"sqlite:///{tmp_path / 'api.db'}")
-    init_db(engine)
-    factory = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
-
-    def override():
-        session = factory()
-        try:
-            yield session
-        finally:
-            session.close()
-
-    app.dependency_overrides[get_session] = override
-    return TestClient(app)
-
-
-def test_health_still_works(tmp_path):
-    client = _client(tmp_path)
-    try:
-        assert client.get("/health").json()["status"] == "ok"
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_analyze_endpoint_persists_and_returns(tmp_path):
-    client = _client(tmp_path)
-    try:
-        resp = client.post("/analyze", json=BANKING_LEAD)
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["lead"]["id"] > 0
-        assert body["priority"] == "HOT"
-        assert body["lead"]["signal_type"] in {s.value for s in SignalType}
-
-        listed = client.get("/leads")
-        assert listed.status_code == 200
-        assert listed.json()["total"] >= 1
-
-        lead_id = body["lead"]["id"]
-        detail = client.get(f"/leads/{lead_id}")
-        assert detail.status_code == 200
-        assert detail.json()["company_name"] == "NorthStar Banking Technologies"
-
-        missing = client.get("/leads/999999")
-        assert missing.status_code == 404
-        assert missing.json()["error"]["code"] == "not_found"
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_analyze_endpoint_requires_company_name(tmp_path):
-    client = _client(tmp_path)
-    try:
-        resp = client.post("/analyze", json={"signal_description": "hiring engineers"})
-        assert resp.status_code == 422
-    finally:
-        app.dependency_overrides.clear()

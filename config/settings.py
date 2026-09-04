@@ -32,12 +32,19 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("APP_ENV", "ENVIRONMENT"),
     )
     log_level: str = "INFO"
+    version: str = "0.1.0"
     database_url: str = f"sqlite:///{DATA_DIR / 'leads.db'}"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    # Comma-separated allowed CORS origins (e.g. the local React dev server).
+    cors_origins: str = "http://localhost:5173,http://localhost:3000"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
     default_sample_path: Path = DATA_DIR / "sample_lead.json"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
 @lru_cache

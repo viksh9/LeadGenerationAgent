@@ -43,9 +43,76 @@ cp .env.example .env
 uvicorn api.main:app --reload
 ```
 
-- `GET /health` — returns `{"status": "ok", "app": ..., "environment": ...}`
+The `leads` table is created automatically on startup. Interactive OpenAPI docs: http://127.0.0.1:8000/docs
 
-The `leads` table is created automatically on startup. Interactive docs: http://127.0.0.1:8000/docs
+### Endpoints
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /health` | Liveness — `{"status":"healthy","app":...,"version":...}` |
+| `POST /leads` | Create a lead directly (no intelligence) → `201` |
+| `POST /leads/analyze` | Run the full analysis pipeline and persist → `201` (new) / `200` (re-analyzed) |
+| `GET /leads` | List with filters, search, sort, pagination |
+| `GET /leads/{id}` | Fetch one lead (`404` if missing) |
+| `PUT /leads/{id}` | Update editable fields (calculated fields are rejected) |
+| `DELETE /leads/{id}` | Delete a lead → `204` (`404` if missing) |
+
+`GET /leads` query params: `page` (≥1), `page_size` (1–100, default 20), `search`,
+`industry`, `location`, `signal_type`, `lead_priority`, `status`, `min_score`,
+`max_score`, `technology`, `sort_by` (`lead_score`|`created_at`|`updated_at`|`signal_date`|`company_name`),
+`sort_order` (`asc`|`desc`). Default sort is `lead_score DESC`.
+
+### Examples
+
+```bash
+# Health
+curl localhost:8000/health
+
+# Create a lead directly
+curl -X POST localhost:8000/leads -H 'Content-Type: application/json' \
+  -d '{"company_name":"Acme Corp","industry":"IT","location":"Pune"}'
+
+# Analyze a raw signal (runs signals → opportunity → score → POC → pitch → persist)
+curl -X POST localhost:8000/leads/analyze -H 'Content-Type: application/json' -d '{
+  "company_name": "NorthStar Banking Technologies",
+  "industry": "BFSI",
+  "signal_description": "Won a major banking modernization project and is hiring 30 Java engineers, 10 AWS engineers and 5 DevOps specialists.",
+  "technologies": ["Java","Spring Boot","AWS","DevOps"],
+  "estimated_hiring": 45
+}'
+
+# Filtered / sorted listing
+curl "localhost:8000/leads?lead_priority=HOT"
+curl "localhost:8000/leads?industry=BFSI&min_score=80"
+curl "localhost:8000/leads?search=banking&sort_by=lead_score&sort_order=desc&page=1&page_size=20"
+
+# Fetch, update, delete
+curl localhost:8000/leads/1
+curl -X PUT localhost:8000/leads/1 -H 'Content-Type: application/json' -d '{"status":"CONTACTED"}'
+curl -X DELETE localhost:8000/leads/1
+```
+
+**`POST /leads/analyze` response** (abridged): a structured `LeadAnalysisResult` with
+`lead_id`, `company_name`, `signal_analysis`, `opportunity_analysis`, `scoring_result`,
+`poc_recommendation`, `pitch_result`, `final_score`, `priority`, `recommended_action`, `status`.
+
+```json
+{
+  "lead_id": 1,
+  "company_name": "NorthStar Banking Technologies",
+  "final_score": 88, "priority": "HOT", "status": "NEW",
+  "signal_analysis": { "signal_types": ["HIRING","PROJECT_AWARD","DIGITAL_TRANSFORMATION"], "detected_technologies": ["Java","AWS","DevOps"] },
+  "opportunity_analysis": { "opportunity_type": "LARGE_SCALE_RAMP_UP", "potential_staffing_need": "HIGH" },
+  "poc_recommendation": { "primary_role": { "role": "CTO", "relevance_score": 100 } },
+  "pitch_result": { "email_subject": "Scaling your Java and AWS engineering team for the new project", "message_strategy": "SCALE_UP" }
+}
+```
+
+### CORS & auth
+
+Allowed origins are configurable via `CORS_ORIGINS` (comma-separated; defaults to the
+local React dev servers `http://localhost:5173,http://localhost:3000`). **Authentication/
+authorization is not implemented in Phase 1 and must be added before production.**
 
 ## Data layer
 
@@ -85,6 +152,7 @@ Configuration is environment-based (via `.env` or process env). Defaults make lo
 | `DATABASE_URL` | SQLAlchemy URL (SQLite by default) | `sqlite:///./data/leads.db` |
 | `API_HOST` | Host for the API server | `127.0.0.1` |
 | `API_PORT` | Port for the API server | `8000` |
+| `CORS_ORIGINS` | Comma-separated allowed CORS origins | `http://localhost:5173,http://localhost:3000` |
 | `OPENAI_API_KEY` | Reserved for a later outreach phase; unused in Phase 1 | — |
 | `OPENAI_MODEL` | Reserved for a later outreach phase | `gpt-4o-mini` |
 
