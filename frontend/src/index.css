@@ -30,6 +30,15 @@
   .btn-ghost {
     @apply btn text-slate-600 hover:bg-slate-100;
   }
+  .btn-danger {
+    @apply btn bg-rose-600 text-white hover:bg-rose-700;
+  }
+
+  /* Removable active-filter chip */
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50
+      px-2.5 py-0.5 text-xs font-medium text-slate-700;
+  }
 
   /* Card */
   .card {

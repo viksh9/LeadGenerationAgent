@@ -12,9 +12,11 @@ vi.mock('@/services/leads', () => ({
   updateLead: vi.fn(),
   deleteLead: vi.fn(),
 }));
-import { getLead, getLeads } from '@/services/leads';
+import { deleteLead, getLead, getLeads, updateLead } from '@/services/leads';
 const getLeadsMock = vi.mocked(getLeads);
 const getLeadMock = vi.mocked(getLead);
+const updateLeadMock = vi.mocked(updateLead);
+const deleteLeadMock = vi.mocked(deleteLead);
 
 function makeLead(p: Partial<Lead> & Pick<Lead, 'id' | 'company_name'>): Lead {
   return {
@@ -90,7 +92,7 @@ describe('LeadsPage', () => {
   it('shows an empty state', async () => {
     getLeadsMock.mockResolvedValue(response([]));
     renderWithProviders(<LeadsPage />, { route: '/leads' });
-    expect(await screen.findByText(/no leads found/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no leads yet/i)).toBeInTheDocument();
   });
 
   it('applies a priority filter to the query', async () => {
@@ -166,5 +168,143 @@ describe('LeadsPage', () => {
     // Table is wrapped in a horizontally scrollable container.
     expect(container.querySelector('.overflow-x-auto')).toBeTruthy();
     expect(within(screen.getByRole('table')).getAllByRole('row').length).toBeGreaterThan(1);
+  });
+
+  it('applies an industry filter to the query', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('NorthStar Banking');
+
+    await userEvent.selectOptions(screen.getByLabelText('Industry'), 'BFSI');
+    await waitFor(() =>
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ industry: 'BFSI' })),
+    );
+  });
+
+  it('applies a status filter to the query', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('NorthStar Banking');
+
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'CONTACTED');
+    await waitFor(() =>
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'CONTACTED' })),
+    );
+  });
+
+  it('applies a signal-type filter to the query', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('NorthStar Banking');
+
+    await userEvent.selectOptions(screen.getByLabelText('Signal type'), 'PROJECT_AWARD');
+    await waitFor(() =>
+      expect(getLeadsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ signal_type: 'PROJECT_AWARD' }),
+      ),
+    );
+  });
+
+  it('applies a minimum-score filter to the query', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('NorthStar Banking');
+
+    await userEvent.type(screen.getByLabelText('Min score'), '80');
+    await waitFor(() =>
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ min_score: 80 })),
+    );
+  });
+
+  it('humanizes signal enums and shows extra technologies', async () => {
+    getLeadsMock.mockResolvedValue(
+      response([
+        makeLead({
+          id: 9,
+          company_name: 'Helios Systems',
+          signal_type: 'PROJECT_AWARD',
+          technologies: ['Java', 'AWS', 'React', 'Kafka'],
+          opportunity_summary: 'Large-scale ramp-up',
+        }),
+      ]),
+    );
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    // Scope to the lead's row — "Project Award" also appears as a filter option.
+    await screen.findByText('Helios Systems');
+    const row = screen.getByText('Helios Systems').closest('tr') as HTMLElement;
+    expect(within(row).getByText('Project Award')).toBeInTheDocument();
+    expect(within(row).getByText('+2 more')).toBeInTheDocument();
+    expect(within(row).getByText('Large-scale ramp-up')).toBeInTheDocument();
+    expect(screen.queryByText('PROJECT_AWARD')).not.toBeInTheDocument();
+  });
+
+  it('renders active filter chips and removes one', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    renderWithProviders(<LeadsPage />, { route: '/leads?lead_priority=HOT&industry=BFSI' });
+    await screen.findByText('NorthStar Banking');
+
+    expect(screen.getByText('Priority: HOT')).toBeInTheDocument();
+    expect(screen.getByText('Industry: BFSI')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /remove filter priority: hot/i }));
+    await waitFor(() => expect(screen.queryByText('Priority: HOT')).not.toBeInTheDocument());
+    // The other chip survives.
+    expect(screen.getByText('Industry: BFSI')).toBeInTheDocument();
+  });
+
+  it('clears all filters from the chip bar', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    renderWithProviders(<LeadsPage />, { route: '/leads?lead_priority=HOT&status=NEW' });
+    await screen.findByText('NorthStar Banking');
+
+    await userEvent.click(screen.getByRole('button', { name: /clear all/i }));
+    await waitFor(() => expect(screen.queryByText('Priority: HOT')).not.toBeInTheDocument());
+    expect(screen.queryByText('Status: NEW')).not.toBeInTheDocument();
+  });
+
+  it('shows a no-results state when filters match nothing', async () => {
+    getLeadsMock.mockResolvedValue(response([]));
+    renderWithProviders(<LeadsPage />, { route: '/leads?lead_priority=HOT' });
+    expect(await screen.findByText(/no leads match your current filters/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear filters/i })).toBeInTheDocument();
+  });
+
+  it('updates lead status via the inline select', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    updateLeadMock.mockResolvedValue({ ...LEADS[0], status: 'CONTACTED' });
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('NorthStar Banking');
+
+    await userEvent.selectOptions(
+      screen.getByLabelText('Status for NorthStar Banking'),
+      'CONTACTED',
+    );
+    await waitFor(() =>
+      expect(updateLeadMock).toHaveBeenCalledWith(1, { status: 'CONTACTED' }),
+    );
+  });
+
+  it('deletes a lead only after confirmation', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    deleteLeadMock.mockResolvedValue(undefined);
+    renderWithProviders(<LeadsPage />, { route: '/leads' });
+    await screen.findByText('NorthStar Banking');
+
+    // Opening the menu must NOT delete on its own.
+    await userEvent.click(screen.getByRole('button', { name: /delete northstar banking/i }));
+    expect(deleteLeadMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(deleteLeadMock).toHaveBeenCalledWith(1));
+  });
+
+  it('navigates to the analyze flow from the header action', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    renderWithProviders(<AppRoutes />, { route: '/leads' });
+    await screen.findByText('NorthStar Banking');
+
+    await userEvent.click(screen.getByRole('link', { name: /analyze new lead/i }));
+    expect(await screen.findByRole('heading', { name: /analyze a lead/i })).toBeInTheDocument();
   });
 });

@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState } from '@/components/ui/States';
+import { ActiveFilters } from '@/components/leads/ActiveFilters';
 import { LeadsFilters } from '@/components/leads/LeadsFilters';
 import { LeadsPagination } from '@/components/leads/LeadsPagination';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useLeads } from '@/hooks/useLeads';
+import { useDeleteLead, useLeads } from '@/hooks/useLeads';
 import { DEFAULT_PAGE_SIZE, type SortBy, type SortOrder } from '@/constants/leads';
-import type { LeadListParams, LeadPriority, LeadStatus, SignalType } from '@/types/lead';
+import type { Lead, LeadListParams, LeadPriority, LeadStatus, SignalType } from '@/types/lead';
 
 const FILTER_KEYS: (keyof LeadListParams)[] = [
   'search',
@@ -51,7 +53,7 @@ function parseParams(sp: URLSearchParams): LeadListParams {
 
 function SkeletonRows() {
   return (
-    <div className="space-y-2 p-4" aria-hidden="true">
+    <div className="space-y-2 p-4" aria-hidden="true" data-testid="leads-skeleton">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="h-10 w-full animate-pulse rounded bg-slate-100" />
       ))}
@@ -65,6 +67,9 @@ export function LeadsPage() {
 
   const [searchText, setSearchText] = useState(params.search ?? '');
   const debouncedSearch = useDebounce(searchText, 350);
+  const [pendingDelete, setPendingDelete] = useState<Lead | null>(null);
+
+  const deleteMutation = useDeleteLead();
 
   const updateParams = (patch: Partial<LeadListParams>) => {
     setSearchParams(
@@ -100,10 +105,20 @@ export function LeadsPage() {
     setSearchParams(new URLSearchParams(), { replace: true });
   };
 
+  const handleRemoveFilter = (key: keyof LeadListParams) => {
+    if (key === 'search') setSearchText('');
+    updateParams({ [key]: undefined } as Partial<LeadListParams>);
+  };
+
   const handleSort = (column: SortBy) => {
     const nextOrder: SortOrder =
       params.sort_by === column && params.sort_order === 'desc' ? 'asc' : 'desc';
     updateParams({ sort_by: column, sort_order: nextOrder });
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    deleteMutation.mutate(pendingDelete.id, { onSuccess: () => setPendingDelete(null) });
   };
 
   let results;
@@ -112,28 +127,39 @@ export function LeadsPage() {
   } else if (query.isError) {
     results = <ErrorState message="Unable to load leads." onRetry={() => query.refetch()} />;
   } else if (!data || data.items.length === 0) {
-    results = (
-      <EmptyState
-        title={activeFilterCount > 0 ? 'No leads match your filters' : 'No leads found.'}
-        description={
-          activeFilterCount > 0
-            ? 'Try adjusting or clearing your filters.'
-            : 'Analyze your first lead to start building your lead intelligence.'
-        }
-        action={
-          activeFilterCount > 0 ? (
+    results =
+      activeFilterCount > 0 ? (
+        <EmptyState
+          title="No leads match your current filters"
+          description="Try adjusting or clearing your filters."
+          action={
             <button type="button" className="btn-secondary" onClick={handleClear}>
               Clear filters
             </button>
-          ) : undefined
-        }
-      />
-    );
+          }
+        />
+      ) : (
+        <EmptyState
+          title="No leads yet."
+          description="Analyze your first lead to start building your sales intelligence."
+          action={
+            <Link to="/leads/analyze" className="btn-primary">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Analyze New Lead
+            </Link>
+          }
+        />
+      );
   } else {
     results = (
       <>
         <div className={query.isFetching ? 'opacity-60 transition-opacity' : undefined}>
-          <LeadsTable leads={data.items} params={params} onSort={handleSort} />
+          <LeadsTable
+            leads={data.items}
+            params={params}
+            onSort={handleSort}
+            onDelete={setPendingDelete}
+          />
         </div>
         <LeadsPagination
           page={data.page}
@@ -147,17 +173,29 @@ export function LeadsPage() {
     );
   }
 
-  const subtitle = data ? `${data.total.toLocaleString()} lead${data.total === 1 ? '' : 's'}` : 'Browse and filter scored leads.';
-
   return (
     <PageContainer
       title="Leads"
-      subtitle={subtitle}
+      subtitle="Discover, qualify, and prioritize your best business opportunities."
       actions={
-        <Link to="/leads/analyze" className="btn-primary">
-          <Sparkles className="h-4 w-4" aria-hidden="true" />
-          Analyze Lead
-        </Link>
+        <>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => query.refetch()}
+            aria-label="Refresh leads"
+          >
+            <RefreshCw
+              className={query.isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'}
+              aria-hidden="true"
+            />
+            Refresh
+          </button>
+          <Link to="/leads/analyze" className="btn-primary">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Analyze New Lead
+          </Link>
+        </>
       }
     >
       <div className="space-y-4">
@@ -166,11 +204,33 @@ export function LeadsPage() {
           searchText={searchText}
           onSearchTextChange={setSearchText}
           onChange={updateParams}
-          onClear={handleClear}
-          activeFilterCount={activeFilterCount}
         />
+
+        <ActiveFilters params={params} onRemove={handleRemoveFilter} onClear={handleClear} />
+
+        {data && (
+          <p className="text-sm text-slate-500">
+            {data.total.toLocaleString()} lead{data.total === 1 ? '' : 's'}
+          </p>
+        )}
+
         <Card padded={false}>{results}</Card>
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        destructive
+        title="Delete this lead?"
+        description={
+          pendingDelete
+            ? `“${pendingDelete.company_name}” will be permanently removed. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        busy={deleteMutation.isPending}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </PageContainer>
   );
 }

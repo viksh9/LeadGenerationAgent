@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
-import { Table, Td, Th } from '@/components/ui/Table';
+import { ArrowDown, ArrowUp, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { Table, Td } from '@/components/ui/Table';
 import { Badge, PriorityBadge } from '@/components/ui/Badge';
 import { ScoreIndicator } from '@/components/common/ScoreIndicator';
+import { LeadStatusSelect } from '@/components/leads/LeadStatusSelect';
+import { humanizeSignal } from '@/constants/leads';
 import { formatDate } from '@/utils/format';
 import type { SortBy } from '@/constants/leads';
 import type { Lead, LeadListParams } from '@/types/lead';
@@ -11,6 +13,7 @@ interface LeadsTableProps {
   leads: Lead[];
   params: LeadListParams;
   onSort: (column: SortBy) => void;
+  onDelete: (lead: Lead) => void;
 }
 
 function SortHeader({
@@ -27,7 +30,10 @@ function SortHeader({
   const active = params.sort_by === column;
   const Icon = active ? (params.sort_order === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown;
   return (
-    <th scope="col" className="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <th
+      scope="col"
+      className="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+    >
       <button
         type="button"
         onClick={() => onSort(column)}
@@ -35,13 +41,46 @@ function SortHeader({
         aria-label={`Sort by ${label}`}
       >
         {label}
-        <Icon className={active ? 'h-3.5 w-3.5 text-slate-700' : 'h-3.5 w-3.5 text-slate-300'} aria-hidden="true" />
+        <Icon
+          className={active ? 'h-3.5 w-3.5 text-slate-700' : 'h-3.5 w-3.5 text-slate-300'}
+          aria-hidden="true"
+        />
       </button>
     </th>
   );
 }
 
-export function LeadsTable({ leads, params, onSort }: LeadsTableProps) {
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th
+      scope="col"
+      className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+    >
+      {children}
+    </th>
+  );
+}
+
+/** Up to two technology chips, then "+N more" (full list on hover). */
+function TechList({ technologies }: { technologies: string[] }) {
+  if (!technologies || technologies.length === 0) return <span className="text-slate-400">—</span>;
+  const shown = technologies.slice(0, 2);
+  const extra = technologies.length - shown.length;
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {shown.map((t) => (
+        <Badge key={t}>{t}</Badge>
+      ))}
+      {extra > 0 && (
+        <span className="text-xs text-slate-500" title={technologies.join(', ')}>
+          {`+${extra} more`}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps) {
   const navigate = useNavigate();
   return (
     <Table>
@@ -50,6 +89,8 @@ export function LeadsTable({ leads, params, onSort }: LeadsTableProps) {
           <SortHeader column="company_name" label="Company" params={params} onSort={onSort} />
           <Th>Industry</Th>
           <Th>Signal</Th>
+          <Th>Opportunity</Th>
+          <Th>Technologies</Th>
           <SortHeader column="lead_score" label="Score" params={params} onSort={onSort} />
           <Th>Priority</Th>
           <Th>Status</Th>
@@ -69,7 +110,27 @@ export function LeadsTable({ leads, params, onSort }: LeadsTableProps) {
               {lead.location && <span className="block text-xs text-slate-400">{lead.location}</span>}
             </Td>
             <Td>{lead.industry ?? '—'}</Td>
-            <Td>{lead.signal_type ? <Badge>{lead.signal_type}</Badge> : '—'}</Td>
+            <Td>
+              {lead.signal_type ? (
+                <Badge className="whitespace-nowrap">
+                  <span title={lead.signal_title ?? undefined}>{humanizeSignal(lead.signal_type)}</span>
+                </Badge>
+              ) : (
+                '—'
+              )}
+            </Td>
+            <Td>
+              {lead.opportunity_summary ? (
+                <span className="block max-w-[16rem] truncate text-slate-700" title={lead.opportunity_summary}>
+                  {lead.opportunity_summary}
+                </span>
+              ) : (
+                <span className="text-slate-400">—</span>
+              )}
+            </Td>
+            <Td>
+              <TechList technologies={lead.technologies} />
+            </Td>
             <Td>
               <ScoreIndicator score={lead.lead_score} />
             </Td>
@@ -77,21 +138,36 @@ export function LeadsTable({ leads, params, onSort }: LeadsTableProps) {
               <PriorityBadge priority={lead.lead_priority} />
             </Td>
             <Td>
-              <span className="text-xs font-medium text-slate-600">{lead.status}</span>
+              <LeadStatusSelect leadId={lead.id} status={lead.status} company={lead.company_name} />
             </Td>
-            <Td>{formatDate(lead.signal_date)}</Td>
             <Td>
-              <button
-                type="button"
-                className="btn-secondary px-2.5 py-1 text-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/leads/${lead.id}`);
-                }}
-                aria-label={`View ${lead.company_name}`}
-              >
-                View
-              </button>
+              <span className="whitespace-nowrap">{formatDate(lead.signal_date)}</span>
+            </Td>
+            <Td>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className="btn-secondary px-2.5 py-1 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/leads/${lead.id}`);
+                  }}
+                  aria-label={`View ${lead.company_name}`}
+                >
+                  View
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(lead);
+                  }}
+                  aria-label={`Delete ${lead.company_name}`}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </Td>
           </tr>
         ))}

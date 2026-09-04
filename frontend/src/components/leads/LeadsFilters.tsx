@@ -1,7 +1,7 @@
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { PRIORITIES, SIGNAL_TYPES, STATUSES } from '@/constants/leads';
+import { INDUSTRIES, PRIORITIES, SIGNAL_LABELS, SIGNAL_TYPES, STATUSES } from '@/constants/leads';
 import type { LeadListParams } from '@/types/lead';
 
 interface LeadsFiltersProps {
@@ -9,8 +9,6 @@ interface LeadsFiltersProps {
   searchText: string;
   onSearchTextChange: (value: string) => void;
   onChange: (patch: Partial<LeadListParams>) => void;
-  onClear: () => void;
-  activeFilterCount: number;
 }
 
 /** Blank option value maps back to "no filter" (undefined). */
@@ -23,14 +21,7 @@ function toNumber(value: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-export function LeadsFilters({
-  params,
-  searchText,
-  onSearchTextChange,
-  onChange,
-  onClear,
-  activeFilterCount,
-}: LeadsFiltersProps) {
+export function LeadsFilters({ params, searchText, onSearchTextChange, onChange }: LeadsFiltersProps) {
   return (
     <div className="card card-pad">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -46,7 +37,7 @@ export function LeadsFilters({
             <input
               id="lead-search"
               className="input pl-9"
-              placeholder="Company, signal, or project…"
+              placeholder="Search companies, projects, or signals..."
               value={searchText}
               onChange={(e) => onSearchTextChange(e.target.value)}
             />
@@ -80,6 +71,19 @@ export function LeadsFilters({
         </Select>
 
         <Select
+          label="Industry"
+          value={params.industry ?? ''}
+          onChange={(e) => onChange({ industry: toParam(e.target.value) })}
+        >
+          <option value="">All industries</option>
+          {INDUSTRIES.map((i) => (
+            <option key={i} value={i}>
+              {i}
+            </option>
+          ))}
+        </Select>
+
+        <Select
           label="Signal type"
           value={params.signal_type ?? ''}
           onChange={(e) => onChange({ signal_type: toParam(e.target.value) as LeadListParams['signal_type'] })}
@@ -87,16 +91,16 @@ export function LeadsFilters({
           <option value="">All signals</option>
           {SIGNAL_TYPES.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {SIGNAL_LABELS[s]}
             </option>
           ))}
         </Select>
 
         <Input
-          label="Industry"
-          placeholder="e.g. BFSI"
-          value={params.industry ?? ''}
-          onChange={(e) => onChange({ industry: toParam(e.target.value) })}
+          label="Location"
+          placeholder="e.g. Pune"
+          value={params.location ?? ''}
+          onChange={(e) => onChange({ location: toParam(e.target.value) })}
         />
 
         <Input
@@ -124,18 +128,6 @@ export function LeadsFilters({
           onChange={(e) => onChange({ max_score: toNumber(e.target.value) })}
         />
       </div>
-
-      {activeFilterCount > 0 && (
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-slate-500">
-            {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'} applied
-          </span>
-          <button type="button" className="btn-ghost text-sm" onClick={onClear}>
-            <X className="h-4 w-4" aria-hidden="true" />
-            Clear all
-          </button>
-        </div>
-      )}
     </div>
   );
 }
