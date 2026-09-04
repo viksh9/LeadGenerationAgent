@@ -1,0 +1,87 @@
+{
+  "companies": [
+    {
+      "name": "Northwind Logistics",
+      "domain": "northwindlogistics.example",
+      "industry": "Supply Chain",
+      "size": "201-500",
+      "location": "Chicago, IL",
+      "description": "Regional freight and warehouse operator modernizing last-mile delivery.",
+      "signals": [
+        {
+          "signal_type": "hiring",
+          "title": "Hiring Senior Data Engineer and Head of Operations Systems",
+          "description": "Open roles mention replacing spreadsheets with a real-time routing platform and integrating TMS data.",
+          "source": "careers",
+          "source_url": "https://northwindlogistics.example/careers",
+          "strength": 0.86,
+          "observed_at": "2026-08-28T00:00:00"
+        },
+        {
+          "signal_type": "project",
+          "title": "Warehouse automation RFP",
+          "description": "Public RFP for inventory visibility and exception alerting across 12 warehouses.",
+          "source": "procurement",
+          "source_url": "https://northwindlogistics.example/rfp",
+          "strength": 0.92,
+          "observed_at": "2026-08-12T00:00:00"
+        }
+      ],
+      "contacts": [
+        {
+          "full_name": "Priya Raman",
+          "title": "VP of Operations",
+          "email": "priya.raman@northwindlogistics.example",
+          "linkedin_url": "https://linkedin.com/in/priya-raman-example",
+          "seniority": "vp",
+          "is_decision_maker": true
+        }
+      ]
+    },
+    {
+      "name": "Helios Health",
+      "domain": "helioshealth.example",
+      "industry": "Healthcare",
+      "size": "51-200",
+      "location": "Austin, TX",
+      "description": "Outpatient clinic network building a patient engagement product.",
+      "signals": [
+        {
+          "signal_type": "funding",
+          "title": "Series B announced",
+          "description": "Raised $28M to expand clinics and digitize intake workflows.",
+          "source": "news",
+          "source_url": "https://news.example/helios-series-b",
+          "strength": 0.9,
+          "observed_at": "2026-07-20T00:00:00"
+        },
+        {
+          "signal_type": "hiring",
+          "title": "Hiring Product Manager, EHR Integrations",
+          "description": "Job post cites FHIR, HL7, and reducing no-show rates.",
+          "source": "linkedin",
+          "strength": 0.74,
+          "observed_at": "2026-08-30T00:00:00"
+        }
+      ]
+    },
+    {
+      "name": "Harbor Retail",
+      "domain": "harborretail.example",
+      "industry": "Retail",
+      "size": "1001-5000",
+      "location": "Seattle, WA",
+      "description": "Omnichannel retailer with dated POS and inventory systems.",
+      "signals": [
+        {
+          "signal_type": "tech_stack",
+          "title": "Legacy POS mentioned in engineering blog",
+          "description": "Team discussing migration off a 12-year-old POS with limited API access.",
+          "source": "blog",
+          "strength": 0.55,
+          "observed_at": "2026-05-02T00:00:00"
+        }
+      ]
+    }
+  ]
+}
