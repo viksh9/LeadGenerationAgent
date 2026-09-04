@@ -60,16 +60,20 @@ export function CompaniesPage() {
     body = <CompaniesTable companies={visible} />;
   }
 
-  const subtitle =
+  const countLabel =
     companies && companies.length > 0
       ? `${companies.length} compan${companies.length === 1 ? 'y' : 'ies'} across ${fetchedCount} lead${fetchedCount === 1 ? '' : 's'}`
-      : 'Companies discovered across your leads.';
+      : null;
 
   const showControls = !isLoading && !isError && companies && companies.length > 0;
 
   return (
-    <PageContainer title="Companies" subtitle={subtitle}>
+    <PageContainer
+      title="Companies"
+      subtitle="Research target accounts and identify organizations with active business opportunities."
+    >
       <div className="space-y-4">
+        {countLabel && <p className="text-sm text-slate-500">{countLabel}</p>}
         {showControls && (
           <div className="card card-pad">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

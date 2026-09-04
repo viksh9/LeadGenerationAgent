@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { Table, Td, Th } from '@/components/ui/Table';
-import { Badge, PriorityBadge } from '@/components/ui/Badge';
+import { PriorityBadge } from '@/components/ui/Badge';
 import { ScoreIndicator } from '@/components/common/ScoreIndicator';
+import { humanizeSignal } from '@/constants/leads';
+import { formatDate } from '@/utils/format';
 import type { CompanySummary } from '@/types/company';
 
 /** Navigate to the leads list filtered to this company. */
@@ -23,10 +25,11 @@ export function CompaniesTable({ companies }: { companies: CompanySummary[] }) {
           <Th>Company</Th>
           <Th>Industry</Th>
           <Th>Location</Th>
-          <Th>Leads</Th>
+          <Th>Signals</Th>
+          <Th>Open leads</Th>
           <Th>Best score</Th>
+          <Th>Latest signal</Th>
           <Th>Priority</Th>
-          <Th>Technologies</Th>
           <Th>Action</Th>
         </tr>
       </thead>
@@ -46,27 +49,28 @@ export function CompaniesTable({ companies }: { companies: CompanySummary[] }) {
             <Td>{company.industry ?? '—'}</Td>
             <Td>{company.location ?? '—'}</Td>
             <Td>
+              <span className="tabular-nums">{company.totalSignals}</span>
+            </Td>
+            <Td>
               <span className="tabular-nums">{company.leadCount}</span>
             </Td>
             <Td>
               <ScoreIndicator score={company.bestScore} />
             </Td>
             <Td>
-              <PriorityBadge priority={company.topPriority} />
+              {company.latestSignalType ? (
+                <div>
+                  <span className="whitespace-nowrap text-slate-700">
+                    {humanizeSignal(company.latestSignalType)}
+                  </span>
+                  <span className="block text-xs text-slate-400">{formatDate(company.latestSignal)}</span>
+                </div>
+              ) : (
+                '—'
+              )}
             </Td>
             <Td>
-              {company.technologies.length === 0 ? (
-                '—'
-              ) : (
-                <div className="flex max-w-xs flex-wrap gap-1">
-                  {company.technologies.slice(0, 3).map((tech) => (
-                    <Badge key={tech}>{tech}</Badge>
-                  ))}
-                  {company.technologies.length > 3 && (
-                    <span className="text-xs text-slate-400">+{company.technologies.length - 3}</span>
-                  )}
-                </div>
-              )}
+              <PriorityBadge priority={company.topPriority} />
             </Td>
             <Td>
               <button

@@ -1,30 +1,38 @@
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2, ExternalLink, Users } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
-import { Badge, PriorityBadge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/States';
-import { CompanySignalsTable } from '@/components/companies/CompanySignalsTable';
+import { CompanyHeader } from '@/components/companies/CompanyHeader';
+import { CompanyOverview } from '@/components/companies/CompanyOverview';
+import { AccountOpportunitySummary } from '@/components/companies/AccountOpportunitySummary';
+import { TechnologyLandscape } from '@/components/companies/TechnologyLandscape';
+import { SignalTimeline } from '@/components/companies/SignalTimeline';
+import { HiringIntelligence } from '@/components/companies/HiringIntelligence';
+import { ProjectIntelligence } from '@/components/companies/ProjectIntelligence';
+import { CompanyOpportunities } from '@/components/companies/CompanyOpportunities';
+import { DecisionMakerRecommendations } from '@/components/companies/DecisionMakerRecommendations';
+import { RelatedLeads } from '@/components/companies/RelatedLeads';
+import { CompanyEvidence } from '@/components/companies/CompanyEvidence';
+import { AccountAction } from '@/components/companies/AccountAction';
 import { useCompany } from '@/hooks/useCompanies';
-
-function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="card card-pad">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="mt-1 text-lg font-semibold text-slate-900">{children}</div>
-    </div>
-  );
-}
 
 function DetailSkeleton() {
   return (
     <div className="space-y-4" aria-hidden="true" data-testid="company-skeleton">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
-        ))}
+      <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-100" />
+          ))}
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-100" />
+          ))}
+        </div>
       </div>
-      <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
     </div>
   );
 }
@@ -32,7 +40,7 @@ function DetailSkeleton() {
 export function CompanyDetailsPage() {
   const { name: rawName } = useParams();
   const name = rawName ? decodeURIComponent(rawName) : '';
-  const { company, isLoading, isError, refetch, notFound } = useCompany(name);
+  const { company, isLoading, isError, isFetching, refetch, notFound } = useCompany(name);
 
   const backLink = (
     <Link to="/companies" className="btn-ghost text-sm">
@@ -43,7 +51,7 @@ export function CompanyDetailsPage() {
 
   if (isLoading) {
     return (
-      <PageContainer title={name} subtitle="Loading company profile…" actions={backLink}>
+      <PageContainer title={name} subtitle="Loading account intelligence…" actions={backLink}>
         <DetailSkeleton />
       </PageContainer>
     );
@@ -51,9 +59,9 @@ export function CompanyDetailsPage() {
 
   if (isError) {
     return (
-      <PageContainer title={name} subtitle="Company profile" actions={backLink}>
+      <PageContainer title={name} subtitle="Company intelligence" actions={backLink}>
         <Card>
-          <ErrorState message="Unable to load this company." onRetry={() => refetch()} />
+          <ErrorState message="Unable to load company intelligence." onRetry={() => refetch()} />
         </Card>
       </PageContainer>
     );
@@ -61,7 +69,7 @@ export function CompanyDetailsPage() {
 
   if (notFound || !company) {
     return (
-      <PageContainer title={name || 'Company'} subtitle="Company profile" actions={backLink}>
+      <PageContainer title={name || 'Company'} subtitle="Company intelligence" actions={backLink}>
         <Card>
           <EmptyState
             title="Company not found"
@@ -77,7 +85,9 @@ export function CompanyDetailsPage() {
     );
   }
 
-  const subtitle = [company.industry, company.location].filter(Boolean).join(' • ') || 'Company profile';
+  const subtitle =
+    [company.industry, company.location].filter(Boolean).join(' • ') || 'Company intelligence';
+  const noSignals = company.metrics.totalSignals === 0;
 
   return (
     <PageContainer
@@ -86,130 +96,57 @@ export function CompanyDetailsPage() {
       actions={
         <div className="flex items-center gap-2">
           {backLink}
+          <button
+            type="button"
+            className="btn-secondary text-sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            aria-label="Refresh account intelligence"
+          >
+            <RefreshCw className={isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} aria-hidden="true" />
+            Refresh
+          </button>
           <Link
             to={`/leads?search=${encodeURIComponent(company.name)}`}
             className="btn-secondary text-sm"
           >
-            View all leads
+            View leads
           </Link>
         </div>
       }
     >
-      <div className="space-y-6">
-        {/* KPIs */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Leads">
-            <span className="tabular-nums">{company.leadCount}</span>
-          </StatCard>
-          <StatCard label="Best score">
-            <span className="tabular-nums">
-              {Math.round(company.bestScore)}
-              <span className="text-sm font-normal text-slate-400"> / 100</span>
-            </span>
-          </StatCard>
-          <StatCard label="Top priority">
-            <PriorityBadge priority={company.topPriority} />
-          </StatCard>
-          <StatCard label="Est. hiring">
-            <span className="tabular-nums">{company.estimatedHiring || '—'}</span>
-          </StatCard>
-        </div>
+      <div className="space-y-4">
+        <CompanyHeader company={company} />
 
-        {/* Profile */}
-        <Card>
-          <div className="card-pad">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <Building2 className="h-4 w-4 text-slate-400" aria-hidden="true" />
-              Company profile
-            </h3>
-            <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-500">Industry</dt>
-                <dd className="text-sm text-slate-800">{company.industry ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-500">Location</dt>
-                <dd className="text-sm text-slate-800">{company.location ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-500">Company size</dt>
-                <dd className="text-sm text-slate-800">{company.companySize ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-500">Website</dt>
-                <dd className="text-sm text-slate-800">
-                  {company.website ? (
-                    <a
-                      href={company.website}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700"
-                    >
-                      {company.website.replace(/^https?:\/\//, '')}
-                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                    </a>
-                  ) : (
-                    '—'
-                  )}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="mt-4">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Technology stack</dt>
-              <dd className="mt-1 flex flex-wrap gap-1">
-                {company.technologies.length === 0 ? (
-                  <span className="text-sm text-slate-400">—</span>
-                ) : (
-                  company.technologies.map((tech) => <Badge key={tech}>{tech}</Badge>)
-                )}
-              </dd>
-            </div>
-          </div>
-        </Card>
-
-        {/* Signals / opportunities */}
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-slate-900">
-            Signals &amp; opportunities ({company.leadCount})
-          </h3>
-          <Card padded={false}>
-            <CompanySignalsTable leads={company.leads} />
+        {noSignals && (
+          <Card>
+            <p className="text-sm text-slate-500">
+              No meaningful business signals available yet. Additional project or hiring signals are
+              needed before this account can be qualified.
+            </p>
           </Card>
-        </div>
-
-        {/* Key contacts */}
-        {company.contacts.length > 0 && (
-          <div>
-            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <Users className="h-4 w-4 text-slate-400" aria-hidden="true" />
-              Key contacts
-            </h3>
-            <Card>
-              <ul className="divide-y divide-slate-100">
-                {company.contacts.map((contact) => (
-                  <li key={contact.name} className="flex items-center justify-between px-5 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{contact.name}</p>
-                      {contact.title && <p className="text-xs text-slate-500">{contact.title}</p>}
-                    </div>
-                    {contact.linkedinUrl && (
-                      <a
-                        href={contact.linkedinUrl}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
-                      >
-                        LinkedIn
-                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          </div>
         )}
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* Main intelligence column */}
+          <div className="space-y-4 lg:col-span-2">
+            <AccountOpportunitySummary company={company} />
+            <SignalTimeline company={company} />
+            <TechnologyLandscape company={company} />
+            <ProjectIntelligence company={company} />
+            <CompanyOpportunities company={company} />
+            <RelatedLeads company={company} />
+            <CompanyEvidence company={company} />
+          </div>
+
+          {/* Secondary rail */}
+          <div className="space-y-4">
+            <AccountAction company={company} />
+            <CompanyOverview company={company} />
+            <HiringIntelligence company={company} />
+            <DecisionMakerRecommendations company={company} />
+          </div>
+        </div>
       </div>
     </PageContainer>
   );
