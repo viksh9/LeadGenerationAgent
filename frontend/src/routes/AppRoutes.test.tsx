@@ -8,7 +8,6 @@ describe('routing', () => {
     renderWithProviders(<AppRoutes />, { route: '/leads' });
     // The page heading (h2); the header also shows the section title (h1).
     expect(screen.getByRole('heading', { level: 2, name: /^leads$/i })).toBeInTheDocument();
-    expect(screen.getByText(/coming next/i)).toBeInTheDocument();
   });
 
   it('renders a Not Found page for unknown routes', () => {

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   analyzeLead,
   createLead,
@@ -24,6 +24,8 @@ export function useLeads(params: LeadListParams = {}) {
   return useQuery({
     queryKey: leadKeys.list(params),
     queryFn: () => getLeads(params),
+    // Keep the previous page visible while the next page loads.
+    placeholderData: keepPreviousData,
   });
 }
 
