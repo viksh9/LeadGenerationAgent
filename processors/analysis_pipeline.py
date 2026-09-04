@@ -7,7 +7,7 @@ the flat ``Lead`` fields and the ``LeadAnalyzeResponse`` API schema:
         -> SignalDetector      (signals, technologies, hiring)
         -> OpportunityAnalyzer  (opportunity type, staffing, urgency)
         -> LeadScorer           (lead_score, priority)
-        -> POCEnricher          (who to target)
+        -> POCFinder            (decision-maker role recommendation)
         -> calculated Lead (optionally persisted) + LeadAnalyzeResponse
 
 This is the integration layer, so — unlike the individual engines — it may
@@ -32,7 +32,7 @@ from api.schemas import (
 )
 from database.models import LeadStatus, SignalType
 from database.repository import create_lead
-from enrichment.poc_finder import POCEnricher, POCEnrichmentResult
+from enrichment.poc_finder import POCFinder, POCRecommendationResult
 from intelligence.lead_scorer import LeadScorer, LeadScoreResult
 from intelligence.opportunity_analyzer import OpportunityAnalyzer, OpportunityAssessment
 from intelligence.signal_detector import (
@@ -50,7 +50,7 @@ class AnalysisArtifacts:
     signal: SignalDetectionResult
     opportunity: OpportunityAssessment
     score: LeadScoreResult
-    poc: POCEnrichmentResult
+    poc: POCRecommendationResult
     pitch: PitchGenerationResult
     lead_fields: dict[str, Any]
 
@@ -61,13 +61,13 @@ class AnalysisPipeline:
         detector: Optional[SignalDetector] = None,
         analyzer: Optional[OpportunityAnalyzer] = None,
         scorer: Optional[LeadScorer] = None,
-        enricher: Optional[POCEnricher] = None,
+        poc_finder: Optional[POCFinder] = None,
         pitcher: Optional[PitchGenerator] = None,
     ) -> None:
         self.detector = detector or SignalDetector()
         self.analyzer = analyzer or OpportunityAnalyzer()
         self.scorer = scorer or LeadScorer()
-        self.enricher = enricher or POCEnricher()
+        self.poc_finder = poc_finder or POCFinder()
         self.pitcher = pitcher or PitchGenerator()
 
     # -- core orchestration -------------------------------------------------
@@ -91,7 +91,7 @@ class AnalysisPipeline:
         )
         opportunity = self.analyzer.analyze(request, signal)
         score = self.scorer.score(request, signal, opportunity)
-        poc = self.enricher.enrich(request, signal, opportunity)
+        poc = self.poc_finder.recommend(request, signal, opportunity)
         pitch = self.pitcher.generate(request, signal, opportunity, poc, score)
 
         lead_fields = self._lead_fields(request, signal, opportunity, score, poc, pitch)
@@ -126,7 +126,7 @@ class AnalysisPipeline:
         signal: SignalDetectionResult,
         opportunity: OpportunityAssessment,
         score: LeadScoreResult,
-        poc: POCEnrichmentResult,
+        poc: POCRecommendationResult,
         pitch: PitchGenerationResult,
     ) -> dict[str, Any]:
         primary_signal = signal.signal_types[0] if signal.signal_types else SignalType.OTHER
@@ -138,12 +138,10 @@ class AnalysisPipeline:
             else float(signal.signal_strength)
         )
 
-        best = poc.best_known_contact
-        poc_name = best.full_name if best else request.poc_name
-        poc_title = (best.title if best else request.poc_title) or (
-            poc.primary_contact.title if poc.primary_contact else None
-        )
-        poc_linkedin = (best.linkedin_url if best else None) or request.poc_linkedin_url
+        primary_role = poc.primary_role.role if poc.primary_role else None
+        poc_name = request.poc_name  # POCFinder recommends roles, not real people
+        poc_title = request.poc_title or primary_role
+        poc_linkedin = request.poc_linkedin_url
 
         return {
             "company_name": request.company_name,
@@ -223,28 +221,17 @@ class AnalysisPipeline:
         )
 
     @staticmethod
-    def _poc_recommendation(poc: POCEnrichmentResult) -> Optional[POCRecommendation]:
-        best = poc.best_known_contact
-        if best:
-            return POCRecommendation(
-                full_name=best.full_name,
-                title=best.title,
-                email=best.email or best.suggested_email,
-                linkedin_url=best.linkedin_url,
-                seniority=best.seniority.value,
-                is_decision_maker=best.is_decision_maker,
-                confidence=best.confidence,
-            )
-        primary = poc.primary_contact
-        if primary:
-            return POCRecommendation(
-                full_name=primary.title,  # a recommended role, not a real person
-                title=primary.title,
-                seniority=primary.seniority.value,
-                is_decision_maker=primary.is_decision_maker,
-                confidence=round(poc.enrichment_confidence / 100.0, 2),
-            )
-        return None
+    def _poc_recommendation(poc: POCRecommendationResult) -> Optional[POCRecommendation]:
+        primary = poc.primary_role
+        if primary is None:
+            return None
+        return POCRecommendation(
+            full_name=primary.role,  # a recommended role, not a real person
+            title=primary.role,
+            seniority=primary.decision_maker_type.value,
+            is_decision_maker=True,
+            confidence=round(primary.relevance_score / 100.0, 2),
+        )
 
 
 def run_analysis(request: "LeadAnalyzeRequest | dict") -> LeadAnalyzeResponse:
