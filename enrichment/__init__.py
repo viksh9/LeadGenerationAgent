@@ -1,3 +1,41 @@
-from enrichment.poc_finder import PointOfContact, find_points_of_contact
+from enrichment.poc_finder import (
+    ContactPriority,
+    DecisionMakerType,
+    Department,
+    POCEnricher,
+    POCEnrichmentResult,
+    POCFinder,
+    POCFinderConfig,
+    POCRecommendationResult,
+    PointOfContact,
+    RecommendedContact,
+    RoleCategory,
+    RoleRecommendation,
+    ScoredContact,
+    Seniority,
+    default_poc_config,
+    find_points_of_contact,
+    run_poc_enrichment,
+    run_poc_recommendation,
+)
 
-__all__ = ["PointOfContact", "find_points_of_contact"]
+__all__ = [
+    "PointOfContact",
+    "find_points_of_contact",
+    "POCEnricher",
+    "POCEnrichmentResult",
+    "RecommendedContact",
+    "ScoredContact",
+    "Seniority",
+    "Department",
+    "ContactPriority",
+    "run_poc_enrichment",
+    "POCFinder",
+    "POCFinderConfig",
+    "POCRecommendationResult",
+    "RoleRecommendation",
+    "RoleCategory",
+    "DecisionMakerType",
+    "default_poc_config",
+    "run_poc_recommendation",
+]

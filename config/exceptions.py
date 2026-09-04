@@ -22,6 +22,13 @@ class NotFoundError(AppError):
         super().__init__(message, status_code=404, code="not_found")
 
 
+class ValidationError(AppError):
+    """Invalid input for a persistence operation (missing/out-of-range fields)."""
+
+    def __init__(self, message: str = "Invalid lead data") -> None:
+        super().__init__(message, status_code=422, code="validation_error")
+
+
 class CollectorError(AppError):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=400, code="collector_error")

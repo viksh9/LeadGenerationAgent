@@ -1,6 +1,35 @@
-from intelligence.lead_scorer import LeadScore, score_lead
-from intelligence.opportunity_analyzer import OpportunityInsight, analyze_opportunity
-from intelligence.signal_detector import DetectedSignal, detect_signals
+from intelligence.lead_scorer import (
+    LeadScore,
+    LeadScorer,
+    LeadScoreResult,
+    ScoringConfig,
+    default_scoring_config,
+    run_lead_scoring,
+    score_lead,
+)
+from intelligence.opportunity_analyzer import (
+    OpportunityAnalyzer,
+    OpportunityAssessment,
+    OpportunityConfig,
+    OpportunityInsight,
+    OpportunityType,
+    StaffingNeed,
+    Urgency,
+    analyze_opportunity,
+    default_opportunity_config,
+    run_opportunity_analysis,
+)
+from intelligence.signal_detector import (
+    DetectedSignal,
+    DetectedSignalDetail,
+    DetectorConfig,
+    SignalDetectionInput,
+    SignalDetectionResult,
+    SignalDetector,
+    default_config,
+    detect_signals,
+    run_signal_detection,
+)
 
 __all__ = [
     "LeadScore",
@@ -9,4 +38,24 @@ __all__ = [
     "analyze_opportunity",
     "DetectedSignal",
     "detect_signals",
+    "SignalDetector",
+    "SignalDetectionInput",
+    "SignalDetectionResult",
+    "DetectedSignalDetail",
+    "DetectorConfig",
+    "default_config",
+    "run_signal_detection",
+    "LeadScorer",
+    "LeadScoreResult",
+    "ScoringConfig",
+    "default_scoring_config",
+    "run_lead_scoring",
+    "OpportunityAnalyzer",
+    "OpportunityAssessment",
+    "OpportunityConfig",
+    "OpportunityType",
+    "StaffingNeed",
+    "Urgency",
+    "default_opportunity_config",
+    "run_opportunity_analysis",
 ]
