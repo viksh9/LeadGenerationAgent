@@ -40,7 +40,7 @@ from intelligence.signal_detector import (
     SignalDetectionResult,
     SignalDetector,
 )
-from outreach.pitch_generator import GeneratedPitchResult, PitchGenerator
+from outreach.pitch_generator import PitchGenerationResult, PitchGenerator
 
 
 @dataclass
@@ -51,7 +51,7 @@ class AnalysisArtifacts:
     opportunity: OpportunityAssessment
     score: LeadScoreResult
     poc: POCEnrichmentResult
-    pitch: GeneratedPitchResult
+    pitch: PitchGenerationResult
     lead_fields: dict[str, Any]
 
 
@@ -92,7 +92,7 @@ class AnalysisPipeline:
         opportunity = self.analyzer.analyze(request, signal)
         score = self.scorer.score(request, signal, opportunity)
         poc = self.enricher.enrich(request, signal, opportunity)
-        pitch = self.pitcher.generate(request, opportunity, signal, score, poc)
+        pitch = self.pitcher.generate(request, signal, opportunity, poc, score)
 
         lead_fields = self._lead_fields(request, signal, opportunity, score, poc, pitch)
         return AnalysisArtifacts(
@@ -127,7 +127,7 @@ class AnalysisPipeline:
         opportunity: OpportunityAssessment,
         score: LeadScoreResult,
         poc: POCEnrichmentResult,
-        pitch: GeneratedPitchResult,
+        pitch: PitchGenerationResult,
     ) -> dict[str, Any]:
         primary_signal = signal.signal_types[0] if signal.signal_types else SignalType.OTHER
         estimated = signal.estimated_hiring if signal.estimated_hiring is not None else request.estimated_hiring
@@ -171,7 +171,7 @@ class AnalysisPipeline:
             "lead_priority": score.priority,
             "opportunity_summary": opportunity.business_reason,
             "recommended_action": opportunity.recommended_next_step,
-            "recommended_pitch": f"Subject: {pitch.subject}\n\n{pitch.body}",
+            "recommended_pitch": f"Subject: {pitch.email_subject}\n\n{pitch.recommended_pitch}",
             "status": LeadStatus.NEW,
         }
 
@@ -219,7 +219,7 @@ class AnalysisPipeline:
                 for label, points in score.score_breakdown.items()
             ],
             recommended_action=opportunity.recommended_next_step,
-            recommended_pitch=f"Subject: {artifacts.pitch.subject}\n\n{artifacts.pitch.body}",
+            recommended_pitch=f"Subject: {artifacts.pitch.email_subject}\n\n{artifacts.pitch.recommended_pitch}",
         )
 
     @staticmethod

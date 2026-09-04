@@ -1,8 +1,9 @@
 from outreach.pitch_generator import (
     GeneratedPitch,
-    GeneratedPitchResult,
+    MessageStrategy,
+    PitchGenerationResult,
     PitchGenerator,
-    PitchTone,
+    ServiceAngle,
     generate_pitch,
     run_pitch_generation,
 )
@@ -10,8 +11,9 @@ from outreach.pitch_generator import (
 __all__ = [
     "GeneratedPitch",
     "generate_pitch",
-    "GeneratedPitchResult",
     "PitchGenerator",
-    "PitchTone",
+    "PitchGenerationResult",
+    "MessageStrategy",
+    "ServiceAngle",
     "run_pitch_generation",
 ]
