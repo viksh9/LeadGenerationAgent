@@ -37,7 +37,10 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     # Comma-separated allowed CORS origins (e.g. the local React dev server).
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    cors_origins: str = (
+        "http://localhost:5173,http://localhost:3000,"
+        "http://127.0.0.1:5173,http://127.0.0.1:3000"
+    )
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
     default_sample_path: Path = DATA_DIR / "sample_lead.json"
