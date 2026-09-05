@@ -11,7 +11,8 @@ import { LeadsPagination } from '@/components/leads/LeadsPagination';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useDeleteLead, useLeads } from '@/hooks/useLeads';
-import { DEFAULT_PAGE_SIZE, type SortBy, type SortOrder } from '@/constants/leads';
+import { type SortBy, type SortOrder } from '@/constants/leads';
+import { getPreferences } from '@/services/preferences';
 import type { Lead, LeadListParams, LeadPriority, LeadStatus, SignalType } from '@/types/lead';
 
 const FILTER_KEYS: (keyof LeadListParams)[] = [
@@ -36,7 +37,7 @@ function parseParams(sp: URLSearchParams): LeadListParams {
   };
   return {
     page: num('page') ?? 1,
-    page_size: num('page_size') ?? DEFAULT_PAGE_SIZE,
+    page_size: num('page_size') ?? getPreferences().leadsPageSize,
     search: str('search'),
     industry: str('industry'),
     location: str('location'),
