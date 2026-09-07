@@ -383,6 +383,14 @@ class JobRecord(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     collected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
 
+    # Cross-source deduplication (processors/deduplication). Normalized title kept
+    # for matching; original titles from EVERY source retained; per-field source
+    # conflicts recorded rather than silently overwritten.
+    normalized_title: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
+    original_job_titles: Mapped[list[str]] = mapped_column(JSON, default=list)
+    field_conflicts: Mapped[dict] = mapped_column(JSON, default=dict)
+    deduplication_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     source_references: Mapped[list["JobSourceReference"]] = relationship(
         back_populates="job", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -404,7 +412,11 @@ class JobSourceReference(Base):
     source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     raw_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # soft link to raw_source_records
     source_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    source_priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_primary_source: Mapped[bool] = mapped_column(default=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
 
     job: Mapped["JobRecord"] = relationship(back_populates="source_references")
 
@@ -613,4 +625,49 @@ class OpportunityCandidate(Base):
         SAEnum(OpportunityStatus, native_enum=False, length=16), default=OpportunityStatus.CANDIDATE, index=True
     )
     lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class MatchConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    NO_MATCH = "NO_MATCH"
+
+
+class MatchDecision(str, Enum):
+    AUTO_MERGE = "AUTO_MERGE"
+    REVIEW = "REVIEW"
+    NO_MATCH = "NO_MATCH"
+
+
+class DuplicateStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class JobDuplicateCandidate(Base):
+    """A MEDIUM-confidence potential duplicate held for human review — never
+    auto-merged. Keeps the explanation (matched fields + differences)."""
+
+    __tablename__ = "job_duplicate_candidates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    canonical_job_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    record_a: Mapped[dict] = mapped_column(JSON, default=dict)   # {source_id, external_id, title, ...}
+    record_b: Mapped[dict] = mapped_column(JSON, default=dict)
+    match_score: Mapped[int] = mapped_column(Integer, default=0)
+    match_confidence: Mapped[MatchConfidence] = mapped_column(
+        SAEnum(MatchConfidence, native_enum=False, length=16), default=MatchConfidence.LOW
+    )
+    matched_fields: Mapped[list[str]] = mapped_column(JSON, default=list)
+    differences: Mapped[list[str]] = mapped_column(JSON, default=list)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    status: Mapped[DuplicateStatus] = mapped_column(
+        SAEnum(DuplicateStatus, native_enum=False, length=16), default=DuplicateStatus.PENDING, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
