@@ -102,7 +102,52 @@ class CompanyType(str, Enum):
     ENTERPRISE_SOFTWARE = "ENTERPRISE_SOFTWARE"
     IT_CONSULTING = "IT_CONSULTING"
     DIGITAL_TRANSFORMATION = "DIGITAL_TRANSFORMATION"
+    CONSULTING = "CONSULTING"
+    SYSTEM_INTEGRATOR = "SYSTEM_INTEGRATOR"
+    OUTSOURCING = "OUTSOURCING"
+    STAFFING_TECH = "STAFFING_TECH"
     OTHER_TECHNOLOGY = "OTHER_TECHNOLOGY"
+
+
+class CompanyMatchStatus(str, Enum):
+    EXACT_MATCH = "EXACT_MATCH"
+    HIGH_CONFIDENCE_MATCH = "HIGH_CONFIDENCE_MATCH"
+    POSSIBLE_MATCH = "POSSIBLE_MATCH"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    NO_MATCH = "NO_MATCH"
+    CONFLICT = "CONFLICT"
+
+
+class CompanyRelationshipType(str, Enum):
+    PARENT_OF = "PARENT_OF"
+    SUBSIDIARY_OF = "SUBSIDIARY_OF"
+    BRAND_OF = "BRAND_OF"
+    DIVISION_OF = "DIVISION_OF"
+    ACQUIRED_BY = "ACQUIRED_BY"
+    MERGED_WITH = "MERGED_WITH"
+    RELATED_TO = "RELATED_TO"
+
+
+class CompanyResolutionDecision(str, Enum):
+    PENDING = "PENDING"
+    MERGE = "MERGE"
+    KEEP_SEPARATE = "KEEP_SEPARATE"
+    IGNORE = "IGNORE"
+
+
+class HiringTrend(str, Enum):
+    RAPIDLY_INCREASING = "RAPIDLY_INCREASING"
+    INCREASING = "INCREASING"
+    STABLE = "STABLE"
+    DECREASING = "DECREASING"
+    LOW_ACTIVITY = "LOW_ACTIVITY"
+    UNKNOWN = "UNKNOWN"
+
+
+class DemandStrength(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
 
 
 class VerificationStatus(str, Enum):
@@ -197,6 +242,7 @@ class Lead(Base):
     # Company
     company_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     normalized_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # -> Company (soft link)
     company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     company_type: Mapped[CompanyType | None] = mapped_column(
         SAEnum(CompanyType, native_enum=False, length=32), nullable=True
@@ -858,6 +904,151 @@ class EvidenceClaim(Base):
     )
     supporting_sources: Mapped[list[str]] = mapped_column(JSON, default=list)
     contradictory_sources: Mapped[list[str]] = mapped_column(JSON, default=list)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class Company(Base):
+    """Canonical company entity — the resolved identity multiple source records
+    map to. Unknown facts stay NULL; identity/evidence confidence are explicit and
+    separate. Raw source names are preserved via CompanySourceReference."""
+
+    __tablename__ = "companies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    canonical_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    legal_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    normalized_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    website: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    primary_domain: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    alternate_domains: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+    industry: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    sub_industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    company_type: Mapped[CompanyType | None] = mapped_column(
+        SAEnum(CompanyType, native_enum=False, length=32), nullable=True
+    )
+    company_types: Mapped[list[str]] = mapped_column(JSON, default=list)  # may have several
+
+    headquarters_country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    headquarters_state: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    headquarters_city: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    india_presence: Mapped[bool | None] = mapped_column(nullable=True)
+    india_locations: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+    company_size_band: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    employee_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    employee_count_source: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    founded_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    public_company: Mapped[bool | None] = mapped_column(nullable=True)
+    parent_company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+    source_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    identity_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        SAEnum(VerificationStatus, native_enum=False, length=24), default=VerificationStatus.UNVERIFIED, index=True
+    )
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    source_references: Mapped[list["CompanySourceReference"]] = relationship(
+        back_populates="company", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class CompanyRelationship(Base):
+    """A parent/subsidiary/brand/etc. relationship. Only created with evidence —
+    ownership/acquisitions are never inferred."""
+
+    __tablename__ = "company_relationships"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    from_company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    to_company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    relationship_type: Mapped[CompanyRelationshipType] = mapped_column(
+        SAEnum(CompanyRelationshipType, native_enum=False, length=24), default=CompanyRelationshipType.RELATED_TO
+    )
+    evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[int] = mapped_column(Integer, default=0)
+    source: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class CompanySourceReference(Base):
+    """How one source represented a company. Never overwritten — every source's
+    original representation is preserved as evidence."""
+
+    __tablename__ = "company_source_references"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    source_name: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    source_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    observed_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    observed_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    observed_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    evidence_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confidence: Mapped[int] = mapped_column(Integer, default=0)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    company: Mapped["Company"] = relationship(back_populates="source_references")
+
+
+class CompanyResolutionCandidate(Base):
+    """An uncertain entity-resolution decision held for human review — never
+    silently merged."""
+
+    __tablename__ = "company_resolution_candidates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    observed_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    observed_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    observed_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    candidate_company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    match_status: Mapped[CompanyMatchStatus] = mapped_column(
+        SAEnum(CompanyMatchStatus, native_enum=False, length=24), default=CompanyMatchStatus.REVIEW_REQUIRED
+    )
+    confidence: Mapped[int] = mapped_column(Integer, default=0)
+    matching_factors: Mapped[list[str]] = mapped_column(JSON, default=list)
+    conflicting_factors: Mapped[list[str]] = mapped_column(JSON, default=list)
+    resolution_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[CompanyResolutionDecision] = mapped_column(
+        SAEnum(CompanyResolutionDecision, native_enum=False, length=16),
+        default=CompanyResolutionDecision.PENDING, index=True,
+    )
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class CompanyEvent(Base):
+    """A meaningful change in a company's intelligence (history / audit trail).
+    Powers "why did this become a HOT lead?"."""
+
+    __tablename__ = "company_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    event_type: Mapped[str] = mapped_column(String(48), index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    old_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    new_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
     data_provenance: Mapped[DataProvenance] = mapped_column(
         SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
     )

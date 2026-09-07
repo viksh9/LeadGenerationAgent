@@ -130,12 +130,17 @@ def main(argv: list[str] | None = None) -> int:
             create_raw_record_from_draft(session, draft)
         session.commit()
         result = run_company_pipeline(session, provenance=DataProvenance.SYNTHETIC, now=now)
+        from company.service import CompanyResolutionService
+        company_summary = CompanyResolutionService(session).upsert_companies_from_jobs(
+            provenance=DataProvenance.SYNTHETIC, now=now)
 
     print("Synthetic company demo seeded (data_provenance = SYNTHETIC).")
     print(f"  raw job records inserted: {len(drafts)}")
     print(f"  canonical job records: {result.dedup.canonical_created} (duplicates folded: {result.dedup.duplicates})")
     print(f"  companies -> leads: {result.companies.companies} "
           f"(created {result.companies.created}, updated {result.companies.updated})")
+    print(f"  company entities: created {company_summary.companies_created}, "
+          f"linked leads {company_summary.linked_leads}, review {company_summary.review_candidates}")
     if result.companies.errors:
         print(f"  errors: {len(result.companies.errors)}")
     return 0
