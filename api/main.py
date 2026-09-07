@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.dependencies import get_session  # re-exported for tests/overrides
 from api.errors import register_exception_handlers
-from api.routes import health, leads
+from api.routes import companies, health, leads
 from api.schemas import ErrorBody
 from config import configure_logging, get_settings
 from database.repository import init_db
@@ -54,3 +54,4 @@ app.add_middleware(
 register_exception_handlers(app)
 app.include_router(health.router)
 app.include_router(leads.router)
+app.include_router(companies.router)

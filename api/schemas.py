@@ -235,6 +235,57 @@ class LeadResponse(BaseModel):
     last_verified_at: Optional[datetime] = None
 
 
+class CompanyResponse(BaseModel):
+    """A canonical company entity (list/detail)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    canonical_name: str
+    legal_name: Optional[str] = None
+    normalized_name: str
+    primary_domain: Optional[str] = None
+    website: Optional[str] = None
+    industry: Optional[str] = None
+    company_type: Optional[CompanyType] = None
+    company_types: list[str] = Field(default_factory=list)
+    headquarters_city: Optional[str] = None
+    india_presence: Optional[bool] = None
+    india_locations: list[str] = Field(default_factory=list)
+    identity_confidence: int = 0
+    evidence_confidence: int = 0
+    verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
+    data_provenance: DataProvenance = DataProvenance.REAL
+
+
+class CompanyListResponse(BaseModel):
+    items: list[CompanyResponse] = Field(default_factory=list)
+    total: int = 0
+    page: int = 1
+    page_size: int = 20
+    total_pages: int = 0
+
+
+class ResolutionCandidateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    observed_name: Optional[str] = None
+    observed_domain: Optional[str] = None
+    candidate_company_id: Optional[int] = None
+    match_status: str
+    confidence: int = 0
+    matching_factors: list[str] = Field(default_factory=list)
+    conflicting_factors: list[str] = Field(default_factory=list)
+    resolution_explanation: Optional[str] = None
+    status: str
+    data_provenance: DataProvenance = DataProvenance.REAL
+
+
+class ResolutionDecisionRequest(BaseModel):
+    decision: str = Field(description="MERGE | KEEP_SEPARATE | IGNORE")
+
+
 class EvidenceResponse(BaseModel):
     """One evidence record supporting a lead/signal."""
 

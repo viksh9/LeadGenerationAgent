@@ -4,6 +4,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState } from '@/components/ui/States';
 import { CompanyHeader } from '@/components/companies/CompanyHeader';
+import { CompanyIntelligencePanel } from '@/components/companies/CompanyIntelligencePanel';
 import { CompanyOverview } from '@/components/companies/CompanyOverview';
 import { AccountOpportunitySummary } from '@/components/companies/AccountOpportunitySummary';
 import { TechnologyLandscape } from '@/components/companies/TechnologyLandscape';
@@ -117,6 +118,7 @@ export function CompanyDetailsPage() {
     >
       <div className="space-y-4">
         <CompanyHeader company={company} />
+        <CompanyIntelligencePanel name={company.name} />
 
         {noSignals && (
           <Card>
