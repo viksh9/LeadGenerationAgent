@@ -605,6 +605,71 @@ reports `NOT_CONFIGURED` and no live AI request has run:
 Optional live tests are opt-in via `RUN_LIVE_AI_TESTS=true` and validate only
 schema + safety, not exact wording.
 
+## Continuous monitoring & scheduling
+
+A **continuous monitoring & scheduling** layer keeps the real-data intelligence
+current over time: it re-runs the existing collectors on configurable intervals,
+**deterministically detects what actually changed** between runs (jobs, companies,
+leads, opportunities, tenders, source health), and raises **in-app alerts** worth
+a salesperson's attention. Full detail:
+[docs/monitoring-scheduler.md](docs/monitoring-scheduler.md).
+
+> **Monitoring detects change over REAL data; it is never a source of facts.** It
+> invents nothing — every event, trend, surge, and alert derives from a real
+> record already collected and verified.
+
+> **The background scheduler runner is OFF by default and performs NO live
+> collection.** It starts only when `SCHEDULER_ENABLED=true`; importing the app,
+> running tests, or CI spawns no threads and makes no network calls. Even when
+> enabled, a source only collects when it is actually configured.
+
+- **Simplest appropriate technology** (`scheduler/`). A lightweight, in-process
+  `asyncio` runner wraps a deterministic, clock-injectable core
+  (`SchedulerService`) — **no** Celery/APScheduler/Redis/cron and no new heavy
+  deps. Handlers **reuse the existing collectors, pipeline, and monitoring
+  detectors** (no duplicate ingestion). Runs are idempotent (interval-bucket
+  `run_key`), locked per source, retried with typed transient/permanent errors,
+  and fully audited on `SchedulerRun`.
+- **Deterministic detection** (`monitoring/`). Pure, unit-testable functions
+  classify the eight `ChangeType`s (`REMOVED_FROM_SOURCE` is never `CLOSED`),
+  hiring/technology surges (a surge is a *signal*, not a commercial conclusion),
+  trends (returning `INSUFFICIENT_DATA` rather than guessing), tender deadlines,
+  and source-health transitions (once per transition).
+- **Change-driven AI only.** AI re-analysis runs only on a *meaningful* change,
+  reuses the context-hash cache, and falls back to the deterministic grounded
+  baseline — it never gates or invents a fact, and its failures never break the
+  scheduler.
+- **Alerting** (`notifications/`). A single service turns real Findings into
+  in-app `Alert` rows after provenance gating, conservative preferences, and
+  deduplication. `IN_APP` is implemented; `EMAIL`/`SLACK`/`WEBHOOK` are stubs that
+  **never send until configured**.
+- **/monitoring dashboard + Alert Center.** `GET /monitoring/dashboard` reports
+  real pipeline counts, per-source health + latest run, jobs, recent runs, and
+  alerts (plus `scheduler_enabled` and `data_mode`). The Alert Center is served by
+  `GET /alerts` (+ `unread-count`, status updates) and
+  `GET/PUT /notification-preferences`.
+
+### Scheduler & alert APIs / CLI
+
+Read endpoints are open; mutating scheduler actions are admin-guarded when
+`ADMIN_API_KEY` is set (via an `X-Admin-Key` header).
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /scheduler/jobs` · `/scheduler/jobs/{id}` · `/scheduler/jobs/{id}/runs` · `/scheduler/runs` | Scheduled jobs + run audit |
+| `POST /scheduler/jobs/{id}/run` \| `/pause` \| `/resume` | Trigger / pause / resume a job (admin) |
+| `GET /alerts` · `/alerts/unread-count` · `/alerts/{id}` · `POST /alerts/{id}/status` | Alert Center |
+| `GET`/`PUT /notification-preferences` | Alert preferences |
+| `GET /monitoring/dashboard` | Operational monitoring dashboard (real metrics) |
+
+```bash
+python scripts/scheduler.py list             # show jobs + status
+python scripts/scheduler.py seed             # create the default job set (idempotent)
+python scripts/scheduler.py run <job_name>   # run one job now (MANUAL)
+python scripts/scheduler.py tick             # run all currently-due jobs once
+python scripts/scheduler.py runs --limit 20  # recent run audit
+```
+
 ## Business signals & tenders
 
 Hiring is one signal; this layer adds structured **business events** and

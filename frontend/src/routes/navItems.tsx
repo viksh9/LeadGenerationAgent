@@ -1,4 +1,5 @@
 import {
+  Activity,
   BarChart3,
   Building2,
   FileText,
@@ -28,5 +29,6 @@ export const navItems: NavItem[] = [
   { label: 'Contacts', to: '/contacts', icon: Users },
   { label: 'Outreach', to: '/outreach', icon: Mail },
   { label: 'Analytics', to: '/analytics', icon: BarChart3 },
+  { label: 'Monitoring', to: '/monitoring', icon: Activity },
   { label: 'Settings', to: '/settings', icon: Settings },
 ];

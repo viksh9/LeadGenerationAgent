@@ -1529,3 +1529,392 @@ class AIAnalysisAudit(Base):
     unsupported_claim_count: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+# ===================================================================== #
+# Continuous monitoring & scheduling layer (Prompt 38)
+#
+# All events below record REAL changes to REAL collected data (or real
+# source-health transitions). Nothing here fabricates companies, jobs,
+# tenders, signals, alerts, or statuses; every row is derived by the
+# deterministic monitoring engine from source-backed records.
+# ===================================================================== #
+
+
+# ---- Scheduler enums ------------------------------------------------- #
+class JobType(str, Enum):
+    SOURCE_COLLECTION = "SOURCE_COLLECTION"
+    EVIDENCE_REVERIFICATION = "EVIDENCE_REVERIFICATION"
+    COMPANY_ENRICHMENT = "COMPANY_ENRICHMENT"
+    SIGNAL_RECOMPUTATION = "SIGNAL_RECOMPUTATION"
+    OPPORTUNITY_RECOMPUTATION = "OPPORTUNITY_RECOMPUTATION"
+    AI_REANALYSIS = "AI_REANALYSIS"
+    NOTIFICATION_DISPATCH = "NOTIFICATION_DISPATCH"
+    SOURCE_HEALTH_CHECK = "SOURCE_HEALTH_CHECK"
+    TENDER_DEADLINE_SCAN = "TENDER_DEADLINE_SCAN"
+
+
+class ScheduledJobStatus(str, Enum):
+    DISABLED = "DISABLED"
+    SCHEDULED = "SCHEDULED"
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    PAUSED = "PAUSED"
+
+
+class SchedulerRunStatus(str, Enum):
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"      # idempotency / lock skip (not an error)
+    PARTIAL = "PARTIAL"      # completed with recoverable errors
+
+
+# ---- Change-detection enums ------------------------------------------ #
+class ChangeType(str, Enum):
+    NEW = "NEW"
+    UPDATED = "UPDATED"
+    UNCHANGED = "UNCHANGED"
+    CLOSED = "CLOSED"
+    REMOVED_FROM_SOURCE = "REMOVED_FROM_SOURCE"
+    REOPENED = "REOPENED"
+    STALE = "STALE"
+    CONTRADICTED = "CONTRADICTED"
+
+
+class ChangeSignificance(str, Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class TrendStatus(str, Enum):
+    RAPIDLY_INCREASING = "RAPIDLY_INCREASING"
+    INCREASING = "INCREASING"
+    STABLE = "STABLE"
+    DECREASING = "DECREASING"
+    RAPIDLY_DECREASING = "RAPIDLY_DECREASING"
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+
+
+# ---- Alerting enums -------------------------------------------------- #
+class AlertType(str, Enum):
+    NEW_HIGH_INTENT_LEAD = "NEW_HIGH_INTENT_LEAD"
+    LEAD_SCORE_INCREASED = "LEAD_SCORE_INCREASED"
+    LEAD_PRIORITY_INCREASED = "LEAD_PRIORITY_INCREASED"
+    HIRING_SURGE = "HIRING_SURGE"
+    NEW_PROJECT = "NEW_PROJECT"
+    NEW_TENDER = "NEW_TENDER"
+    TENDER_CLOSING_SOON = "TENDER_CLOSING_SOON"
+    NEW_TECHNOLOGY_SIGNAL = "NEW_TECHNOLOGY_SIGNAL"
+    NEW_DECISION_MAKER = "NEW_DECISION_MAKER"
+    CONTACT_VERIFIED = "CONTACT_VERIFIED"
+    EVIDENCE_CONFLICT = "EVIDENCE_CONFLICT"
+    EVIDENCE_STALE = "EVIDENCE_STALE"
+    SOURCE_FAILURE = "SOURCE_FAILURE"
+    SOURCE_RECOVERED = "SOURCE_RECOVERED"
+
+
+class AlertSeverity(str, Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class AlertStatus(str, Enum):
+    NEW = "NEW"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    DISMISSED = "DISMISSED"
+    RESOLVED = "RESOLVED"
+
+
+class SourceHealthEventType(str, Enum):
+    SOURCE_CONNECTED = "SOURCE_CONNECTED"
+    SOURCE_FAILED = "SOURCE_FAILED"
+    SOURCE_RATE_LIMITED = "SOURCE_RATE_LIMITED"
+    SOURCE_AUTH_FAILED = "SOURCE_AUTH_FAILED"
+    SOURCE_RECOVERED = "SOURCE_RECOVERED"
+    SOURCE_SCHEMA_CHANGED = "SOURCE_SCHEMA_CHANGED"
+
+
+# ---- Scheduler models ------------------------------------------------ #
+class ScheduledJob(Base):
+    """Configuration + live state for one recurring monitoring job.
+
+    Schedules are interval-based (``interval_seconds``) and fully configurable;
+    business logic never hard-codes cadence. ``next_run_at``/``last_*`` reflect
+    REAL executions only — no fabricated timestamps are ever written here.
+    """
+
+    __tablename__ = "scheduled_jobs"
+    __table_args__ = (UniqueConstraint("job_name", name="uq_scheduled_job_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    job_type: Mapped[JobType] = mapped_column(SAEnum(JobType, native_enum=False, length=32), index=True)
+    enabled: Mapped[bool] = mapped_column(default=True, index=True)
+    interval_seconds: Mapped[int] = mapped_column(Integer, default=86400)
+    schedule: Mapped[str | None] = mapped_column(String(64), nullable=True)   # human label, e.g. "every 6h"
+    timezone: Mapped[str] = mapped_column(String(48), default="Asia/Kolkata")
+    source_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
+    max_retries: Mapped[int] = mapped_column(Integer, default=3)
+    retry_backoff_seconds: Mapped[int] = mapped_column(Integer, default=300)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    current_status: Mapped[ScheduledJobStatus] = mapped_column(
+        SAEnum(ScheduledJobStatus, native_enum=False, length=16),
+        default=ScheduledJobStatus.SCHEDULED, index=True,
+    )
+    last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), default=utcnow, onupdate=utcnow
+    )
+
+
+class SchedulerRun(Base):
+    """Per-execution audit of a scheduled job (§41). All counters are actual
+    values produced by the run; a failed run records the error, never silence."""
+
+    __tablename__ = "scheduler_runs"
+    __table_args__ = (UniqueConstraint("run_key", name="uq_scheduler_run_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("scheduled_jobs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    job_name: Mapped[str] = mapped_column(String(128), index=True)
+    job_type: Mapped[JobType] = mapped_column(SAEnum(JobType, native_enum=False, length=32), index=True)
+    source_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    run_key: Mapped[str] = mapped_column(String(128), index=True)   # idempotency guard
+    trigger: Mapped[str] = mapped_column(String(16), default="SCHEDULE")   # SCHEDULE | MANUAL
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[SchedulerRunStatus] = mapped_column(
+        SAEnum(SchedulerRunStatus, native_enum=False, length=16),
+        default=SchedulerRunStatus.RUNNING, index=True,
+    )
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    records_fetched: Mapped[int] = mapped_column(Integer, default=0)
+    records_new: Mapped[int] = mapped_column(Integer, default=0)
+    records_changed: Mapped[int] = mapped_column(Integer, default=0)
+    records_unchanged: Mapped[int] = mapped_column(Integer, default=0)
+    records_removed: Mapped[int] = mapped_column(Integer, default=0)
+    signals_changed: Mapped[int] = mapped_column(Integer, default=0)
+    opportunities_changed: Mapped[int] = mapped_column(Integer, default=0)
+    leads_changed: Mapped[int] = mapped_column(Integer, default=0)
+    alerts_generated: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    notes: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+# ---- Change-event models --------------------------------------------- #
+class JobChangeEvent(Base):
+    """A detected change to a canonical job (§7). ``REMOVED_FROM_SOURCE`` never
+    implies closure — only explicit source status yields ``CLOSED``."""
+
+    __tablename__ = "job_change_events"
+    __table_args__ = (UniqueConstraint("dedup_key", name="uq_job_change_dedup"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    canonical_job_id: Mapped[int] = mapped_column(Integer, index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    company_normalized_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    change_type: Mapped[ChangeType] = mapped_column(
+        SAEnum(ChangeType, native_enum=False, length=24), index=True
+    )
+    field_name: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    old_value: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    new_value: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    significance: Mapped[ChangeSignificance] = mapped_column(
+        SAEnum(ChangeSignificance, native_enum=False, length=16),
+        default=ChangeSignificance.LOW, index=True,
+    )
+    detected_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    source_reference_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    evidence_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    scheduler_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    dedup_key: Mapped[str] = mapped_column(String(160), index=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class CompanyChangeEvent(Base):
+    """A meaningful company-level change (§9): hiring up/down, new tech/city,
+    project/tender signal, expansion, verified leadership/decision-maker change."""
+
+    __tablename__ = "company_change_events"
+    __table_args__ = (UniqueConstraint("dedup_key", name="uq_company_change_dedup"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("companies.id", ondelete="CASCADE"), index=True
+    )
+    change_type: Mapped[str] = mapped_column(String(48), index=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    old_state: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    new_state: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    evidence_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    significance: Mapped[ChangeSignificance] = mapped_column(
+        SAEnum(ChangeSignificance, native_enum=False, length=16),
+        default=ChangeSignificance.LOW, index=True,
+    )
+    detected_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    scheduler_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    dedup_key: Mapped[str] = mapped_column(String(160), index=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class LeadChangeEvent(Base):
+    """A detected lead-level change (§10): score/priority movement, evidence
+    strengthened/weakened, new signal, conflict, contact verified/stale,
+    outreach-ready. Supports future sales-activity tracking."""
+
+    __tablename__ = "lead_change_events"
+    __table_args__ = (UniqueConstraint("dedup_key", name="uq_lead_change_dedup"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lead_id: Mapped[int] = mapped_column(Integer, index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    change_type: Mapped[str] = mapped_column(String(48), index=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    old_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    new_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    significance: Mapped[ChangeSignificance] = mapped_column(
+        SAEnum(ChangeSignificance, native_enum=False, length=16),
+        default=ChangeSignificance.LOW, index=True,
+    )
+    detected_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    scheduler_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    dedup_key: Mapped[str] = mapped_column(String(160), index=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class OpportunityChangeEvent(Base):
+    """A material opportunity change (§11). Recalculation alone is NOT a change —
+    only a materially different resulting state produces a row."""
+
+    __tablename__ = "opportunity_change_events"
+    __table_args__ = (UniqueConstraint("dedup_key", name="uq_opportunity_change_dedup"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    opportunity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    change_type: Mapped[str] = mapped_column(String(48), index=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    old_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    new_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    significance: Mapped[ChangeSignificance] = mapped_column(
+        SAEnum(ChangeSignificance, native_enum=False, length=16),
+        default=ChangeSignificance.LOW, index=True,
+    )
+    detected_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    scheduler_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    dedup_key: Mapped[str] = mapped_column(String(160), index=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SourceHealthEvent(Base):
+    """A source-health transition (§19/20). These are operational events and
+    NEVER produce business leads. Recovery/failure is emitted once per transition
+    (deduped), not on every refresh."""
+
+    __tablename__ = "source_health_events"
+    __table_args__ = (UniqueConstraint("dedup_key", name="uq_source_health_event_dedup"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(64), index=True)
+    event_type: Mapped[SourceHealthEventType] = mapped_column(
+        SAEnum(SourceHealthEventType, native_enum=False, length=32), index=True
+    )
+    previous_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    new_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    message: Mapped[str | None] = mapped_column(String(512), nullable=True)   # credential-free
+    detected_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    scheduler_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    dedup_key: Mapped[str] = mapped_column(String(160), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+# ---- Alerting models ------------------------------------------------- #
+class Alert(Base):
+    """An in-app notification derived from a REAL change/event (§26). Business
+    alerts require REAL provenance and supporting evidence; source-health alerts
+    are operational. ``deduplication_key`` suppresses repeat alerts for the same
+    unchanged condition within a window."""
+
+    __tablename__ = "alerts"
+    __table_args__ = (UniqueConstraint("deduplication_key", name="uq_alert_dedup"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    alert_type: Mapped[AlertType] = mapped_column(
+        SAEnum(AlertType, native_enum=False, length=32), index=True
+    )
+    severity: Mapped[AlertSeverity] = mapped_column(
+        SAEnum(AlertSeverity, native_enum=False, length=16), default=AlertSeverity.LOW, index=True
+    )
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    opportunity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    signal_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tender_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    link: Mapped[str | None] = mapped_column(String(255), nullable=True)   # in-app route, e.g. /leads/12
+    status: Mapped[AlertStatus] = mapped_column(
+        SAEnum(AlertStatus, native_enum=False, length=16), default=AlertStatus.NEW, index=True
+    )
+    channel: Mapped[str] = mapped_column(String(16), default="IN_APP")
+    deduplication_key: Mapped[str] = mapped_column(String(200), index=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    triggered_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class NotificationPreference(Base):
+    """User alert preferences (§32). Single-user app => one row (scope='DEFAULT').
+    Defaults are conservative to avoid notification noise: only high-value alert
+    types are on, and score-increase alerts require a meaningful delta."""
+
+    __tablename__ = "notification_preferences"
+    __table_args__ = (UniqueConstraint("scope", name="uq_notification_pref_scope"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    scope: Mapped[str] = mapped_column(String(48), default="DEFAULT", index=True)
+    hot_leads_only: Mapped[bool] = mapped_column(default=False)
+    min_score_increase: Mapped[int] = mapped_column(Integer, default=10)
+    enabled_alert_types: Mapped[list[str]] = mapped_column(JSON, default=list)
+    min_severity: Mapped[AlertSeverity] = mapped_column(
+        SAEnum(AlertSeverity, native_enum=False, length=16), default=AlertSeverity.LOW
+    )
+    channels: Mapped[list[str]] = mapped_column(JSON, default=list)   # e.g. ["IN_APP"]
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

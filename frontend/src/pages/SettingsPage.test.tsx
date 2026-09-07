@@ -34,6 +34,27 @@ vi.mock('@/services/ai', async (importOriginal) => {
 import { fetchAIStatus } from '@/services/ai';
 const fetchAIStatusMock = vi.mocked(fetchAIStatus);
 
+// Notification preferences. Keep the real display helpers; stub the fetcher with
+// a conservative server default so the new Notifications section renders.
+vi.mock('@/services/alerts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/alerts')>();
+  return {
+    ...actual,
+    fetchPreferences: vi.fn(),
+    updatePreferences: vi.fn(),
+  };
+});
+import { fetchPreferences } from '@/services/alerts';
+const fetchPreferencesMock = vi.mocked(fetchPreferences);
+
+const PREFERENCES = {
+  hot_leads_only: false,
+  min_score_increase: 5,
+  enabled_alert_types: ['NEW_HIGH_INTENT_LEAD'],
+  min_severity: 'MEDIUM' as const,
+  channels: [],
+};
+
 const HEALTH = {
   status: 'healthy',
   app: 'LeadGenerationAgent',
@@ -147,6 +168,8 @@ beforeEach(() => {
     deterministic_baseline_available: true,
     note: 'No LLM configured; using deterministic baseline.',
   });
+  fetchPreferencesMock.mockReset();
+  fetchPreferencesMock.mockResolvedValue(PREFERENCES);
   localStorage.clear();
 });
 afterEach(() => {
@@ -191,6 +214,17 @@ describe('SettingsPage', () => {
     // Data mode badge from the list response.
     expect(screen.getByText('Data mode: REAL_ONLY')).toBeInTheDocument();
     expect(fetchSourcesMock).toHaveBeenCalled();
+  });
+
+  it('renders the Notifications section from /notification-preferences', async () => {
+    getHealthMock.mockResolvedValue(HEALTH);
+    renderWithProviders(<SettingsPage />, { route: '/settings' });
+
+    expect(await screen.findByText('Notifications')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Minimum severity')).toBeInTheDocument();
+    // A humanized alert-type checkbox renders from the real display helper.
+    expect(screen.getByText('New high-intent lead')).toBeInTheDocument();
+    expect(fetchPreferencesMock).toHaveBeenCalled();
   });
 
   it('renders the AI provider status from /ai/status', async () => {

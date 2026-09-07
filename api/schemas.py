@@ -835,3 +835,177 @@ class AIStatusResponse(BaseModel):
     status: str = "NOT_CONFIGURED"
     deterministic_baseline_available: bool = True
     note: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Monitoring & scheduling (Prompt 38)
+# ---------------------------------------------------------------------------
+def _enum_value(v):
+    return v.value if hasattr(v, "value") else v
+
+
+class ScheduledJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    job_name: str
+    job_type: str
+    enabled: bool
+    interval_seconds: int
+    schedule: Optional[str] = None
+    timezone: str = "Asia/Kolkata"
+    source_id: Optional[str] = None
+    current_status: str
+    consecutive_failures: int = 0
+    max_retries: int = 3
+    last_run_at: Optional[datetime] = None
+    last_success_at: Optional[datetime] = None
+    last_failure_at: Optional[datetime] = None
+    next_run_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+
+    @field_validator("job_type", "current_status", mode="before")
+    @classmethod
+    def _ev(cls, v):
+        return _enum_value(v)
+
+
+class ScheduledJobListResponse(BaseModel):
+    items: list[ScheduledJobResponse]
+    total: int
+    scheduler_enabled: bool = False
+
+
+class SchedulerRunResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    job_name: str
+    job_type: str
+    source_id: Optional[str] = None
+    trigger: str = "SCHEDULE"
+    status: str
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    duration_seconds: Optional[float] = None
+    retry_count: int = 0
+    records_fetched: int = 0
+    records_new: int = 0
+    records_changed: int = 0
+    records_unchanged: int = 0
+    records_removed: int = 0
+    signals_changed: int = 0
+    opportunities_changed: int = 0
+    leads_changed: int = 0
+    alerts_generated: int = 0
+    error: Optional[str] = None
+
+    @field_validator("job_type", "status", mode="before")
+    @classmethod
+    def _ev(cls, v):
+        return _enum_value(v)
+
+
+class SchedulerRunListResponse(BaseModel):
+    items: list[SchedulerRunResponse]
+    total: int
+
+
+class AlertResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    alert_type: str
+    severity: str
+    status: str
+    title: str
+    message: Optional[str] = None
+    company_id: Optional[int] = None
+    lead_id: Optional[int] = None
+    opportunity_id: Optional[int] = None
+    signal_id: Optional[int] = None
+    tender_id: Optional[int] = None
+    source_id: Optional[str] = None
+    evidence_ids: list[int] = Field(default_factory=list)
+    link: Optional[str] = None
+    triggered_at: datetime
+    acknowledged_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+
+    @field_validator("alert_type", "severity", "status", mode="before")
+    @classmethod
+    def _ev(cls, v):
+        return _enum_value(v)
+
+
+class AlertListResponse(BaseModel):
+    items: list[AlertResponse]
+    total: int
+    unread_count: int = 0
+
+
+class AlertStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: str
+
+
+class NotificationPreferenceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    hot_leads_only: bool = False
+    min_score_increase: int = 10
+    enabled_alert_types: list[str] = Field(default_factory=list)
+    min_severity: str = "LOW"
+    channels: list[str] = Field(default_factory=list)
+
+    @field_validator("min_severity", mode="before")
+    @classmethod
+    def _ev(cls, v):
+        return _enum_value(v)
+
+
+class NotificationPreferenceUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hot_leads_only: Optional[bool] = None
+    min_score_increase: Optional[int] = None
+    enabled_alert_types: Optional[list[str]] = None
+    min_severity: Optional[str] = None
+    channels: Optional[list[str]] = None
+
+
+class MonitoringPipelineMetrics(BaseModel):
+    raw_records: int = 0
+    canonical_jobs: int = 0
+    companies: int = 0
+    signals: int = 0
+    opportunities: int = 0
+    leads: int = 0
+    tenders: int = 0
+
+
+class MonitoringSourceMetric(BaseModel):
+    source_id: str
+    connection_status: str = "NOT_CONFIGURED"
+    last_success_at: Optional[datetime] = None
+    last_failure_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    last_run_at: Optional[datetime] = None
+    records_fetched: int = 0
+
+
+class MonitoringChangeSummary(BaseModel):
+    change_type: str
+    count: int
+
+
+class MonitoringDashboardResponse(BaseModel):
+    generated_at: datetime
+    scheduler_enabled: bool = False
+    data_mode: str = "REAL_ONLY"
+    pipeline: MonitoringPipelineMetrics
+    sources: list[MonitoringSourceMetric] = Field(default_factory=list)
+    jobs: list[ScheduledJobResponse] = Field(default_factory=list)
+    recent_runs: list[SchedulerRunResponse] = Field(default_factory=list)
+    recent_alerts: list[AlertResponse] = Field(default_factory=list)
+    unread_alerts: int = 0
+    job_change_summary: list[MonitoringChangeSummary] = Field(default_factory=list)
