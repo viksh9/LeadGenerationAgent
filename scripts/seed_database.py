@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 
 from api.schemas import LeadAnalyzeRequest  # noqa: E402
 from config import get_settings  # noqa: E402
-from database.models import Lead  # noqa: E402
+from database.models import DataProvenance, Lead  # noqa: E402
 from database.session import create_session_factory, get_engine, init_db  # noqa: E402
 from intelligence.lead_pipeline import LeadAnalysisPipeline  # noqa: E402
 
@@ -136,7 +136,9 @@ def seed(
             continue
 
         try:
-            result = pipeline.analyze(payload, session=session, persist=True)
+            result = pipeline.analyze(
+                payload, session=session, persist=True, provenance=DataProvenance.SYNTHETIC
+            )
         except Exception as exc:  # noqa: BLE001 - report per-record, don't abort the run
             summary.failed += 1
             summary.errors.append(f"{company}: analysis failed ({exc})")

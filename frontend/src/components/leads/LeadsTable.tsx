@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ChevronsUpDown, Trash2 } from 'lucide-react';
 import { Table, Td } from '@/components/ui/Table';
-import { Badge, PriorityBadge } from '@/components/ui/Badge';
+import { Badge, HiringIntensityBadge, PriorityBadge, ProvenanceBadge } from '@/components/ui/Badge';
 import { ScoreIndicator } from '@/components/common/ScoreIndicator';
 import { LeadStatusSelect } from '@/components/leads/LeadStatusSelect';
 import { humanizeSignal } from '@/constants/leads';
@@ -91,14 +91,15 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
       <thead>
         <tr>
           <SortHeader column="company_name" label="Company" params={params} onSort={onSort} />
-          <Th>Industry</Th>
+          <Th>IT openings</Th>
+          <Th>Intensity</Th>
           <Th>Signal</Th>
-          <Th>Opportunity</Th>
-          <Th>Technologies</Th>
+          <Th>Top technologies</Th>
+          <Th>Target</Th>
+          <Th>Sources</Th>
           <SortHeader column="lead_score" label="Score" params={params} onSort={onSort} />
           <Th>Priority</Th>
           <Th>Status</Th>
-          <SortHeader column="signal_date" label="Signal date" params={params} onSort={onSort} />
           <Th>Action</Th>
         </tr>
       </thead>
@@ -110,30 +111,49 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
             onClick={() => openLead(lead.id)}
           >
             <Td>
-              <span className="font-medium text-slate-900 dark:text-slate-100">{lead.company_name}</span>
+              <span className="flex items-center gap-2">
+                <span className="font-medium text-slate-900 dark:text-slate-100">{lead.company_name}</span>
+                <ProvenanceBadge provenance={lead.data_provenance} />
+              </span>
               {lead.location && <span className="block text-xs text-slate-400 dark:text-slate-500">{lead.location}</span>}
             </Td>
-            <Td>{lead.industry ?? '—'}</Td>
+            <Td>
+              <span className="font-medium text-slate-900 dark:text-slate-100">{lead.it_job_count}</span>
+              {lead.recent_job_count > 0 && (
+                <span className="block text-xs text-emerald-600 dark:text-emerald-400">
+                  {lead.recent_job_count} recent
+                </span>
+              )}
+            </Td>
+            <Td>
+              <HiringIntensityBadge intensity={lead.hiring_intensity} />
+            </Td>
             <Td>
               {lead.signal_type ? (
                 <Badge className="whitespace-nowrap">
-                  <span title={lead.signal_title ?? undefined}>{humanizeSignal(lead.signal_type)}</span>
+                  <span title={lead.opportunity_summary ?? lead.signal_title ?? undefined}>
+                    {humanizeSignal(lead.signal_type)}
+                  </span>
                 </Badge>
               ) : (
                 '—'
               )}
             </Td>
             <Td>
-              {lead.opportunity_summary ? (
-                <span className="block max-w-[16rem] truncate text-slate-700 dark:text-slate-300" title={lead.opportunity_summary}>
-                  {lead.opportunity_summary}
-                </span>
-              ) : (
-                <span className="text-slate-400 dark:text-slate-500">—</span>
-              )}
+              <TechList technologies={lead.technologies} />
             </Td>
             <Td>
-              <TechList technologies={lead.technologies} />
+              <span className="whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
+                {lead.primary_target_role ?? '—'}
+              </span>
+            </Td>
+            <Td>
+              <span
+                className="text-slate-700 dark:text-slate-300"
+                title={lead.last_signal_date ? `Last signal: ${formatDate(lead.last_signal_date)}` : undefined}
+              >
+                {lead.source_count}
+              </span>
             </Td>
             <Td>
               <ScoreIndicator score={lead.lead_score} />
@@ -143,9 +163,6 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
             </Td>
             <Td>
               <LeadStatusSelect leadId={lead.id} status={lead.status} company={lead.company_name} />
-            </Td>
-            <Td>
-              <span className="whitespace-nowrap">{formatDate(lead.signal_date)}</span>
             </Td>
             <Td>
               <div className="flex items-center gap-1">

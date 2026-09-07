@@ -112,6 +112,13 @@ function buildData(items: Lead[], serverTotal: number, range: DateRange): Dashbo
   };
 }
 
+export interface DashboardProvenance {
+  hasReal: boolean;
+  hasSynthetic: boolean;
+  /** True when the only leads shown are synthetic/demo data. */
+  demoOnly: boolean;
+}
+
 export function useDashboard(range: DateRange) {
   const query = useLeads({
     page_size: DASHBOARD_PAGE_SIZE,
@@ -124,8 +131,16 @@ export function useDashboard(range: DateRange) {
     return buildData(query.data.items, query.data.total, range);
   }, [query.data, range]);
 
+  const provenance = useMemo<DashboardProvenance>(() => {
+    const items = query.data?.items ?? [];
+    const hasReal = items.some((l) => l.data_provenance === 'REAL');
+    const hasSynthetic = items.some((l) => l.data_provenance === 'SYNTHETIC');
+    return { hasReal, hasSynthetic, demoOnly: hasSynthetic && !hasReal };
+  }, [query.data]);
+
   return {
     data,
+    provenance,
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,

@@ -29,8 +29,9 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from collectors.raw_record import normalize_company_name
 from config.exceptions import AppError, NotFoundError
-from database.models import LeadPriority, LeadStatus, SignalType, utcnow
+from database.models import DataProvenance, LeadPriority, LeadStatus, SignalType, utcnow
 from database.repository import (
     create_lead,
     create_session_factory,
@@ -218,6 +219,7 @@ class LeadAnalysisPipeline:
         *,
         persist: bool = True,
         existing_id: Optional[int] = None,
+        provenance: DataProvenance = DataProvenance.REAL,
     ) -> LeadAnalysisResult:
         """Run the full pipeline on a raw lead and (optionally) persist it."""
         normalized = self._run("normalization", lambda: normalize_lead(raw_lead))
@@ -245,7 +247,7 @@ class LeadAnalysisPipeline:
 
         if persist:
             lead_id, existed = self._persist_lead(
-                session, normalized, signal, opportunity, score, poc, pitch, existing_id
+                session, normalized, signal, opportunity, score, poc, pitch, existing_id, provenance
             )
             result.lead_id = lead_id
             result.already_existed = existed
@@ -376,6 +378,7 @@ class LeadAnalysisPipeline:
         poc: POCRecommendationResult,
         pitch: PitchGenerationResult,
         existing_id: Optional[int],
+        provenance: DataProvenance = DataProvenance.REAL,
     ) -> tuple[int, bool]:
         own_session = False
         if session is None:
@@ -383,6 +386,8 @@ class LeadAnalysisPipeline:
             own_session = True
         try:
             fields = self._lead_fields(normalized, signal, opportunity, score, poc, pitch)
+            fields["data_provenance"] = provenance
+            fields["normalized_company_name"] = normalize_company_name(normalized.company_name) or None
             target_id = existing_id
             if target_id is None:
                 dup = find_duplicate_lead(

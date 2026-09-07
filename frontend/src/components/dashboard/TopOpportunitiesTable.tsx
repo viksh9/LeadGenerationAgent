@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { Table, Td, Th } from '@/components/ui/Table';
-import { Badge, PriorityBadge } from '@/components/ui/Badge';
+import { Badge, HiringIntensityBadge, PriorityBadge, ProvenanceBadge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/States';
 import { ScoreIndicator } from '@/components/common/ScoreIndicator';
 import type { Lead } from '@/types/lead';
@@ -22,11 +22,13 @@ export function TopOpportunitiesTable({ leads }: { leads: Lead[] }) {
           <thead>
             <tr>
               <Th>Company</Th>
-              <Th>Industry</Th>
-              <Th>Signal</Th>
+              <Th>Location</Th>
+              <Th>IT openings</Th>
+              <Th>Intensity</Th>
+              <Th>Top technologies</Th>
               <Th>Score</Th>
               <Th>Priority</Th>
-              <Th>Potential Opportunity</Th>
+              <Th>Target</Th>
               <Th>Action</Th>
             </tr>
           </thead>
@@ -38,10 +40,31 @@ export function TopOpportunitiesTable({ leads }: { leads: Lead[] }) {
                 onClick={() => navigate(`/leads/${lead.id}`)}
               >
                 <Td>
-                  <span className="font-medium text-slate-900 dark:text-slate-100">{lead.company_name}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{lead.company_name}</span>
+                    <ProvenanceBadge provenance={lead.data_provenance} />
+                  </span>
                 </Td>
-                <Td>{lead.industry ?? '—'}</Td>
-                <Td>{lead.signal_type ? <Badge>{lead.signal_type}</Badge> : '—'}</Td>
+                <Td>{lead.location ?? '—'}</Td>
+                <Td>
+                  <span className="font-medium text-slate-900 dark:text-slate-100">{lead.it_job_count}</span>
+                  {lead.recent_job_count > 0 && (
+                    <span className="block text-xs text-emerald-600 dark:text-emerald-400">
+                      {lead.recent_job_count} recent
+                    </span>
+                  )}
+                </Td>
+                <Td>
+                  <HiringIntensityBadge intensity={lead.hiring_intensity} />
+                </Td>
+                <Td>
+                  <span className="flex flex-wrap gap-1">
+                    {lead.technologies.slice(0, 3).map((t) => (
+                      <Badge key={t}>{t}</Badge>
+                    ))}
+                    {lead.technologies.length === 0 && <span className="text-slate-400">—</span>}
+                  </span>
+                </Td>
                 <Td>
                   <ScoreIndicator score={lead.lead_score} />
                 </Td>
@@ -49,8 +72,8 @@ export function TopOpportunitiesTable({ leads }: { leads: Lead[] }) {
                   <PriorityBadge priority={lead.lead_priority} />
                 </Td>
                 <Td>
-                  <span className="line-clamp-1 max-w-xs text-slate-600 dark:text-slate-300">
-                    {lead.opportunity_summary ?? lead.signal_title ?? '—'}
+                  <span className="whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
+                    {lead.primary_target_role ?? '—'}
                   </span>
                 </Td>
                 <Td>

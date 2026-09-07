@@ -86,6 +86,7 @@ class FetchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: Optional[str] = None
+    location: Optional[str] = None
     since: Optional[datetime] = None
     cursor: Optional[str] = None
     after_external_id: Optional[str] = None
@@ -103,6 +104,9 @@ class CollectorResult(BaseModel):
     next_cursor: Optional[str] = None
     has_more: bool = False
     total_records: Optional[int] = None
+    duration_seconds: Optional[float] = None
+    # Source-specific metadata (e.g. query, country, location) — never credentials.
+    context: dict = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
 
@@ -116,6 +120,7 @@ class HealthStatus(str, Enum):
     DEGRADED = "DEGRADED"
     UNAVAILABLE = "UNAVAILABLE"
     NOT_CONFIGURED = "NOT_CONFIGURED"
+    RESTRICTED = "RESTRICTED"
 
 
 class HealthCheckResult(BaseModel):

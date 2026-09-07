@@ -22,6 +22,18 @@ const iso = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).
 
 function makeLead(partial: Partial<Lead> & Pick<Lead, 'id' | 'company_name'>): Lead {
   return {
+    normalized_company_name: null,
+    company_domain: null,
+    company_type: null,
+    it_job_count: 0,
+    recent_job_count: 0,
+    hiring_intensity: null,
+    primary_target_role: null,
+    company_signals: [],
+    data_provenance: 'REAL',
+    source_count: 0,
+    evidence: [],
+    last_signal_date: null,
     industry: 'IT',
     location: null,
     company_size: null,
@@ -110,7 +122,8 @@ describe('DashboardPage', () => {
 
     const table = (await screen.findByText('Top Opportunities')).closest('div')!.parentElement!;
     expect(within(table).getByText('NorthStar Banking Technologies')).toBeInTheDocument();
-    expect(within(table).getByText('Large-scale ramp-up')).toBeInTheDocument();
+    // Company-level columns are shown (not per-signal opportunity text).
+    expect(within(table).getByText('IT openings')).toBeInTheDocument();
   });
 
   it('renders recent signals', async () => {
@@ -146,7 +159,21 @@ describe('DashboardPage', () => {
   it('shows an empty state when there are no leads', async () => {
     getLeadsMock.mockResolvedValue(listResponse([]));
     renderWithProviders(<DashboardPage />, { route: '/dashboard' });
-    expect(await screen.findByText(/no leads available yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no verified indian it signals available yet/i)).toBeInTheDocument();
+  });
+
+  it('shows a demo-data banner when all leads are synthetic', async () => {
+    const demo = LEADS.map((l) => makeLead({ ...l, data_provenance: 'SYNTHETIC' }));
+    getLeadsMock.mockResolvedValue(listResponse(demo));
+    renderWithProviders(<DashboardPage />, { route: '/dashboard' });
+    expect(await screen.findByText(/demo data — no real sources connected yet/i)).toBeInTheDocument();
+  });
+
+  it('does not show the demo banner for real leads', async () => {
+    getLeadsMock.mockResolvedValue(listResponse(LEADS));
+    renderWithProviders(<DashboardPage />, { route: '/dashboard' });
+    await screen.findByText('Total Leads');
+    expect(screen.queryByText(/demo data/i)).not.toBeInTheDocument();
   });
 
   it('navigates to lead details when a top opportunity is viewed', async () => {

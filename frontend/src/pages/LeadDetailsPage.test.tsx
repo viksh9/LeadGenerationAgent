@@ -18,6 +18,18 @@ const deleteLeadMock = vi.mocked(deleteLead);
 
 function makeLead(p: Partial<Lead> = {}): Lead {
   return {
+    normalized_company_name: null,
+    company_domain: null,
+    company_type: null,
+    it_job_count: 0,
+    recent_job_count: 0,
+    hiring_intensity: null,
+    primary_target_role: null,
+    company_signals: [],
+    data_provenance: 'REAL',
+    source_count: 0,
+    evidence: [],
+    last_signal_date: null,
     id: 1,
     company_name: 'NorthStar Banking Technologies',
     industry: 'BFSI',
