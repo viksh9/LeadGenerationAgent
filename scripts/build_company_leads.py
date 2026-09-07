@@ -26,7 +26,7 @@ if str(ROOT) not in sys.path:
 from config import get_settings  # noqa: E402
 from database.models import DataProvenance  # noqa: E402
 from database.session import create_session_factory, get_engine, init_db  # noqa: E402
-from intelligence.company_pipeline import rebuild_company_leads  # noqa: E402
+from ingestion.job_pipeline import run_company_pipeline  # noqa: E402
 
 logger = logging.getLogger("build_company_leads")
 
@@ -42,15 +42,17 @@ def main(argv: list[str] | None = None) -> int:
     engine = get_engine(settings.database_url)
     init_db(engine)
     with create_session_factory(engine)() as session:
-        summary = rebuild_company_leads(session, provenance=provenance)
+        result = run_company_pipeline(session, provenance=provenance)
 
-    print(f"Company aggregation ({summary.provenance}):")
-    print(f"  raw job records: {summary.jobs}")
-    print(f"  companies -> leads: {summary.companies} (created {summary.created}, updated {summary.updated})")
-    if summary.jobs == 0:
+    dedup, companies = result.dedup, result.companies
+    print(f"Company pipeline ({companies.provenance}): raw -> canonical jobs -> company leads")
+    print(f"  raw jobs normalized: {dedup.input_jobs}")
+    print(f"  canonical job records: {dedup.canonical_created} (duplicates folded: {dedup.duplicates})")
+    print(f"  companies -> leads: {companies.companies} (created {companies.created}, updated {companies.updated})")
+    if dedup.input_jobs == 0:
         print("  No real job data collected yet — no company leads created (honest empty state).")
-    if summary.errors:
-        print(f"  errors: {len(summary.errors)}")
+    if companies.errors:
+        print(f"  errors: {len(companies.errors)}")
     return 0
 
 

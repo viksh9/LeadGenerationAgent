@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from collectors.base import BaseCollector, FetchRequest
 from collectors.raw_record import RawRecordDraft
-from database.models import utcnow
+from database.models import CollectionRun, CollectionRunStatus, utcnow
 from database.raw_repository import create_raw_record_from_draft, find_by_content_hash, find_by_external_id
 
 logger = logging.getLogger("collectors")
@@ -31,6 +31,7 @@ class CollectionSummary:
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
+    run_id: int | None = None
 
 
 class JobCollectionService:
@@ -52,8 +53,15 @@ class JobCollectionService:
         requests: Iterable[FetchRequest],
         *,
         dry_run: bool = False,
+        record_run: bool = True,
     ) -> CollectionSummary:
         summary = CollectionSummary(source_id=collector.source_id)
+        run: CollectionRun | None = None
+        if record_run and not dry_run:
+            run = CollectionRun(source_id=collector.source_id, status=CollectionRunStatus.RUNNING)
+            self.session.add(run)
+            self.session.commit()
+            summary.run_id = run.id
         for request in requests:
             summary.requests += 1
             try:
@@ -82,8 +90,19 @@ class JobCollectionService:
                     self.session.commit()
                 summary.accepted += 1
 
+        if run is not None:
+            run.completed_at = utcnow()
+            run.duration_seconds = summary.duration_seconds
+            run.pages = summary.requests
+            run.records_fetched = summary.fetched
+            run.records_created = summary.accepted
+            run.duplicates = summary.skipped_duplicates
+            run.errors = len(summary.errors)
+            run.status = CollectionRunStatus.FAILED if summary.errors and summary.accepted == 0 else CollectionRunStatus.COMPLETED
+            self.session.commit()
+
         logger.info(
-            "collection_completed source_id=%s requests=%s fetched=%s accepted=%s duplicates=%s",
-            collector.source_id, summary.requests, summary.fetched, summary.accepted, summary.skipped_duplicates,
+            "collection_completed source_id=%s run_id=%s requests=%s fetched=%s accepted=%s duplicates=%s",
+            collector.source_id, summary.run_id, summary.requests, summary.fetched, summary.accepted, summary.skipped_duplicates,
         )
         return summary

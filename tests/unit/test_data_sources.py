@@ -78,9 +78,10 @@ def test_source_definition_validation():
 def test_source_registry_loads_no_source_is_connected():
     registry = get_registry()
     assert len(registry) >= 5
-    # Nothing is CONNECTED (no live-verified source); Adzuna is AVAILABLE (built).
+    # Nothing is CONNECTED (no live-verified source). Adzuna is NOT_CONFIGURED
+    # (collector built, but no credentials configured).
     assert all(s.status != SourceStatus.CONNECTED for s in registry.all())
-    assert registry.get("adzuna").status == SourceStatus.AVAILABLE
+    assert registry.get("adzuna").status == SourceStatus.NOT_CONFIGURED
     assert registry.get("does-not-exist") is None
 
 

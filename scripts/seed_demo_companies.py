@@ -26,14 +26,20 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sqlalchemy import delete  # noqa: E402
+from sqlalchemy import delete, select  # noqa: E402
 
 from collectors.raw_record import RawRecordDraft  # noqa: E402
 from config import get_settings  # noqa: E402
-from database.models import DataProvenance, Lead, RawSourceRecord  # noqa: E402
+from database.models import (  # noqa: E402
+    DataProvenance,
+    JobRecord,
+    JobSourceReference,
+    Lead,
+    RawSourceRecord,
+)
 from database.raw_repository import create_raw_record_from_draft  # noqa: E402
 from database.session import create_session_factory, get_engine, init_db  # noqa: E402
-from intelligence.company_pipeline import rebuild_company_leads  # noqa: E402
+from ingestion.job_pipeline import run_company_pipeline  # noqa: E402
 
 logger = logging.getLogger("seed_demo")
 
@@ -45,7 +51,7 @@ SAFE_ENVIRONMENTS = {"development", "test", "local"}
 def _drafts(path: Path, now: datetime) -> list[RawRecordDraft]:
     data = json.loads(path.read_text(encoding="utf-8"))
     drafts: list[RawRecordDraft] = []
-    for company in data.get("companies", []):
+    for c_idx, company in enumerate(data.get("companies", [])):
         name = company["company_name"]
         domain = company.get("company_domain")
         city = company.get("city")
@@ -59,7 +65,8 @@ def _drafts(path: Path, now: datetime) -> list[RawRecordDraft]:
             sources = role.get("sources", ["demo_jobs"])
             for count_i in range(role.get("count", 1)):
                 for source_id in sources:
-                    ext = f"{source_id}-{r_idx}-{count_i}"
+                    # Globally-unique-per-source external id (company, role, req).
+                    ext = f"{source_id}-c{c_idx}-r{r_idx}-{count_i}"
                     drafts.append(RawRecordDraft(
                         source_id=source_id,
                         external_id=ext,
@@ -85,6 +92,13 @@ def _reset(session) -> None:
             Lead.data_provenance == DataProvenance.SYNTHETIC, Lead.it_job_count > 0
         )
     )
+    # Clear canonical job records + references for the demo sources.
+    ref_ids = session.execute(
+        select(JobSourceReference.job_record_id).where(JobSourceReference.source_id.in_(DEMO_SOURCES))
+    ).scalars().all()
+    if ref_ids:
+        session.execute(delete(JobRecord).where(JobRecord.id.in_(ref_ids)))
+    session.execute(delete(JobRecord).where(JobRecord.data_provenance == DataProvenance.SYNTHETIC))
     session.commit()
 
 
@@ -115,13 +129,15 @@ def main(argv: list[str] | None = None) -> int:
         for draft in drafts:
             create_raw_record_from_draft(session, draft)
         session.commit()
-        summary = rebuild_company_leads(session, provenance=DataProvenance.SYNTHETIC, now=now)
+        result = run_company_pipeline(session, provenance=DataProvenance.SYNTHETIC, now=now)
 
     print("Synthetic company demo seeded (data_provenance = SYNTHETIC).")
     print(f"  raw job records inserted: {len(drafts)}")
-    print(f"  companies -> leads: {summary.companies} (created {summary.created}, updated {summary.updated})")
-    if summary.errors:
-        print(f"  errors: {len(summary.errors)}")
+    print(f"  canonical job records: {result.dedup.canonical_created} (duplicates folded: {result.dedup.duplicates})")
+    print(f"  companies -> leads: {result.companies.companies} "
+          f"(created {result.companies.created}, updated {result.companies.updated})")
+    if result.companies.errors:
+        print(f"  errors: {len(result.companies.errors)}")
     return 0
 
 

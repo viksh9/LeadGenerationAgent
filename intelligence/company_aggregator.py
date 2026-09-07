@@ -64,6 +64,12 @@ class JobInput:
     source_url: Optional[str] = None
     published_at: Optional[datetime] = None
     is_synthetic: bool = False
+    # Every source that observed this posting (for company-level source_count).
+    all_sources: list[str] = field(default_factory=list)
+
+    @property
+    def sources(self) -> list[str]:
+        return self.all_sources or [self.source_id]
 
     @classmethod
     def from_raw_record(cls, rec) -> "JobInput":
@@ -85,6 +91,31 @@ class JobInput:
             source_url=rec.source_url,
             published_at=_to_naive_utc(rec.published_at),
             is_synthetic=bool(rec.is_synthetic),
+            all_sources=[rec.source_id],
+        )
+
+    @classmethod
+    def from_job_record(cls, jr) -> "JobInput":
+        """Build from a canonical JobRecord (post-dedup). Carries every source."""
+        text = " ".join(p for p in (jr.original_job_title, jr.description) if p)
+        sources = [ref.source_id for ref in jr.source_references] or [jr.primary_source or "unknown"]
+        return cls(
+            source_id=jr.primary_source or (sources[0] if sources else "unknown"),
+            title=jr.original_job_title,
+            description=jr.description,
+            company_name=jr.company_name,
+            company_domain=jr.company_domain,
+            location=jr.original_location,
+            city=jr.city,
+            industry=jr.job_category,
+            technologies=list(jr.technologies) if jr.technologies else extract_technologies(text),
+            roles=list(jr.skills) if jr.skills else extract_roles(text),
+            contract_type=jr.employment_type,
+            external_id=str(jr.id),
+            source_url=None,
+            published_at=_to_naive_utc(jr.published_at),
+            is_synthetic=(getattr(jr.data_provenance, "value", jr.data_provenance) == "SYNTHETIC"),
+            all_sources=list(dict.fromkeys(sources)),
         )
 
 
@@ -267,7 +298,7 @@ def aggregate_companies(
             seen_units[norm] = set()
             content_source[norm] = {}
 
-        agg.sources.add(job.source_id)
+        agg.sources.update(job.sources)
 
         # Same exact posting re-seen (same source + id) → ignore, record evidence.
         unit = _unit_key(job)
