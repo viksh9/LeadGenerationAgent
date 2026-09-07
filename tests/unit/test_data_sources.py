@@ -75,11 +75,12 @@ def test_source_definition_validation():
         SourceDefinition(source_id="y", name="Y", category="NOPE", source_type=SourceType.API)
 
 
-def test_source_registry_loads_and_all_planned():
+def test_source_registry_loads_no_source_is_connected():
     registry = get_registry()
     assert len(registry) >= 5
-    assert all(s.status == SourceStatus.PLANNED for s in registry.all())
-    assert registry.get("adzuna") is not None
+    # Nothing is CONNECTED (no live-verified source); Adzuna is AVAILABLE (built).
+    assert all(s.status != SourceStatus.CONNECTED for s in registry.all())
+    assert registry.get("adzuna").status == SourceStatus.AVAILABLE
     assert registry.get("does-not-exist") is None
 
 
@@ -88,7 +89,7 @@ def test_source_registry_filters():
     jobs = registry.list(category=SourceCategory.JOB)
     assert all(s.category == SourceCategory.JOB for s in jobs)
     planned = registry.list(status=SourceStatus.PLANNED)
-    assert len(planned) == len(registry)
+    assert 0 < len(planned) < len(registry)  # most planned, Adzuna available
 
 
 def test_registry_rejects_duplicate_ids():

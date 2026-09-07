@@ -16,7 +16,7 @@ export interface DataSourceInfo {
 }
 
 export const PLANNED_DATA_SOURCES: DataSourceInfo[] = [
-  { id: 'adzuna', name: 'Adzuna Jobs API', category: 'Job', status: 'Planned' },
+  { id: 'adzuna', name: 'Adzuna Jobs API', category: 'Job', status: 'Available' },
   { id: 'company_career_pages', name: 'Company Career Pages', category: 'Company', status: 'Planned' },
   { id: 'government_open_data', name: 'Government Open Data / Tenders', category: 'Government', status: 'Planned' },
   { id: 'rss_news', name: 'RSS / Business & Technology News', category: 'News', status: 'Planned' },

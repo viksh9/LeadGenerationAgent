@@ -12,7 +12,7 @@ sources:
     category: JOB
     source_type: THIRD_PARTY_API
     base_url: https://api.adzuna.com/v1/api
-    status: PLANNED
+    status: AVAILABLE
     enabled: false
     requires_api_key: true
     rate_limit: { requests_per_minute: 25, requests_per_day: 1000 }
@@ -28,7 +28,10 @@ sources:
       api_terms_reviewed: false
       commercial_use_status: REQUIRES_APPROVAL
       data_retention_notes: Review API terms for retention/attribution before enabling.
-    notes: Public jobs aggregator API; candidate for the first real IT job collector.
+    notes: >-
+      Public jobs aggregator API. Collector implemented (collectors/adzuna.py) and
+      unit-tested offline; AVAILABLE once SOURCE_ADZUNA_APP_ID / SOURCE_ADZUNA_API_KEY
+      are set. Not marked CONNECTED until verified against the live API.
 
   - source_id: company_career_pages
     name: Company Career Pages
