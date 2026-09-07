@@ -18,6 +18,7 @@ from api.errors import register_exception_handlers
 from api.routes import companies, health, leads, sources
 from api.schemas import ErrorBody
 from config import configure_logging, get_settings
+from config.dotenv import load_dotenv
 from database.repository import init_db
 
 settings = get_settings()
@@ -29,6 +30,11 @@ __all__ = ["app", "get_session"]
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Load .env into the environment so source configs (Adzuna/Jooble) that read
+    # os.environ directly pick up credentials when the server actually runs.
+    # Done in startup (not at import) so importing the app in tests never loads
+    # real credentials or triggers network-capable code paths. Secrets never logged.
+    load_dotenv()
     logger.info("startup app=%s env=%s version=%s", settings.app_name, settings.environment, settings.version)
     init_db()
     yield

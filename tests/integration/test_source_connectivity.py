@@ -118,7 +118,10 @@ def test_sources_status_alias(client):
     assert client.get("/sources/status").status_code == 200
 
 
-def test_check_endpoint_not_configured_no_network(client):
+def test_check_endpoint_not_configured_no_network(client, monkeypatch):
+    # Ensure no ambient credentials so the check reports config state without network.
+    for var in ("ADZUNA_APP_ID", "ADZUNA_APP_KEY"):
+        monkeypatch.delenv(var, raising=False)
     body = client.post("/sources/adzuna/check").json()
     assert body["connection_status"] == "NOT_CONFIGURED"
     assert body["performed_request"] is False

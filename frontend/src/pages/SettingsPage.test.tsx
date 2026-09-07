@@ -49,6 +49,9 @@ const SOURCES = {
       last_success_at: '2026-09-05T10:00:00Z',
       last_failure_at: null,
       last_error: null,
+      last_ingestion_at: '2026-09-05T09:30:00Z',
+      last_ingestion_records_fetched: 120,
+      last_ingestion_records_persisted: 45,
     },
     {
       source_id: 'rss_news',
@@ -74,6 +77,9 @@ const SOURCES = {
       last_success_at: null,
       last_failure_at: null,
       last_error: null,
+      last_ingestion_at: null,
+      last_ingestion_records_fetched: null,
+      last_ingestion_records_persisted: null,
     },
   ],
   total: 2,
@@ -120,6 +126,11 @@ describe('SettingsPage', () => {
     expect(screen.getByText(/^Last successful:/)).toBeInTheDocument();
     // The unchecked source shows the honest "Not yet checked" note.
     expect(screen.getByText('Not yet checked')).toBeInTheDocument();
+    // Ingestion line for the source with a completed run.
+    expect(screen.getByText(/^Last ingestion:/)).toBeInTheDocument();
+    expect(screen.getByText(/120 fetched · 45 new/)).toBeInTheDocument();
+    // The source without an ingestion run shows the honest note.
+    expect(screen.getByText('Not yet ingested')).toBeInTheDocument();
     // Data mode badge from the list response.
     expect(screen.getByText('Data mode: REAL_ONLY')).toBeInTheDocument();
     expect(fetchSourcesMock).toHaveBeenCalled();

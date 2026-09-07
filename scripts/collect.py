@@ -17,8 +17,10 @@ Behaviour (real-data-only):
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,8 +37,9 @@ from collectors.registry import CollectorNotImplemented, build_collector, runnab
 from collectors.service import JobCollectionService  # noqa: E402
 from config import get_settings  # noqa: E402
 from database.integrity import audit_database  # noqa: E402
-from database.models import DataProvenance  # noqa: E402
+from database.models import CollectionRun, DataProvenance  # noqa: E402
 from database.session import create_session_factory, get_engine, init_db  # noqa: E402
+from ingestion.ingestion_audit import build_ingestion_report, format_ingestion_report  # noqa: E402
 from ingestion.job_pipeline import run_company_pipeline  # noqa: E402
 
 EXIT_OK, EXIT_ERROR, EXIT_NOT_CONFIGURED, EXIT_NOT_IMPLEMENTED = 0, 1, 2, 3
@@ -48,7 +51,15 @@ def _plan(collector, args) -> list[FetchRequest]:
         return [FetchRequest(query=args.query, location=args.location, page=p, limit=args.per_page)
                 for p in range(1, pages + 1)]
     if hasattr(collector, "plan_requests"):
-        return collector.plan_requests(max_pages=args.max_pages)
+        kwargs = {"max_pages": args.max_pages}
+        # Pass strategy controls to collectors that support them (e.g. Adzuna).
+        import inspect
+        params = inspect.signature(collector.plan_requests).parameters
+        if "mode" in params and args.mode:
+            kwargs["mode"] = args.mode
+        if "max_requests" in params and args.max_requests:
+            kwargs["max_requests"] = args.max_requests
+        return collector.plan_requests(**kwargs)
     return [FetchRequest(page=1, limit=args.per_page)]
 
 
@@ -61,6 +72,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--location", help="Override location.")
     parser.add_argument("--max-pages", type=int, help="Pages per query (default: source config).")
     parser.add_argument("--per-page", type=int, help="Results per page (default: source config).")
+    parser.add_argument("--mode", choices=["ROLE_FIRST", "TECHNOLOGY_FIRST", "LOCATION_FIRST"],
+                        help="Query strategy (Adzuna). Default: source config (ROLE_FIRST).")
+    parser.add_argument("--max-requests", type=int,
+                        help="Hard cap on API requests this run (default: source config).")
     parser.add_argument("--dry-run", action="store_true", help="Fetch and report; persist nothing.")
     parser.add_argument("--skip-aggregate", action="store_true", help="Skip company-lead aggregation.")
     args = parser.parse_args(argv)
@@ -92,6 +107,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Collecting '{args.source}': {len(reqs)} request(s)"
           f"{' [DRY RUN]' if args.dry_run else ''}…")
 
+    started = time.monotonic()
     with create_session_factory(engine)() as session:
         try:
             summary = JobCollectionService(session).collect(collector, reqs, dry_run=args.dry_run)
@@ -110,11 +126,22 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_OK
         if not args.skip_aggregate:
             result = run_company_pipeline(session, provenance=DataProvenance.REAL)
-            c = result.companies
-            print(f"Aggregation (REAL): canonical_jobs={result.dedup.canonical_created} "
-                  f"companies→leads={c.companies} (created {c.created}, updated {c.updated})")
+            duration = round(time.monotonic() - started, 2)
+            report = build_ingestion_report(
+                session, source_id=args.source, collection_summary=summary,
+                pipeline_summary=result, provenance=DataProvenance.REAL,
+                duration_seconds=duration,
+            )
+            print("\n--- Ingestion report (actual counts) ---")
+            print(format_ingestion_report(report))
+            # Persist the consolidated counts on the collection run for auditability.
+            if summary.run_id is not None:
+                run = session.get(CollectionRun, summary.run_id)
+                if run is not None:
+                    run.notes = json.dumps(report.as_dict())
+                    session.commit()
         audit = audit_database(session)
-        print(f"DB now: {audit.total_records} real record(s); synthetic={audit.synthetic_total}; "
+        print(f"\nDB now: {audit.total_records} real record(s); synthetic={audit.synthetic_total}; "
               f"clean={audit.is_clean}")
     return EXIT_OK
 

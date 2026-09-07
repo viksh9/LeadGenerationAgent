@@ -21,16 +21,18 @@ from api.schemas import (
     SourceStatusListResponse,
     SourceStatusResponse,
 )
+from sqlalchemy import select
+
 from collectors.connectivity import check_source_connection, get_source_health
 from collectors.source_status import all_source_status
 from config.exceptions import NotFoundError
 from config.settings import get_settings
-from database.models import SourceConnectionStatus, SourceHealth
+from database.models import CollectionRun, CollectionRunStatus, SourceConnectionStatus, SourceHealth
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
 
-def _merge(report, health: SourceHealth | None) -> SourceStatusResponse:
+def _merge(report, health: SourceHealth | None, run: CollectionRun | None) -> SourceStatusResponse:
     resp = SourceStatusResponse(
         source_id=report.source_id,
         name=report.name,
@@ -57,13 +59,31 @@ def _merge(report, health: SourceHealth | None) -> SourceStatusResponse:
         resp.last_success_at = health.last_success_at
         resp.last_failure_at = health.last_failure_at
         resp.last_error = health.last_error
+    if run is not None:
+        resp.last_ingestion_at = run.completed_at or run.started_at
+        resp.last_ingestion_records_fetched = run.records_fetched
+        resp.last_ingestion_records_persisted = run.records_created
     return resp
+
+
+def _latest_runs(session: Session) -> dict[str, CollectionRun]:
+    """Most recent COMPLETED collection run per source_id."""
+    runs = session.execute(
+        select(CollectionRun)
+        .where(CollectionRun.status == CollectionRunStatus.COMPLETED)
+        .order_by(CollectionRun.started_at.desc())
+    ).scalars().all()
+    latest: dict[str, CollectionRun] = {}
+    for run in runs:
+        latest.setdefault(run.source_id, run)
+    return latest
 
 
 def _list(session: Session) -> SourceStatusListResponse:
     reports = all_source_status()
     health_by_id = {h.source_id: h for h in session.query(SourceHealth).all()}
-    items = [_merge(r, health_by_id.get(r.source_id)) for r in reports]
+    runs_by_id = _latest_runs(session)
+    items = [_merge(r, health_by_id.get(r.source_id), runs_by_id.get(r.source_id)) for r in reports]
     # CONNECTED is only true from a persisted, verified check.
     connected = sum(1 for it in items if it.connection_status == SourceConnectionStatus.CONNECTED.value)
     configured = sum(1 for it in items if it.status == "CONFIGURED")

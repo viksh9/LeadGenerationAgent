@@ -42,6 +42,9 @@ export interface SourceStatusItem {
   last_success_at: string | null;
   last_failure_at: string | null;
   last_error: string | null;
+  last_ingestion_at: string | null;
+  last_ingestion_records_fetched: number | null;
+  last_ingestion_records_persisted: number | null;
 }
 
 export interface SourceStatusList {
