@@ -68,3 +68,37 @@ def test_jooble_connection():
         assert draft.is_synthetic is False
         assert draft.source_url
         assert draft.external_id
+
+
+def test_greenhouse_public_board():
+    # Greenhouse public Job Board API needs no credentials; use a configured board.
+    board = os.environ.get("GREENHOUSE_TEST_BOARD", "greenhouse")
+    from collectors.ats.greenhouse import GreenhouseCollector, GreenhouseConfig
+    from collectors.base import FetchRequest, HealthStatus
+    from collectors.source_registry import get_registry
+
+    collector = GreenhouseCollector(get_registry().get("greenhouse"),
+                                    config=GreenhouseConfig(boards=[board]))
+    assert collector.health_check().status is HealthStatus.HEALTHY
+    result = collector.fetch(FetchRequest(board=board))
+    assert result.source_id == "greenhouse"
+    assert isinstance(result.records, list)
+    for draft in result.records:
+        assert draft.is_synthetic is False
+        assert draft.source_url and draft.external_id
+
+
+def test_lever_public_site():
+    site = os.environ.get("LEVER_TEST_SITE", "leverdemo")
+    from collectors.ats.lever import LeverCollector, LeverConfig
+    from collectors.base import FetchRequest, HealthStatus
+    from collectors.source_registry import get_registry
+
+    collector = LeverCollector(get_registry().get("lever"), config=LeverConfig(sites=[site]))
+    assert collector.health_check().status is HealthStatus.HEALTHY
+    result = collector.fetch(FetchRequest(board=site, limit=5))
+    assert result.source_id == "lever"
+    assert isinstance(result.records, list)
+    for draft in result.records:
+        assert draft.is_synthetic is False
+        assert draft.source_url and draft.external_id

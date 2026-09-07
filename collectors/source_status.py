@@ -37,6 +37,7 @@ class RuntimeSourceStatus(str, Enum):
     NOT_CONFIGURED = "NOT_CONFIGURED"            # implemented but missing credentials/config
     AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED"
     REQUIRES_REVIEW = "REQUIRES_REVIEW"          # compliance/legal review pending
+    DISCOVERY_REQUIRED = "DISCOVERY_REQUIRED"    # ATS: no board/site identifier known yet
     PLANNED = "PLANNED"                          # catalogued, no collector yet
     DISABLED = "DISABLED"
     ERROR = "ERROR"
@@ -45,8 +46,12 @@ class RuntimeSourceStatus(str, Enum):
 # Sources whose collectors are actually implemented in this codebase. Presence
 # here means "a real collector exists" — NOT that it is connected.
 _IMPLEMENTED_COLLECTORS: frozenset[str] = frozenset(
-    {"adzuna", "jooble", "company_career_pages", "rss_news", "company_newsroom"}
+    {"adzuna", "jooble", "greenhouse", "lever", "company_career_pages", "rss_news", "company_newsroom"}
 )
+# ATS sources are "configured" only once a real board/site identifier is known;
+# otherwise they are DISCOVERY_REQUIRED (not NOT_CONFIGURED — the collector works,
+# we just need a legitimately-identified board).
+_ATS_SOURCES: frozenset[str] = frozenset({"greenhouse", "lever"})
 
 
 @dataclass
@@ -87,6 +92,14 @@ def _is_configured(defn: SourceDefinition) -> bool:
         from collectors.jobs.jooble import load_jooble_config
 
         return load_jooble_config().is_configured
+    if defn.source_id == "greenhouse":
+        from collectors.ats.greenhouse import load_greenhouse_config
+
+        return load_greenhouse_config().is_configured
+    if defn.source_id == "lever":
+        from collectors.ats.lever import load_lever_config
+
+        return load_lever_config().is_configured
     if defn.requires_api_key:
         return bool(source_api_key(defn.source_id))
     # Keyless collectors (career pages, RSS feeds) require reviewed per-source
@@ -111,6 +124,10 @@ def source_runtime_status(defn: SourceDefinition) -> SourceStatusReport:
         status = RuntimeSourceStatus.CONFIGURED
         detail = ("Collector implemented and credentials configured. Not yet verified "
                   "against the live source — run a health check to confirm connectivity.")
+    elif defn.source_id in _ATS_SOURCES:
+        status = RuntimeSourceStatus.DISCOVERY_REQUIRED
+        detail = ("Collector implemented (public ATS API, no key). No company board/site "
+                  "identifier configured yet — discover a legitimate board first.")
     elif defn.requires_api_key:
         status = RuntimeSourceStatus.NOT_CONFIGURED
         detail = "Collector implemented but API credentials are not set in the environment."

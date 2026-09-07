@@ -6,9 +6,11 @@ LeadGenerationAgent, what each provides, and its **truthful** current status.
 > **No source is connected yet.** A collector class existing — or even having
 > credentials present — is *not* the same as an active, verified connection. A
 > source is reported `CONNECTED` only **after a real live request has actually
-> succeeded**. Today, none have been verified live, so every source's connection
-> status is `NOT_CONFIGURED`. The application data mode is **`REAL_ONLY`**: there
-> is no demo, mock, or synthetic runtime path.
+> succeeded**. Today, none have been verified live: most sources' connection
+> status is `NOT_CONFIGURED`, and the official ATS collectors (Greenhouse, Lever)
+> are `DISCOVERY_REQUIRED` — implemented and working, but awaiting a legitimate
+> board token / site handle before they can run. The application data mode is
+> **`REAL_ONLY`**: there is no demo, mock, or synthetic runtime path.
 
 The catalogue itself lives in [`config/sources.yaml`](../config/sources.yaml) and
 is loaded as `SourceDefinition` records by
@@ -28,6 +30,7 @@ Two independent axes are tracked and never collapsed into one:
 | --- | --- |
 | `IMPLEMENTED` | A collector class exists for the source. |
 | `CONFIGURED` | Implemented **and** required credentials/config are present — but not yet verified against the live source. |
+| `DISCOVERY_REQUIRED` | Implemented and the collector works, but the specific target (e.g. an ATS board token / site handle) is **not yet known**. Needs a legitimate board to be discovered/configured before it can run. |
 | `NOT_CONFIGURED` | Implemented but missing credentials/per-source configuration. |
 | `NOT_IMPLEMENTED` | No collector class exists yet (catalogued/planned only). |
 | `REQUIRES_REVIEW` | Blocked pending a compliance/licensing review before it may be enabled. |
@@ -36,8 +39,9 @@ Two independent axes are tracked and never collapsed into one:
 
 | Status | Meaning |
 | --- | --- |
-| `CONNECTED` | A real, credential-based request **actually succeeded**. Set only by a live check. |
-| `NOT_CONFIGURED` | No verified live request has succeeded (current state for **every** source). |
+| `CONNECTED` | A real request **actually succeeded**. Set only by a live check. |
+| `DISCOVERY_REQUIRED` | Collector works but no target board/site is configured yet (official ATS sources); no live request has been attempted. |
+| `NOT_CONFIGURED` | No verified live request has succeeded (missing credentials/config). |
 
 "IMPLEMENTED" describes code; "CONFIGURED" describes credentials; "CONNECTED"
 describes a verified live request. All three must be true — in that order — before
@@ -49,6 +53,8 @@ a source produces real data.
 | --- | --- | --- | --- | --- | --- | --- |
 | Adzuna Jobs API | Adzuna | JOB | `collectors/jobs/adzuna.py` | IMPLEMENTED | `NOT_CONFIGURED` | TIER_2 |
 | Jooble Jobs API | Jooble | JOB | `collectors/jobs/jooble.py` | IMPLEMENTED | `NOT_CONFIGURED` | TIER_2 |
+| Greenhouse Job Board API | Greenhouse (official, public) | JOB / ATS | `collectors/ats/greenhouse.py` | IMPLEMENTED | `DISCOVERY_REQUIRED` | TIER_1 |
+| Lever Postings API | Lever (official, public) | JOB / ATS | `collectors/ats/lever.py` | IMPLEMENTED | `DISCOVERY_REQUIRED` | TIER_1 |
 | Company Career Pages | Public web (per company) | COMPANY | `collectors/company/career_page.py` | IMPLEMENTED (per-source config; not `source_id`-runnable) | `NOT_CONFIGURED` | Not yet assigned |
 | Company Newsroom / RSS | Official company feeds | NEWS | `collectors/business/collector.py` | IMPLEMENTED (per-source config; not `source_id`-runnable) | `NOT_CONFIGURED` | Not yet assigned |
 | Government Procurement / Open Data | Government open-data portals | GOVERNMENT / TENDER | — | NOT_IMPLEMENTED | `NOT_CONFIGURED` | Not yet assigned |
@@ -132,16 +138,22 @@ Per-source detail follows.
 - **Env vars**: `JOOBLE_API_KEY`, `JOOBLE_API_HOST` (default `jooble.org`),
   `JOOBLE_LOCATION` (default `India`), `JOOBLE_MAX_PAGES`,
   `JOOBLE_RESULTS_PER_PAGE`, `JOOBLE_REQUESTS_PER_MINUTE`,
-  `JOOBLE_DAILY_REQUEST_LIMIT`, `JOOBLE_TIMEOUT_SECONDS`. See
-  [`.env.example`](../.env.example).
+  `JOOBLE_DAILY_REQUEST_LIMIT`, `JOOBLE_LIFETIME_REQUEST_BUDGET` (default `500`),
+  `JOOBLE_TIMEOUT_SECONDS`. See [`.env.example`](../.env.example).
 - **Capabilities**: keyword search, location filter, radius, salary, pagination,
   company search mode. **No** date filter and **no** true incremental cursor.
 - **India support**: Yes — **but keys are per-country domain**. An India key from
   `in.jooble.org` is required for Indian listings; set
   `JOOBLE_API_HOST=in.jooble.org`.
 - **Rate limits**: The FREE plan is a **hard 500-request lifetime cap per key**
-  (absolute, not per-period). Use sparingly; the project's per-minute/daily knobs
-  are conservative self-limits only.
+  (absolute, **not** per-period). Use sparingly; the project's per-minute/daily
+  knobs are conservative self-limits only.
+- **Lifetime request budget (enforced)**: the app **persists request usage**
+  (`source_health.requests_used` / `request_budget`) and, in `scripts/collect.py`,
+  **caps a run to the remaining budget**, warns at 80% consumption, and stops
+  cleanly with `BUDGET_EXHAUSTED` once the budget is used up. The ceiling is
+  configurable via `JOOBLE_LIFETIME_REQUEST_BUDGET` (default `500`, matching the
+  free plan).
 - **Licensing / commercial use**: `REQUIRES_REVIEW` — commercial-use terms are not
   documented on the API reference page; confirm against Jooble's Terms of Service
   before commercial use.
@@ -149,6 +161,94 @@ Per-source detail follows.
   `source_id`-runnable via the CLI).
 - **Connection status**: `NOT_CONFIGURED` (not verified live).
 - **Evidence tier**: `TIER_2`.
+
+## Greenhouse Job Board API
+
+- **Purpose**: First-party IT job postings collected directly from a company's own
+  Greenhouse-hosted job board — a higher-confidence, direct hiring signal than an
+  aggregator's syndicated copy.
+- **Provider**: Greenhouse (official public **Job Board API**). Official docs:
+  <https://docs.greenhouse.io/job-board.html>.
+- **Endpoint**:
+  `GET https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true`.
+  Public — **no authentication / no key**. Implemented in
+  `collectors/ats/greenhouse.py`.
+- **Data provided (fields)**: response is
+  `{"jobs": [{ id, title, updated_at, location:{name}, absolute_url, content,
+  company_name, departments, offices }], "meta": {total}}`. Capabilities:
+  `jobs, companies, job_dates, job_locations, source_urls, source_ids`.
+- **Authentication**: none (public board API). Config is by **board token**, not a
+  credential — `GREENHOUSE_BOARDS` (comma-separated company board tokens). Board
+  tokens are format-validated; boards are **not** enumerated blindly.
+- **Env vars**: `GREENHOUSE_BOARDS` (comma-separated board tokens; also settable
+  per-run via `--board`). See [`.env.example`](../.env.example).
+- **Capabilities**: fetch all published jobs for a board, with full posting content
+  (`content=true`), locations, departments/offices, update timestamps, and the
+  canonical `absolute_url`. No keyword-search API (the board returns the full list).
+- **India support**: Depends on the specific board configured; Indian roles appear
+  when the company's board lists them (filter downstream by `location`).
+- **Rate limits**: Governed by Greenhouse; the project applies conservative
+  self-limits and fetches per configured board only (no blind enumeration).
+- **Licensing / commercial use**: `REQUIRES_REVIEW` — review Greenhouse's terms
+  before ongoing/commercial reuse. Being publicly reachable is **not** the same as
+  approved for commercial use.
+- **Implementation status**: `IMPLEMENTED` (`collectors/ats/greenhouse.py`;
+  `source_id`-runnable via the CLI with `--board`).
+- **Connection status**: `DISCOVERY_REQUIRED` — the collector works but no board
+  token is configured yet; becomes `CONNECTED` only after a real public request
+  succeeds.
+- **Evidence tier**: `TIER_1` (official first-party company source — higher-
+  confidence direct evidence than an aggregator).
+- **More detail**: [`docs/sources/greenhouse.md`](sources/greenhouse.md).
+
+## Lever Postings API
+
+- **Purpose**: First-party IT job postings collected directly from a company's own
+  Lever-hosted board — a higher-confidence, direct hiring signal than an
+  aggregator's syndicated copy.
+- **Provider**: Lever (official public **Postings API**). Official docs:
+  <https://github.com/lever/postings-api> (developer docs at
+  <https://hire.lever.co/developer>).
+- **Endpoint**:
+  `GET https://api.lever.co/v0/postings/{site}?mode=json[&limit=N&skip=M]`.
+  Public — **no authentication / no key**. Only **published** postings are
+  returned. Implemented in `collectors/ats/lever.py`.
+- **Data provided (fields)**: response is a **list** of
+  `{ id, text, categories:{location, team, commitment, department}, hostedUrl,
+  applyUrl, createdAt (epoch ms), descriptionPlain, workplaceType }`. Capabilities:
+  `jobs, companies, job_dates, job_locations, source_urls, source_ids`.
+- **Authentication**: none (public postings API). Config is by **site handle**, not
+  a credential — `LEVER_SITES` (comma-separated company site handles).
+- **Env vars**: `LEVER_SITES` (comma-separated site handles; also settable per-run
+  via `--board`). See [`.env.example`](../.env.example).
+- **Capabilities**: fetch all published postings for a site with `limit`/`skip`
+  pagination, categories (location/team/commitment/department), plain-text
+  description, workplace type, creation timestamp, and the canonical `hostedUrl` /
+  `applyUrl`. No keyword-search API (the site returns the full list).
+- **India support**: Depends on the specific site configured; Indian roles appear
+  when the company's board lists them (filter downstream by `categories.location`).
+- **Rate limits**: Governed by Lever; the project applies conservative self-limits
+  and fetches per configured site only.
+- **Licensing / commercial use**: `REQUIRES_REVIEW` — review Lever's terms before
+  ongoing/commercial reuse. Being publicly reachable is **not** the same as
+  approved for commercial use.
+- **Implementation status**: `IMPLEMENTED` (`collectors/ats/lever.py`;
+  `source_id`-runnable via the CLI with `--board`).
+- **Connection status**: `DISCOVERY_REQUIRED` — the collector works but no site
+  handle is configured yet; becomes `CONNECTED` only after a real public request
+  succeeds.
+- **Evidence tier**: `TIER_1` (official first-party company source — higher-
+  confidence direct evidence than an aggregator).
+- **More detail**: [`docs/sources/lever.md`](sources/lever.md).
+
+> **Syndication is one evidence group.** One canonical job may carry **multiple**
+> source references across Adzuna / Jooble / ATS. Syndicated copies of the same
+> posting form a single evidence group — **not** independent confirmations.
+> Discovered boards are recorded in the `company_career_sources` table
+> (`CompanyCareerSource`) with status `DISCOVERY_REQUIRED` / `CONFIGURED` /
+> `CONNECTED`. Both ATS collectors reuse the standard pipeline (raw → normalize →
+> canonical dedup → company resolution → evidence verification → signal →
+> opportunity → lead).
 
 ## Company Career Pages
 
@@ -278,6 +378,12 @@ python scripts/collect.py --source adzuna --max-pages 2 --dry-run
 # Adzuna controlled query strategy + hard per-run request cap.
 python scripts/collect.py --source adzuna --mode ROLE_FIRST --max-requests 30
 python scripts/collect.py --source adzuna --mode LOCATION_FIRST --skip-aggregate
+
+# Official ATS boards (public, no key). Pass a board token / site handle with
+# --board, or configure defaults via GREENHOUSE_BOARDS / LEVER_SITES.
+python scripts/collect.py --source greenhouse --board <board_token>
+python scripts/collect.py --source lever --board <site_handle>
+python scripts/collect.py --source greenhouse --board <board_token> --dry-run  # real request, persists nothing
 ```
 
 `scripts/collect.py` exit codes: `0` OK · `1` error/unknown source · `2`
@@ -285,9 +391,11 @@ python scripts/collect.py --source adzuna --mode LOCATION_FIRST --skip-aggregate
 `3` `NOT_IMPLEMENTED` (no runnable collector for the source).
 
 ```bash
-# Real connectivity check — performs a live credential-based request and
-# persists the outcome to the source_health table.
+# Real connectivity check — performs a live request and persists the outcome
+# to the source_health table.
 python scripts/source_check.py --source adzuna
+python scripts/source_check.py --source greenhouse
+python scripts/source_check.py --source lever
 python scripts/source_check.py --all
 ```
 
