@@ -37,6 +37,7 @@ from database.models import (
     CompanyResolutionCandidate,
     CompanySourceReference,
     DataProvenance,
+    CRMActivity,
     EvidenceClaim,
     EvidenceConflict,
     EvidenceRecord,
@@ -46,6 +47,7 @@ from database.models import (
     Lead,
     OpportunityCandidate,
     RawSourceRecord,
+    SalesOpportunity,
     SignalSourceReference,
 )
 
@@ -155,6 +157,8 @@ _PROVENANCE_ENTITIES: tuple[tuple[str, Any], ...] = (
     ("company_events", CompanyEvent),
     ("company_relationships", CompanyRelationship),
     ("company_resolution_candidates", CompanyResolutionCandidate),
+    ("crm_activities", CRMActivity),
+    ("sales_opportunities", SalesOpportunity),
 )
 
 # Tables whose "real vs synthetic" is expressed by the raw is_synthetic flag.

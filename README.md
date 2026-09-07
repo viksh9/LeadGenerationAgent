@@ -670,6 +670,64 @@ python scripts/scheduler.py tick             # run all currently-due jobs once
 python scripts/scheduler.py runs --limit 20  # recent run audit
 ```
 
+## CRM & outreach lifecycle
+
+A **CRM & outreach** layer turns a scored, evidence-backed lead into a managed
+sales relationship: a validated, event-gated lead lifecycle, an internal CRM
+(activities, timeline, sales pipeline), evidence-grounded outreach drafting, a safe
+email send flow, secure inbound webhooks, follow-up tasks, and honest analytics.
+Full detail: [docs/crm-outreach.md](docs/crm-outreach.md).
+
+> **No message is ever sent automatically — and none can be sent at all by
+> default.** Sending requires BOTH a configured email provider AND an explicit
+> human approval of the specific draft. Out of the box no email provider is
+> configured (drafts can be approved but not sent), the CRM is `INTERNAL` (the local
+> database is the CRM), and webhooks are rejected until `WEBHOOK_SECRET` is set.
+
+- **Event-gated truth.** A lead reaches `CONTACTED` / `REPLIED` / `MEETING` only on
+  a real event (a provider-confirmed send, a real inbound reply, a recorded meeting)
+  or an explicit, audited human action — the funnel can never be inflated with
+  imaginary interactions. Every transition writes immutable status history + an
+  audit log.
+- **Evidence-grounded drafting.** Drafts reuse the deterministic pitch generator and
+  map every claim to real `evidence_ids`; an ungrounded draft cannot be approved. AI
+  (if configured) may only refine wording — never add a fact.
+- **Safe sending.** `outreach/send.py` enforces approval → EMAIL-only → verified
+  business email → configured provider → daily cap + per-minute rate limit →
+  idempotency lock, and marks `SENT` only on a real provider confirmation (SMTP is
+  the only implemented provider; others are stubs).
+- **Secure webhooks.** HMAC-signed, timestamp/replay-checked, and deduped by
+  provider event id; unsigned payloads fail closed.
+- **Honest analytics.** Conversion is `INSUFFICIENT_DATA` and pipeline value is
+  `NOT_AVAILABLE` when unsupported — revenue is never inferred.
+
+The React SPA exposes this via the **Pipeline** board, the **CRM** views
+(activities/timeline/analytics), and the **Outreach workspace** (draft → review →
+approve → send).
+
+### CRM & outreach APIs (selected)
+
+Read endpoints allow any role; mutations require SALES (or ADMIN); webhooks are
+public but cryptographically verified. See
+[docs/crm-outreach.md](docs/crm-outreach.md) for the full list + curl examples.
+
+| Method & path | Purpose |
+| --- | --- |
+| `POST /leads/{id}/transition` · `GET /leads/{id}/status-history` | Validated, audited lead lifecycle |
+| `GET /leads/{id}/timeline` · `/activities` · `/next-best-action` | CRM activity trail + deterministic NBA |
+| `GET /pipeline/board` · `GET/POST /sales-opportunities` · `.../{id}/stage` | Sales pipeline board + stages |
+| `GET /crm/analytics` | Honest CRM analytics (INSUFFICIENT_DATA / NOT_AVAILABLE) |
+| `GET/POST /outreach/drafts` · `.../approve` · `POST /outreach/{id}/send` | Draft → review → approve → send |
+| `GET /outreach/providers/status` | Truthful email/CRM provider status (no secrets) |
+| `POST /webhooks/email/{provider}` | Signed provider delivery/bounce/reply events |
+
+Data-quality and production-readiness audits (real counts; never fabricate):
+
+```bash
+python -m app.audit validate-data                  # data-quality issues
+python -m app.audit production-readiness            # real-data/security gate (exit 1 on violation)
+```
+
 ## Business signals & tenders
 
 Hiring is one signal; this layer adds structured **business events** and
@@ -789,3 +847,35 @@ connectivity status.
 Live integration tests are opt-in via `RUN_LIVE_SOURCE_TESTS=true` plus the
 relevant per-source credentials (some also gated by per-source flags such as
 `ADZUNA_INTEGRATION_TEST`).
+
+## Deployment
+
+The app ships with a multi-stage `Dockerfile` (stage 1 builds the React/Vite SPA on
+`node:20-alpine`; stage 2 runs the FastAPI backend on `python:3.12-slim` as a
+non-root user) and a single-service `docker-compose.yml`. Full detail:
+[docs/deployment.md](docs/deployment.md).
+
+```bash
+cp .env.example .env            # placeholders → real values (never commit secrets)
+docker compose up --build       # API at http://127.0.0.1:8000  (health at /health)
+```
+
+- **Config is entirely environment-based.** No credentials live in the image or in
+  Git; `.env.example` holds placeholders only. See the env-var tables in
+  [docs/deployment.md](docs/deployment.md).
+- **The container starts the API only.** The DB schema is initialised idempotently
+  (`init_db()`), a non-fatal `python -m app.audit production-readiness` report is
+  printed, then uvicorn starts. `GET /health` is liveness; `GET /health/ready`
+  checks the database. The **scheduler is off** unless `SCHEDULER_ENABLED=true`, and
+  **no message is ever sent** without a configured provider + human approval.
+- **Production.** Set `APP_ENV=production` (enforces `REAL_ONLY`, turns demo off),
+  set `ADMIN_API_KEY`, restrict `CORS_ORIGINS`, and gate the deploy on
+  `python -m app.audit production-readiness`
+  ([checklist](docs/production-readiness-checklist.md)).
+- **Backups are a documented MANUAL procedure** for the SQLite database (copy
+  `data/leads.db` with the app stopped, or use `sqlite3 .backup`) — nothing backs it
+  up automatically. Schema evolution is additive via `init_db()` (no Alembic). See
+  [docs/deployment.md](docs/deployment.md#database-backup--restore-sqlite).
+
+The API serves JSON only; the built SPA (`frontend/dist`) is included in the image
+for you to serve from a reverse proxy / static host / CDN.

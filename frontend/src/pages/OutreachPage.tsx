@@ -11,6 +11,7 @@ import { OutreachTable } from '@/components/outreach/OutreachTable';
 import { OutreachCard } from '@/components/outreach/OutreachCard';
 import { OutreachDetailDrawer } from '@/components/outreach/OutreachDetailDrawer';
 import { FollowUpQueue } from '@/components/outreach/FollowUpQueue';
+import { OutreachWorkspace } from '@/components/outreach/OutreachWorkspace';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useOutreach } from '@/hooks/useOutreach';
 import {
@@ -97,6 +98,7 @@ export function OutreachPage() {
   const [searchText, setSearchText] = useState(filters.search);
   const debouncedSearch = useDebounce(searchText, 350);
   const [selected, setSelected] = useState<OutreachItem | null>(null);
+  const [view, setView] = useState<'prep' | 'workspace'>('prep');
 
   const { items, isLoading, isError, isFetching, refetch, isEmpty, datasetLimited, serverTotal, fetchedCount } =
     useOutreach();
@@ -165,41 +167,34 @@ export function OutreachPage() {
     </div>
   );
 
-  const header = (children: React.ReactNode) => (
-    <PageContainer
-      title="Outreach"
-      subtitle="Review personalized messaging and prepare outreach for qualified opportunities."
-      actions={actions}
-    >
-      {children}
-    </PageContainer>
-  );
-
-  if (isLoading) return header(<Skeleton />);
-  if (isError)
-    return header(
-      <Card>
-        <ErrorState message="Unable to load outreach opportunities." onRetry={() => refetch()} />
-      </Card>,
-    );
-  if (isEmpty || base.length === 0)
-    return header(
-      <Card>
-        <EmptyState
-          title="No outreach opportunities are ready yet."
-          description="Analyze and qualify leads before preparing outreach."
-          action={
-            <Link to="/leads" className="btn-secondary">
-              View leads
-            </Link>
-          }
-        />
-      </Card>,
-    );
-
   const noMatches = ready.length === 0 && needsReview.length === 0;
 
-  return header(
+  const prepBody = () => {
+    if (isLoading) return <Skeleton />;
+    if (isError)
+      return (
+        <Card>
+          <ErrorState message="Unable to load outreach opportunities." onRetry={() => refetch()} />
+        </Card>
+      );
+    if (isEmpty || base.length === 0)
+      return (
+        <Card>
+          <EmptyState
+            title="No outreach opportunities are ready yet."
+            description="Analyze and qualify leads before preparing outreach."
+            action={
+              <Link to="/leads" className="btn-secondary">
+                View leads
+              </Link>
+            }
+          />
+        </Card>
+      );
+    return derivedBody();
+  };
+
+  const derivedBody = () => (
     <div className="space-y-4">
       <OutreachSummaryCards summary={summary} />
       <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -278,6 +273,45 @@ export function OutreachPage() {
       )}
 
       <OutreachDetailDrawer item={selected} onClose={() => setSelected(null)} />
-    </div>,
+    </div>
+  );
+
+  return (
+    <PageContainer
+      title="Outreach"
+      subtitle="Review personalized messaging and prepare outreach for qualified opportunities."
+      actions={actions}
+    >
+      <div className="mb-4 flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'prep'}
+          className={
+            view === 'prep'
+              ? 'rounded-md bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+              : 'rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+          }
+          onClick={() => setView('prep')}
+        >
+          Outreach prep (derived)
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'workspace'}
+          className={
+            view === 'workspace'
+              ? 'rounded-md bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+              : 'rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+          }
+          onClick={() => setView('workspace')}
+        >
+          Live workspace
+        </button>
+      </div>
+
+      {view === 'prep' ? prepBody() : <OutreachWorkspace />}
+    </PageContainer>
   );
 }

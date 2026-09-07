@@ -17,6 +17,11 @@ import { VerificationPanel } from '@/components/leads/detail/VerificationPanel';
 import { AIIntelligencePanel } from '@/components/leads/detail/AIIntelligencePanel';
 import { OutreachPanel } from '@/components/leads/detail/OutreachPanel';
 import { RecommendationCard } from '@/components/leads/detail/RecommendationCard';
+import {
+  LeadNextActionCard,
+  LeadStatusHistoryCard,
+  LeadTimelineCard,
+} from '@/components/leads/detail/LeadLifecycle';
 import { useDeleteLead, useLead } from '@/hooks/useLeads';
 import type { ApiErrorShape } from '@/services/api';
 
@@ -124,11 +129,14 @@ export function LeadDetailsPage() {
             <VerificationPanel leadId={lead.id} />
             <AIIntelligencePanel lead={lead} />
             <OutreachPanel lead={lead} />
+            <LeadTimelineCard leadId={lead.id} />
+            <LeadStatusHistoryCard leadId={lead.id} />
           </div>
 
           {/* Score / action / contact rail */}
           <div className="space-y-4">
             <RecommendationCard lead={lead} />
+            <LeadNextActionCard leadId={lead.id} />
             <POCPanel lead={lead} />
             <StakeholdersPanel leadId={lead.id} />
           </div>

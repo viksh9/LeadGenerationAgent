@@ -47,6 +47,24 @@ vi.mock('@/services/alerts', async (importOriginal) => {
 import { fetchPreferences } from '@/services/alerts';
 const fetchPreferencesMock = vi.mocked(fetchPreferences);
 
+// CRM & Email provider status. Keep the real display helpers; stub the fetcher.
+vi.mock('@/services/outreachApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/outreachApi')>();
+  return { ...actual, fetchProviderStatus: vi.fn() };
+});
+import { fetchProviderStatus } from '@/services/outreachApi';
+const fetchProviderStatusMock = vi.mocked(fetchProviderStatus);
+
+const PROVIDER_STATUS = {
+  email_provider: null,
+  email_status: 'NOT_CONFIGURED' as const,
+  email_from: null,
+  crm_provider: 'internal',
+  crm_status: 'CONFIGURED',
+  webhook_configured: false,
+  note: 'No email provider configured; drafts can be approved but not sent.',
+};
+
 const PREFERENCES = {
   hot_leads_only: false,
   min_score_increase: 5,
@@ -170,6 +188,8 @@ beforeEach(() => {
   });
   fetchPreferencesMock.mockReset();
   fetchPreferencesMock.mockResolvedValue(PREFERENCES);
+  fetchProviderStatusMock.mockReset();
+  fetchProviderStatusMock.mockResolvedValue(PROVIDER_STATUS);
   localStorage.clear();
 });
 afterEach(() => {
@@ -225,6 +245,17 @@ describe('SettingsPage', () => {
     // A humanized alert-type checkbox renders from the real display helper.
     expect(screen.getByText('New high-intent lead')).toBeInTheDocument();
     expect(fetchPreferencesMock).toHaveBeenCalled();
+  });
+
+  it('renders the CRM & Email providers section from /outreach/providers/status', async () => {
+    getHealthMock.mockResolvedValue(HEALTH);
+    renderWithProviders(<SettingsPage />, { route: '/settings' });
+
+    expect(await screen.findByText('CRM & Email providers')).toBeInTheDocument();
+    // NOT_CONFIGURED email status renders honestly as a badge.
+    expect(await screen.findByText('NOT_CONFIGURED', { selector: 'span.badge' })).toBeInTheDocument();
+    expect(screen.getByText(/drafts can be approved but not sent/i)).toBeInTheDocument();
+    expect(fetchProviderStatusMock).toHaveBeenCalled();
   });
 
   it('renders the AI provider status from /ai/status', async () => {

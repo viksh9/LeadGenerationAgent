@@ -20,6 +20,7 @@ import type { ThemePreference } from '@/types/settings';
 import { API_BASE_URL } from '@/services/api';
 import { PAGE_SIZE_OPTIONS } from '@/constants/leads';
 import { sourceStatusDisplay, connectionStatusDisplay } from '@/services/sources';
+import { useProviderStatus } from '@/hooks/useOutreachApi';
 import { formatDateTime } from '@/utils/format';
 
 function ConnectionDot({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'idle' }) {
@@ -33,6 +34,86 @@ function ConnectionDot({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'i
 }
 
 const SEVERITY_OPTIONS: AlertSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+
+const EMERALD_BADGE = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300';
+const AMBER_BADGE = 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300';
+const ROSE_BADGE = 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300';
+
+function statusBadgeClass(status: string): string {
+  if (status === 'CONFIGURED' || status === 'CONNECTED') return EMERALD_BADGE;
+  if (status === 'NOT_CONFIGURED') return AMBER_BADGE;
+  if (status === 'ERROR') return ROSE_BADGE;
+  return AMBER_BADGE;
+}
+
+function ProvidersSection() {
+  const providers = useProviderStatus();
+  const p = providers.data;
+  return (
+    <SettingsSection
+      title="CRM & Email providers"
+      description="Live email and CRM provider configuration. Drafts can always be prepared and approved; sending requires a configured email provider. No secrets are shown."
+    >
+      {providers.isLoading ? (
+        <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">Checking providers…</p>
+      ) : providers.isError ? (
+        <div className="flex items-center justify-between gap-3 py-2.5">
+          <p className="text-sm text-rose-600 dark:text-rose-400">Unable to load provider status.</p>
+          <button type="button" className="btn-ghost text-sm" onClick={() => providers.refetch()}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Retry
+          </button>
+        </div>
+      ) : p ? (
+        <>
+          <SettingRow
+            label="Email provider"
+            control={
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                {p.email_provider ?? 'None'}
+              </span>
+            }
+          />
+          <SettingRow
+            label="Email status"
+            control={<span className={`badge ${statusBadgeClass(p.email_status)}`}>{p.email_status}</span>}
+          />
+          <SettingRow
+            label="From address"
+            control={
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                {p.email_from ?? 'Not configured'}
+              </span>
+            }
+          />
+          <SettingRow
+            label="CRM provider"
+            control={<span className="text-sm text-slate-700 dark:text-slate-300">{p.crm_provider}</span>}
+          />
+          <SettingRow
+            label="CRM status"
+            control={<span className={`badge ${statusBadgeClass(p.crm_status)}`}>{p.crm_status}</span>}
+          />
+          <SettingRow
+            label="Webhook configured"
+            control={
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                {p.webhook_configured ? 'Yes' : 'No'}
+              </span>
+            }
+          />
+          {p.note && (
+            <p className="border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+              {p.note}
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">Provider status unavailable.</p>
+      )}
+    </SettingsSection>
+  );
+}
 
 function NotificationsSection() {
   const prefsQuery = useNotificationPreferences();
@@ -351,6 +432,10 @@ export function SettingsPage() {
             <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">AI provider status unavailable.</p>
           )}
         </SettingsSection>
+
+        <div className="lg:col-span-2">
+          <ProvidersSection />
+        </div>
 
         <div className="lg:col-span-2">
           <NotificationsSection />
