@@ -5,8 +5,8 @@ import { renderWithProviders } from '@/test/test-utils';
 import { SettingsPage } from './SettingsPage';
 import { getPreferences } from '@/services/preferences';
 
-vi.mock('@/services/system', () => ({ getHealth: vi.fn() }));
-import { getHealth } from '@/services/system';
+vi.mock('@/services/health', () => ({ getHealth: vi.fn() }));
+import { getHealth } from '@/services/health';
 const getHealthMock = vi.mocked(getHealth);
 
 const HEALTH = {
@@ -20,7 +20,10 @@ beforeEach(() => {
   getHealthMock.mockReset();
   localStorage.clear();
 });
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  document.documentElement.classList.remove('dark');
+  vi.clearAllMocks();
+});
 
 describe('SettingsPage', () => {
   it('renders the settings sections', async () => {
@@ -70,6 +73,16 @@ describe('SettingsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
     await waitFor(() => expect(getPreferences().leadsPageSize).toBe(20));
     expect((screen.getByLabelText('Leads per page') as HTMLSelectElement).value).toBe('20');
+  });
+
+  it('changes the theme and applies the dark class', async () => {
+    getHealthMock.mockResolvedValue(HEALTH);
+    renderWithProviders(<SettingsPage />, { route: '/settings' });
+    await screen.findByRole('heading', { level: 2, name: 'Settings' });
+
+    await userEvent.selectOptions(screen.getByLabelText('Theme'), 'dark');
+    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(true));
+    expect(getPreferences().theme).toBe('dark');
   });
 
   it('clears cached data with feedback', async () => {

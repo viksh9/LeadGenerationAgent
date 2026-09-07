@@ -102,7 +102,7 @@ describe('LeadsPage', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Priority'), 'HOT');
     await waitFor(() =>
-      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ lead_priority: 'HOT' })),
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ lead_priority: 'HOT' }), expect.anything()),
     );
   });
 
@@ -110,7 +110,7 @@ describe('LeadsPage', () => {
     getLeadsMock.mockResolvedValue(response(LEADS));
     renderWithProviders(<LeadsPage />, { route: '/leads?lead_priority=HOT' });
     await waitFor(() =>
-      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ lead_priority: 'HOT' })),
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ lead_priority: 'HOT' }), expect.anything()),
     );
     expect((screen.getByLabelText('Priority') as HTMLSelectElement).value).toBe('HOT');
   });
@@ -123,7 +123,7 @@ describe('LeadsPage', () => {
     await userEvent.type(screen.getByLabelText('Search'), 'banking');
     await waitFor(
       () =>
-        expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ search: 'banking' })),
+        expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ search: 'banking' }), expect.anything()),
       { timeout: 2000 },
     );
   });
@@ -135,7 +135,7 @@ describe('LeadsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /sort by company/i }));
     await waitFor(() =>
-      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ sort_by: 'company_name' })),
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ sort_by: 'company_name' }), expect.anything()),
     );
   });
 
@@ -146,7 +146,7 @@ describe('LeadsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /next page/i }));
     await waitFor(() =>
-      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })),
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }), expect.anything()),
     );
   });
 
@@ -177,7 +177,7 @@ describe('LeadsPage', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Industry'), 'BFSI');
     await waitFor(() =>
-      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ industry: 'BFSI' })),
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ industry: 'BFSI' }), expect.anything()),
     );
   });
 
@@ -188,7 +188,7 @@ describe('LeadsPage', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Status'), 'CONTACTED');
     await waitFor(() =>
-      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'CONTACTED' })),
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'CONTACTED' }), expect.anything()),
     );
   });
 
@@ -201,6 +201,7 @@ describe('LeadsPage', () => {
     await waitFor(() =>
       expect(getLeadsMock).toHaveBeenCalledWith(
         expect.objectContaining({ signal_type: 'PROJECT_AWARD' }),
+        expect.anything(),
       ),
     );
   });
@@ -212,7 +213,7 @@ describe('LeadsPage', () => {
 
     await userEvent.type(screen.getByLabelText('Min score'), '80');
     await waitFor(() =>
-      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ min_score: 80 })),
+      expect(getLeadsMock).toHaveBeenCalledWith(expect.objectContaining({ min_score: 80 }), expect.anything()),
     );
   });
 

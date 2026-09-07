@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getHealth } from '@/services/system';
+import { getHealth } from '@/services/health';
 
 /** Backend connection status (GET /health). */
 export function useHealth() {

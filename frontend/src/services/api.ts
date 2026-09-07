@@ -1,11 +1,17 @@
 import axios, { AxiosError } from 'axios';
+import { friendlyMessage } from '@/utils/apiError';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+
+/** Default request timeout (ms). Configurable via VITE_API_TIMEOUT. */
+export const API_TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT) || 15000;
+/** Analysis can legitimately take longer than plain CRUD. */
+export const ANALYZE_TIMEOUT = Number(import.meta.env.VITE_ANALYZE_TIMEOUT) || 30000;
 
 /** Shared Axios instance for the FastAPI backend. */
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: API_TIMEOUT,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -22,17 +28,18 @@ export function toApiError(error: unknown): ApiErrorShape {
     const status = axiosError.response?.status;
     const data = axiosError.response?.data;
     if (data?.error) {
-      return { code: data.error.code, message: data.error.message, status };
+      // Trust backend 4xx messages; use a friendly generic for 5xx to avoid
+      // leaking server internals.
+      const message =
+        status && status >= 500 ? friendlyMessage(status, data.error.message) : data.error.message;
+      return { code: data.error.code, message, status };
     }
     if (data?.detail) {
-      const message = Array.isArray(data.detail)
-        ? 'Validation error. Please check the submitted values.'
-        : String(data.detail);
-      return { code: 'validation_error', message, status };
+      return { code: 'validation_error', message: friendlyMessage(422, 'Validation error.'), status };
     }
     return {
       code: 'network_error',
-      message: axiosError.message || 'Unable to reach the server.',
+      message: status ? friendlyMessage(status, axiosError.message) : 'Unable to reach the server.',
       status,
     };
   }

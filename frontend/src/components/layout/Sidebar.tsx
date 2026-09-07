@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { Radar, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { navItems } from '@/routes/navItems';
+import { BackendStatus } from '@/components/layout/BackendStatus';
 
 interface SidebarProps {
   /** Mobile drawer open state. */
@@ -45,7 +46,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 lg:flex">
         <Brand />
         <NavItems />
-        <p className="px-5 py-4 text-xs text-slate-400 dark:text-slate-500">Phase 1 · v0.1.0</p>
+        <div className="flex flex-col gap-2 px-5 py-4">
+          <BackendStatus />
+          <p className="text-xs text-slate-400 dark:text-slate-500">Phase 1 · v0.1.0</p>
+        </div>
       </aside>
 
       {/* Mobile: drawer */}

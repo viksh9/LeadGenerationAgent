@@ -14,13 +14,16 @@ import type {
  * are 1:1 wrappers around the FastAPI routes, kept out of React components.
  */
 
-export async function getLeads(params: LeadListParams = {}): Promise<LeadListResponse> {
-  const { data } = await api.get<LeadListResponse>('/leads', { params });
+export async function getLeads(
+  params: LeadListParams = {},
+  signal?: AbortSignal,
+): Promise<LeadListResponse> {
+  const { data } = await api.get<LeadListResponse>('/leads', { params, signal });
   return data;
 }
 
-export async function getLead(id: number): Promise<Lead> {
-  const { data } = await api.get<Lead>(`/leads/${id}`);
+export async function getLead(id: number, signal?: AbortSignal): Promise<Lead> {
+  const { data } = await api.get<Lead>(`/leads/${id}`, { signal });
   return data;
 }
 
