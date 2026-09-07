@@ -1,0 +1,279 @@
+[
+  {
+    "company_name": "NorthStar Digital Systems", "industry": "IT", "location": "Bengaluru",
+    "signal_title": "Large engineering ramp-up for banking project",
+    "signal_description": "NorthStar has won a major project awarded by a global bank and is hiring 40 Java, Spring Boot and AWS engineers for delivery.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/northstar/ramp-up",
+    "technologies": ["Java", "Spring Boot", "AWS"], "project_name": "Digital Banking Modernization", "project_value": 25000000,
+    "estimated_hiring": 40, "hiring_roles": ["Java Engineer", "AWS Engineer", "DevOps Engineer"],
+    "company_size": "1001-5000", "company_website": "https://synthetic.example/northstar",
+    "poc_title": "VP of Engineering", "signal_confidence": 92, "signal_age_days": 3
+  },
+  {
+    "company_name": "NorthStar Digital Systems", "industry": "IT", "location": "Bengaluru",
+    "signal_title": "Cloud migration and platform modernization program",
+    "signal_description": "NorthStar announced a cloud migration and platform modernization initiative moving workloads to AWS and Kubernetes.",
+    "source_name": "Synthetic Business News", "source_url": "https://synthetic.example/northstar/cloud",
+    "technologies": ["AWS", "Kubernetes", "DevOps"], "project_name": "Cloud Migration Program",
+    "estimated_hiring": 15, "hiring_roles": ["Cloud Engineer", "DevOps Engineer"],
+    "company_size": "1001-5000", "company_website": "https://synthetic.example/northstar",
+    "poc_title": "CTO", "signal_confidence": 78, "signal_age_days": 12
+  },
+  {
+    "company_name": "NorthStar Digital Systems", "industry": "IT", "location": "Bengaluru",
+    "signal_title": "Hiring React and TypeScript developers",
+    "signal_description": "NorthStar is hiring 8 React and TypeScript frontend developers for a product team.",
+    "source_name": "Synthetic Job Portal", "source_url": "https://synthetic.example/northstar/frontend",
+    "technologies": ["React", "TypeScript", "Node.js"],
+    "estimated_hiring": 8, "hiring_roles": ["Frontend Engineer", "React Developer"],
+    "company_size": "1001-5000", "poc_title": "Head of Engineering", "signal_confidence": 60, "signal_age_days": 25
+  },
+  {
+    "company_name": "NorthStar Digital Systems", "industry": "IT", "location": "Bengaluru",
+    "signal_title": "Digital transformation and data platform initiative",
+    "signal_description": "NorthStar launched a digital transformation and data platform initiative using Python and data engineering.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/northstar/dx",
+    "technologies": ["Python", "Data Engineering", "SQL"],
+    "estimated_hiring": 12, "hiring_roles": ["Data Engineer", "Python Developer"],
+    "poc_title": "Program Director", "signal_confidence": 70, "signal_age_days": 40
+  },
+  {
+    "company_name": "BluePeak Banking Technologies", "industry": "BFSI", "location": "Mumbai",
+    "signal_title": "Won core banking modernization contract",
+    "signal_description": "BluePeak secured contract for a digital banking modernization program and is hiring 25 Java and Kafka engineers.",
+    "source_name": "Synthetic Government Tender", "source_url": "https://synthetic.example/bluepeak/tender",
+    "technologies": ["Java", "Kafka", "SQL"], "project_name": "Core Banking Revamp", "project_value": 40000000,
+    "estimated_hiring": 25, "hiring_roles": ["Java Engineer", "Backend Engineer"],
+    "company_size": "5001-10000", "company_website": "https://synthetic.example/bluepeak",
+    "poc_title": "CIO", "signal_confidence": 95, "signal_age_days": 2
+  },
+  {
+    "company_name": "BluePeak Banking Technologies", "industry": "BFSI", "location": "Mumbai",
+    "signal_title": "Vendor requirement for staff augmentation",
+    "signal_description": "BluePeak has a vendor requirement and needs staff augmentation and external resources for .NET and Azure development.",
+    "source_name": "Synthetic Project Registry", "source_url": "https://synthetic.example/bluepeak/vendor",
+    "technologies": [".NET", "C#", "Azure"], "hiring_roles": ["Backend Engineer"],
+    "company_size": "5001-10000", "poc_title": "IT Sourcing Manager", "signal_confidence": 65, "signal_age_days": 18
+  },
+  {
+    "company_name": "BluePeak Banking Technologies", "industry": "BFSI", "location": "Mumbai",
+    "signal_title": "Small compliance reporting hiring",
+    "signal_description": "BluePeak is hiring 3 SQL developers for compliance reporting.",
+    "source_name": "Synthetic Job Portal", "source_url": "https://synthetic.example/bluepeak/sql",
+    "technologies": ["SQL"], "estimated_hiring": 3, "hiring_roles": ["Backend Engineer"],
+    "signal_confidence": 45, "signal_age_days": 70
+  },
+  {
+    "company_name": "BluePeak Banking Technologies", "industry": "BFSI", "location": "Mumbai",
+    "signal_title": "Additional Java hiring for modernization",
+    "signal_description": "BluePeak is hiring 10 additional Java and Spring Boot engineers for the modernization program.",
+    "source_name": "Synthetic Career Page", "source_url": "https://synthetic.example/bluepeak/java",
+    "technologies": ["Java", "Spring Boot"], "estimated_hiring": 10, "hiring_roles": ["Java Engineer"],
+    "poc_title": "Delivery Head", "signal_confidence": 66, "signal_age_days": 8
+  },
+  {
+    "company_name": "SilverLine Financial Systems", "industry": "BFSI", "location": "Pune",
+    "signal_title": "AI initiative for fraud detection",
+    "signal_description": "SilverLine announced an AI initiative and machine learning platform for fraud detection, hiring 10 ML and Python engineers.",
+    "source_name": "Synthetic Business News", "source_url": "https://synthetic.example/silverline/ai",
+    "technologies": ["AI", "ML", "Python"], "estimated_hiring": 10, "hiring_roles": ["ML Engineer", "Data Engineer"],
+    "company_size": "501-1000", "company_website": "https://synthetic.example/silverline",
+    "poc_title": "CTO", "signal_confidence": 80, "signal_age_days": 6
+  },
+  {
+    "company_name": "SilverLine Financial Systems", "industry": "BFSI", "location": "Pune",
+    "signal_title": "Business expansion and new delivery center",
+    "signal_description": "SilverLine announced a business expansion and new delivery center in the previous year.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/silverline/expansion",
+    "technologies": [], "estimated_hiring": 5, "hiring_roles": [], "signal_confidence": 40, "signal_age_days": 200
+  },
+  {
+    "company_name": "SilverLine Financial Systems", "industry": "BFSI", "location": "Pune",
+    "signal_title": "Payments integration project execution",
+    "signal_description": "SilverLine is executing a system integration and rollout, hiring 8 backend engineers in Java.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/silverline/payments",
+    "technologies": ["Java", "SQL"], "project_name": "Payments Integration",
+    "estimated_hiring": 8, "hiring_roles": ["Backend Engineer"], "poc_title": "Program Director",
+    "signal_confidence": 64, "signal_age_days": 20
+  },
+  {
+    "company_name": "GreenBasket Consumer Tech", "industry": "FMCG", "location": "Gurugram",
+    "signal_title": "Retail commerce transformation project awarded",
+    "signal_description": "GreenBasket won a project for retail commerce transformation and is hiring 20 Node.js and AWS engineers.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/greenbasket/commerce",
+    "technologies": ["Node.js", "AWS", "React"], "project_name": "Retail Commerce Transformation", "project_value": 15000000,
+    "estimated_hiring": 20, "hiring_roles": ["Full Stack Engineer", "AWS Engineer"],
+    "company_size": "1001-5000", "company_website": "https://synthetic.example/greenbasket",
+    "poc_title": "VP Engineering", "signal_confidence": 88, "signal_age_days": 4
+  },
+  {
+    "company_name": "GreenBasket Consumer Tech", "industry": "FMCG", "location": "Gurugram",
+    "signal_title": "Customer analytics modernization",
+    "signal_description": "GreenBasket started customer analytics modernization using a data platform and machine learning.",
+    "source_name": "Synthetic Business News", "source_url": "https://synthetic.example/greenbasket/analytics",
+    "technologies": ["Data Engineering", "ML", "Python"], "estimated_hiring": 12,
+    "hiring_roles": ["Data Engineer", "ML Engineer"], "poc_title": "Program Director",
+    "signal_confidence": 72, "signal_age_days": 22
+  },
+  {
+    "company_name": "GreenBasket Consumer Tech", "industry": "FMCG", "location": "Gurugram",
+    "signal_title": "Warehouse and logistics staffing",
+    "signal_description": "GreenBasket is hiring warehouse and logistics staff for new stores.",
+    "source_name": "Synthetic Job Portal", "source_url": "https://synthetic.example/greenbasket/warehouse",
+    "technologies": [], "estimated_hiring": 30, "hiring_roles": [], "signal_confidence": 35, "signal_age_days": 15
+  },
+  {
+    "company_name": "GreenBasket Consumer Tech", "industry": "FMCG", "location": "Gurugram",
+    "signal_title": "Technology partner for loyalty platform",
+    "signal_description": "GreenBasket seeks a technology partner and development partner for a loyalty platform.",
+    "source_name": "Synthetic Project Registry", "source_url": "https://synthetic.example/greenbasket/loyalty",
+    "technologies": ["React", "Node.js"], "hiring_roles": [], "poc_title": "Vendor Manager",
+    "signal_confidence": 57, "signal_age_days": 26
+  },
+  {
+    "company_name": "FreshCart Retail Systems", "industry": "FMCG", "location": "Noida",
+    "signal_title": "QA automation ramp-up for modernization rollout",
+    "signal_description": "FreshCart is hiring 15 QA automation engineers (SDET) with Selenium and Playwright for a modernization rollout.",
+    "source_name": "Synthetic Career Page", "source_url": "https://synthetic.example/freshcart/qa",
+    "technologies": ["Selenium", "Playwright", "Java"], "estimated_hiring": 15,
+    "hiring_roles": ["QA Automation Engineer", "SDET"], "company_size": "501-1000",
+    "poc_title": "Delivery Head", "signal_confidence": 75, "signal_age_days": 9
+  },
+  {
+    "company_name": "FreshCart Retail Systems", "industry": "FMCG", "location": "Noida",
+    "signal_title": "Implementation partner for commerce platform",
+    "signal_description": "FreshCart seeks an implementation partner for outsourcing and contract resources for a commerce platform.",
+    "source_name": "Synthetic Project Registry", "source_url": "https://synthetic.example/freshcart/partner",
+    "technologies": ["React", "Node.js"], "hiring_roles": [], "poc_title": "Vendor Manager",
+    "signal_confidence": 58, "signal_age_days": 33
+  },
+  {
+    "company_name": "FreshCart Retail Systems", "industry": "FMCG", "location": "Noida",
+    "signal_title": "Omnichannel commerce project awarded with large hiring",
+    "signal_description": "FreshCart won a project awarded for omnichannel commerce and is hiring 28 engineers in Java, React and AWS.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/freshcart/omnichannel",
+    "technologies": ["Java", "React", "AWS", "Node.js"], "project_name": "Omnichannel Commerce", "project_value": 18000000,
+    "estimated_hiring": 28, "hiring_roles": ["Full Stack Engineer", "Java Engineer", "AWS Engineer"],
+    "company_size": "501-1000", "company_website": "https://synthetic.example/freshcart",
+    "poc_title": "VP Engineering", "signal_confidence": 89, "signal_age_days": 3
+  },
+  {
+    "company_name": "HealthBridge Digital", "industry": "Healthcare", "location": "Hyderabad",
+    "signal_title": "Healthcare platform upgrade contract awarded",
+    "signal_description": "HealthBridge was awarded a contract for a healthcare platform upgrade and is hiring 22 Java, Spring Boot and Azure engineers.",
+    "source_name": "Synthetic Government Tender", "source_url": "https://synthetic.example/healthbridge/tender",
+    "technologies": ["Java", "Spring Boot", "Azure"], "project_name": "Healthcare Platform Upgrade", "project_value": 30000000,
+    "estimated_hiring": 22, "hiring_roles": ["Java Engineer", "Backend Engineer", "Cloud Engineer"],
+    "company_size": "1001-5000", "company_website": "https://synthetic.example/healthbridge",
+    "poc_title": "CIO", "signal_confidence": 93, "signal_age_days": 1
+  },
+  {
+    "company_name": "HealthBridge Digital", "industry": "Healthcare", "location": "Hyderabad",
+    "signal_title": "Cloud modernization of legacy systems",
+    "signal_description": "HealthBridge began a cloud modernization and technology transformation of legacy systems on GCP.",
+    "source_name": "Synthetic Business News", "source_url": "https://synthetic.example/healthbridge/cloud",
+    "technologies": ["GCP", "Kubernetes", "DevOps"], "estimated_hiring": 14,
+    "hiring_roles": ["Cloud Engineer", "DevOps Engineer"], "poc_title": "CTO",
+    "signal_confidence": 76, "signal_age_days": 28
+  },
+  {
+    "company_name": "HealthBridge Digital", "industry": "Healthcare", "location": "Hyderabad",
+    "signal_title": "General company update",
+    "signal_description": "HealthBridge published a general company update for stakeholders.",
+    "technologies": [], "hiring_roles": [], "signal_confidence": 20, "signal_age_days": 55
+  },
+  {
+    "company_name": "HealthBridge Digital", "industry": "Healthcare", "location": "Hyderabad",
+    "signal_title": "Small ML hiring for diagnostics",
+    "signal_description": "HealthBridge is hiring 5 machine learning engineers for a diagnostics AI initiative.",
+    "source_name": "Synthetic Job Portal", "source_url": "https://synthetic.example/healthbridge/ml",
+    "technologies": ["ML", "AI", "Python"], "estimated_hiring": 5, "hiring_roles": ["ML Engineer"],
+    "poc_title": "Head of Engineering", "signal_confidence": 58, "signal_age_days": 50
+  },
+  {
+    "company_name": "PrimeCare Technology Services", "industry": "Healthcare", "location": "Chennai",
+    "signal_title": "Enterprise implementation of patient data platform",
+    "signal_description": "PrimeCare started an enterprise implementation and deployment of a patient data platform, hiring 18 Python and data engineering specialists.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/primecare/impl",
+    "technologies": ["Python", "Data Engineering", "SQL"], "project_name": "Enterprise Data Platform", "project_value": 12000000,
+    "estimated_hiring": 18, "hiring_roles": ["Data Engineer", "Python Developer", "Platform Engineer"],
+    "company_size": "1001-5000", "company_website": "https://synthetic.example/primecare",
+    "poc_title": "VP Engineering", "signal_confidence": 85, "signal_age_days": 7
+  },
+  {
+    "company_name": "PrimeCare Technology Services", "industry": "Healthcare", "location": "Chennai",
+    "signal_title": "Normal backend hiring",
+    "signal_description": "PrimeCare is hiring 4 backend engineers for maintenance.",
+    "source_name": "Synthetic Job Portal", "source_url": "https://synthetic.example/primecare/backend",
+    "technologies": ["Java"], "estimated_hiring": 4, "hiring_roles": ["Backend Engineer"],
+    "poc_title": "Talent Acquisition Head", "signal_confidence": 50, "signal_age_days": 45
+  },
+  {
+    "company_name": "PrimeCare Technology Services", "industry": "Healthcare", "location": "Chennai",
+    "signal_title": "Possible technology work (unconfirmed)",
+    "signal_description": "PrimeCare may be considering some technology work in the future.",
+    "technologies": [], "hiring_roles": [], "signal_confidence": 15, "signal_age_days": 100
+  },
+  {
+    "company_name": "CloudNova Systems", "industry": "IT", "location": "Bengaluru",
+    "signal_title": "Enterprise cloud platform ramp-up",
+    "signal_description": "CloudNova won a large enterprise project awarded and is scaling team, hiring 45 engineers across Java, AWS, Kubernetes and DevOps.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/cloudnova/platform",
+    "technologies": ["Java", "AWS", "Kubernetes", "DevOps"], "project_name": "Enterprise Cloud Platform", "project_value": 50000000,
+    "estimated_hiring": 45, "hiring_roles": ["Java Engineer", "AWS Engineer", "DevOps Engineer", "Platform Engineer"],
+    "company_size": "5001-10000", "company_website": "https://synthetic.example/cloudnova",
+    "poc_title": "CTO", "signal_confidence": 96, "signal_age_days": 0
+  },
+  {
+    "company_name": "CloudNova Systems", "industry": "IT", "location": "Bengaluru",
+    "signal_title": "AWS migration and automation initiative",
+    "signal_description": "CloudNova announced an AWS migration and automation initiative for internal platforms.",
+    "source_name": "Synthetic Business News", "source_url": "https://synthetic.example/cloudnova/aws",
+    "technologies": ["AWS", "DevOps"], "estimated_hiring": 9, "hiring_roles": ["Cloud Engineer"],
+    "poc_title": "Head of Engineering", "signal_confidence": 68, "signal_age_days": 30
+  },
+  {
+    "company_name": "CloudNova Systems", "industry": "IT", "location": "Bengaluru",
+    "signal_title": "Master service agreement signed",
+    "signal_description": "CloudNova signed a master service agreement (SOW) for a technology engagement.",
+    "source_name": "Synthetic Project Registry", "source_url": "https://synthetic.example/cloudnova/msa",
+    "technologies": [], "hiring_roles": [], "poc_title": "Procurement Head",
+    "signal_confidence": 55, "signal_age_days": 60
+  },
+  {
+    "company_name": "QuantumWorks Solutions", "industry": "IT", "location": "Pune",
+    "signal_title": "Digital transformation program with large hiring",
+    "signal_description": "QuantumWorks launched a digital transformation program and is hiring 30 developers in React, Node.js and Python.",
+    "source_name": "Synthetic Company Announcement", "source_url": "https://synthetic.example/quantumworks/dx",
+    "technologies": ["React", "Node.js", "Python", "TypeScript"], "project_name": "Digital Transformation Program", "project_value": 20000000,
+    "estimated_hiring": 30, "hiring_roles": ["Full Stack Engineer", "React Developer", "Python Developer"],
+    "company_size": "1001-5000", "company_website": "https://synthetic.example/quantumworks",
+    "poc_title": "VP Engineering", "signal_confidence": 90, "signal_age_days": 5
+  },
+  {
+    "company_name": "QuantumWorks Solutions", "industry": "IT", "location": "Pune",
+    "signal_title": "Platform hiring without a confirmed source",
+    "signal_description": "QuantumWorks is hiring 12 DevOps and Kubernetes engineers for platform work.",
+    "technologies": ["DevOps", "Kubernetes", "Docker"], "estimated_hiring": 12,
+    "hiring_roles": ["DevOps Engineer", "Platform Engineer"], "poc_title": "Delivery Head",
+    "signal_confidence": 62, "signal_age_days": 16
+  },
+  {
+    "company_name": "RetailOrbit Technologies", "industry": "IT", "location": "Gurugram",
+    "signal_title": "Government tender won for citizen services platform",
+    "signal_description": "RetailOrbit bagged a government tender and won contract for a citizen services platform, hiring 20 Java and Angular engineers.",
+    "source_name": "Synthetic Government Tender", "source_url": "https://synthetic.example/retailorbit/tender",
+    "technologies": ["Java", "Angular", "SQL"], "project_name": "Citizen Services Platform", "project_value": 35000000,
+    "estimated_hiring": 20, "hiring_roles": ["Java Engineer", "Frontend Engineer"],
+    "company_size": "1001-5000", "company_website": "https://synthetic.example/retailorbit",
+    "poc_title": "CIO", "signal_confidence": 91, "signal_age_days": 2
+  },
+  {
+    "company_name": "RetailOrbit Technologies", "industry": "IT", "location": "Gurugram",
+    "signal_title": "Expansion with a small project and hiring",
+    "signal_description": "RetailOrbit announced an expansion with a new delivery center and won a small project; hiring 6 engineers.",
+    "source_name": "Synthetic Business News", "source_url": "https://synthetic.example/retailorbit/expansion",
+    "technologies": ["Java", "AWS"], "estimated_hiring": 6, "hiring_roles": ["Backend Engineer"],
+    "poc_title": "Program Director", "signal_confidence": 60, "signal_age_days": 35
+  }
+]
