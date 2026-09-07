@@ -16,6 +16,45 @@ const getLeadMock = vi.mocked(getLead);
 const updateLeadMock = vi.mocked(updateLead);
 const deleteLeadMock = vi.mocked(deleteLead);
 
+// Mock only the network fns; keep the real display helpers.
+vi.mock('@/services/decisionMakers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/decisionMakers')>();
+  return { ...actual, fetchContacts: vi.fn(), fetchLeadStakeholders: vi.fn() };
+});
+import { fetchLeadStakeholders, type LeadStakeholders } from '@/services/decisionMakers';
+const fetchLeadStakeholdersMock = vi.mocked(fetchLeadStakeholders);
+
+function makeStakeholders(p: Partial<LeadStakeholders> = {}): LeadStakeholders {
+  return {
+    lead_id: 1,
+    company_name: 'NorthStar Banking Technologies',
+    recommendation_confidence: 70,
+    recommended_roles: [
+      {
+        role: 'Head of Engineering',
+        role_category: 'TECHNICAL',
+        decision_maker_type: 'TECHNICAL',
+        relevance_score: 72,
+        reason: 'Owns engineering hiring decisions.',
+        is_primary: true,
+      },
+      {
+        role: 'Procurement Lead',
+        role_category: 'PROCUREMENT',
+        decision_maker_type: 'PROCUREMENT',
+        relevance_score: 55,
+        reason: null,
+        is_primary: false,
+      },
+    ],
+    verified_decision_makers: [],
+    business_contacts: [],
+    outreach_readiness: 'ROLE_ONLY',
+    outreach_reasons: ['Only recommended roles are available so far.'],
+    ...p,
+  };
+}
+
 function makeLead(p: Partial<Lead> = {}): Lead {
   return {
     normalized_company_name: null,
@@ -79,6 +118,8 @@ beforeEach(() => {
   getLeadMock.mockReset();
   updateLeadMock.mockReset();
   deleteLeadMock.mockReset();
+  fetchLeadStakeholdersMock.mockReset();
+  fetchLeadStakeholdersMock.mockResolvedValue(makeStakeholders());
 });
 afterEach(() => vi.clearAllMocks());
 
@@ -227,5 +268,18 @@ describe('LeadDetailsPage', () => {
     getLeadMock.mockResolvedValue(makeLead());
     renderDetail();
     expect(await screen.findByRole('link', { name: /back to leads/i })).toHaveAttribute('href', '/leads');
+  });
+
+  it('shows the stakeholders panel with roles, readiness and honest empty people states', async () => {
+    getLeadMock.mockResolvedValue(makeLead());
+    renderDetail();
+    await screen.findByRole('heading', { level: 2, name: /northstar/i });
+
+    expect(await screen.findByText('Stakeholders')).toBeInTheDocument();
+    expect(screen.getByText('Head of Engineering')).toBeInTheDocument();
+    expect(screen.getByText('Primary')).toBeInTheDocument();
+    expect(screen.getByText('Role only')).toBeInTheDocument(); // outreach readiness
+    expect(screen.getByText(/no verified people yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no source-backed business contacts yet/i)).toBeInTheDocument();
   });
 });

@@ -87,6 +87,8 @@ class SourceCapability(str, Enum):
     EXPANSION_SIGNALS = "expansion_signals"
     SOURCE_URLS = "source_urls"
     SOURCE_IDS = "source_ids"
+    DECISION_MAKERS = "decision_makers"
+    CONTACTS = "contacts"
 
 
 class RateLimit(BaseModel):

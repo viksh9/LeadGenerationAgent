@@ -681,3 +681,93 @@ class TimelineResponse(BaseModel):
     company_id: int
     events: list[TimelineEventResponse]
     total: int
+
+
+# ---------------------------------------------------------------------------
+# Decision makers / contacts / stakeholders
+# ---------------------------------------------------------------------------
+
+
+class DecisionMakerResponse(BaseModel):
+    """A REAL person or business contact (source-backed; never fabricated)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    full_name: Optional[str] = None
+    job_title: Optional[str] = None
+    normalized_role: Optional[str] = None
+    role_category: str = "OTHER"
+    department: Optional[str] = None
+    seniority: Optional[str] = None
+    profile_url: Optional[str] = None
+    professional_network_url: Optional[str] = None
+    business_email: Optional[str] = None
+    business_phone: Optional[str] = None
+    contact_type: str = "OTHER"
+    email_status: Optional[str] = None
+    contact_source: Optional[str] = None
+    source_type: Optional[str] = None
+    source_url: Optional[str] = None
+    identity_confidence: int = 0
+    role_confidence: int = 0
+    company_confidence: int = 0
+    contact_confidence: int = 0
+    evidence_confidence: int = 0
+    freshness_score: int = 0
+    verification_status: str = "UNVERIFIED"
+    match_status: str = "NO_MATCH"
+    data_provenance: str = "REAL"
+    last_verified_at: Optional[datetime] = None
+
+    @field_validator("role_category", "contact_type", "email_status", "verification_status",
+                     "match_status", "data_provenance", mode="before")
+    @classmethod
+    def _ev(cls, v):
+        return v.value if hasattr(v, "value") else v
+
+
+class DecisionMakerListResponse(BaseModel):
+    items: list[DecisionMakerResponse]
+    total: int
+    page: int = 1
+    page_size: int = 20
+    total_pages: int = 0
+
+
+class StakeholderRoleResponse(BaseModel):
+    role: str
+    role_category: str
+    decision_maker_type: str
+    relevance_score: int
+    reason: str
+    is_primary: bool = False
+
+
+class LeadStakeholdersResponse(BaseModel):
+    """Recommended ROLES (no person) + any VERIFIED people/contacts, kept distinct."""
+
+    lead_id: int
+    company_name: Optional[str] = None
+    recommended_roles: list[StakeholderRoleResponse]
+    recommendation_confidence: int = 0
+    verified_decision_makers: list[DecisionMakerResponse] = Field(default_factory=list)
+    business_contacts: list[DecisionMakerResponse] = Field(default_factory=list)
+    outreach_readiness: str = "RESEARCH_REQUIRED"
+    outreach_reasons: list[str] = Field(default_factory=list)
+
+
+class EnrichRunResponse(BaseModel):
+    """Result of a real official-source enrichment run for one company."""
+
+    company_id: int
+    provider: str
+    people_found: int = 0
+    contacts_found: int = 0
+    people_accepted: int = 0
+    contacts_accepted: int = 0
+    duplicates: int = 0
+    pages_fetched: int = 0
+    message: Optional[str] = None

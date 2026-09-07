@@ -402,6 +402,120 @@ exposed anywhere**. robots.txt and site terms are respected, and no credentials 
 logged. Public, no-auth, board/site format-validated, IT-relevance filtered,
 provenance `REAL`; commercial / ongoing reuse remains `REQUIRES_REVIEW`.
 
+## Decision-maker & contact enrichment
+
+This layer answers *"who should we talk to at this company, and do we have a real,
+verified way to reach them?"* — while keeping **three distinct concepts separate**
+and never confusing one for another:
+
+1. **Recommended stakeholder ROLE (no person).** A role *type* likely to own the
+   decision (e.g. "VP Engineering"), driven by opportunity / signal / hiring /
+   industry evidence. Deterministic and **always available** — no person is
+   claimed, no network is touched.
+2. **Verified real PERSON.** A named individual **only** when found in a permitted,
+   traceable source. Absent that, this stays **NULL** — a person is *never*
+   assumed, guessed, or fabricated.
+3. **Verified business CONTACT.** A *published business* email/contact (e.g. a
+   role-based address), never a personal or guessed one.
+
+> **Role recommendation ≠ person identification ≠ contact verification ≠ outreach
+> permission.** These are four separate questions with four separate answers.
+
+Full detail: [docs/decision-maker-enrichment.md](docs/decision-maker-enrichment.md).
+
+### Role recommendation (roles only)
+
+The role engine (`enrichment/poc_finder.py`, wrapped by
+`enrichment/stakeholder.py`) recommends decision-maker **role types** from the
+detected signals, opportunity analysis, hiring, and industry — each with a
+category, a relevance score, and a grounded reason. It produces **no person, no
+email, no profile, and touches no network**. See also
+[docs/poc-intelligence.md](docs/poc-intelligence.md).
+
+### Official-source person / contact enricher
+
+`enrichment/person_enricher.py` (`OfficialCompanySourceEnricher`) enriches a
+company **only from that company's own official pages** — `/`, `/about`,
+`/leadership`, `/team`, `/management`, `/contact` — fetched through the existing
+`SafeHttpClient` (HTTPS, SSRF guard, private-network block, response-size cap, no
+credentials). From that server HTML it extracts:
+
+- **Real people** from schema.org JSON-LD `Person` entries (name + jobTitle).
+- **Real business contacts** from published `mailto:` addresses that are
+  role-based (`info@`, `sales@`, `careers@`, `procurement@`, …) or on the
+  company's own domain.
+
+It **never** fabricates a person, email, phone, or profile; **never** guesses
+`firstname.lastname@` addresses; **never** constructs LinkedIn/profile URLs from a
+name; and **never** scrapes third-party or private profiles or bypasses
+auth/robots. Personal-looking addresses (e.g. a random Gmail) are rejected. When
+the official pages publish nothing extractable, the result is honestly **empty /
+NULL** — real careers and leadership pages are frequently JS-rendered SPAs whose
+people are not in the server HTML, and there is **no browser automation** by
+policy, so people are found only when published as JSON-LD.
+
+### Distinct confidence axes, verification & freshness
+
+Persistence and resolution live in `enrichment/enrichment_service.py`, which
+stores `DecisionMaker` rows with **distinct confidence axes — never collapsed into
+one**: `identity_confidence`, `role_confidence`, `company_confidence`,
+`contact_confidence`, and `evidence_confidence`. Each row also carries a
+`verification_status` (`VERIFIED` / `PARTIALLY_VERIFIED` / `UNVERIFIED` / `STALE`
+/ `CONTRADICTED`), a `freshness_score`, and `provenance = REAL`.
+
+- **Deterministic person resolution.** Name alone **never** merges two distinct
+  people; the same person observed under a different role becomes
+  `REVIEW_REQUIRED`. Upserts are idempotent, corroborating sources are kept in
+  `source_references`, and history is preserved.
+- **Freshness.** Reuses `verification.freshness` — a person or contact is **not**
+  assumed current forever.
+- **Evidence tier.** An official company source is `TIER_1` — stronger than
+  aggregators.
+
+### Outreach readiness (separate from lead score)
+
+`enrichment/outreach.py` computes a deterministic readiness state — `READY` /
+`ROLE_ONLY` / `RESEARCH_REQUIRED` / `HOLD` — that is **separate from**
+`lead_score`, `evidence_confidence`, and `contact_confidence`. A recommended role
+alone is **never** `READY` (that is `ROLE_ONLY`); anything stale or contradicted
+is `HOLD`.
+
+### Provider architecture
+
+Enrichers are pluggable behind `BasePersonEnricher` / `BaseContactEnricher`.
+`config/sources.yaml` registers two:
+
+- `official_company_people` — **implemented** (the enricher above); status
+  `REQUIRES_REVIEW` pending a privacy/terms review; **no key**.
+- `business_contact_provider` — a **`PLANNED` / `NOT_IMPLEMENTED`** placeholder for
+  a licensed B2B contact provider; it requires a commercial licence, credentials,
+  and a usage policy, and its commercial use is `REQUIRES_APPROVAL`. **No paid
+  provider is wired.**
+
+Provider credentials are never exposed through the API.
+
+### Privacy & data minimization
+
+Business contacts are preferred over personal data. **No** personal home address,
+family, private account, or private phone is collected — only publicly published,
+business-relevant, source-linked, minimized data. There is **no SMTP probing** and
+**no credential verification**; email is format-validated only.
+
+### Enrichment APIs
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /contacts` | List verified contacts; filters `company` / `role_category` / `verification_status` / `people_only`; paginated |
+| `GET /contacts/{id}` | One contact / decision-maker record |
+| `GET /companies/{id}/decision-makers` | Decision-maker rows for one company |
+| `GET /companies/{id}/contacts` | Verified contacts for one company |
+| `GET /leads/{id}/stakeholders` | Recommended roles + verified people/contacts + outreach readiness for a lead |
+| `POST /companies/{id}/enrich` | Run the real, safe, official-source fetch for a company |
+
+> **No live enrichment has been run against a real company** in this change. The
+> enricher is unit-tested with real-shaped HTML over a mocked transport; no
+> credentials are required by the default test suite.
+
 ## Business signals & tenders
 
 Hiring is one signal; this layer adds structured **business events** and

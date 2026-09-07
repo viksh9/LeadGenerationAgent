@@ -469,6 +469,63 @@ class AtsProvider(str, Enum):
     OTHER = "OTHER"
 
 
+class RoleCategory(str, Enum):
+    """Stakeholder role category for opportunity-specific targeting."""
+
+    TECHNICAL = "TECHNICAL"
+    ENGINEERING = "ENGINEERING"
+    BUSINESS = "BUSINESS"
+    DELIVERY = "DELIVERY"
+    PRODUCT = "PRODUCT"
+    PROCUREMENT = "PROCUREMENT"
+    VENDOR_MANAGEMENT = "VENDOR_MANAGEMENT"
+    TALENT_ACQUISITION = "TALENT_ACQUISITION"
+    HR = "HR"
+    OTHER = "OTHER"
+
+
+class ContactType(str, Enum):
+    """Kind of contact method (business-first; personal data minimized)."""
+
+    BUSINESS_EMAIL = "BUSINESS_EMAIL"
+    BUSINESS_PHONE = "BUSINESS_PHONE"
+    OFFICIAL_CONTACT_FORM = "OFFICIAL_CONTACT_FORM"
+    PROCUREMENT_CONTACT = "PROCUREMENT_CONTACT"
+    DEPARTMENT_CONTACT = "DEPARTMENT_CONTACT"
+    PROFESSIONAL_PROFILE = "PROFESSIONAL_PROFILE"
+    OFFICIAL_PROFILE = "OFFICIAL_PROFILE"
+    OTHER = "OTHER"
+
+
+class EmailStatus(str, Enum):
+    """Provenance/quality of a business email (never SMTP-probed, never guessed)."""
+
+    VERIFIED_SOURCE = "VERIFIED_SOURCE"      # published by a permitted source
+    UNVERIFIED_SOURCE = "UNVERIFIED_SOURCE"
+    INVALID_FORMAT = "INVALID_FORMAT"
+    STALE = "STALE"
+
+
+class PersonMatchStatus(str, Enum):
+    """Deterministic person entity-resolution outcome (name alone never merges)."""
+
+    EXACT_MATCH = "EXACT_MATCH"
+    HIGH_CONFIDENCE_MATCH = "HIGH_CONFIDENCE_MATCH"
+    POSSIBLE_MATCH = "POSSIBLE_MATCH"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    NO_MATCH = "NO_MATCH"
+    CONFLICT = "CONFLICT"
+
+
+class OutreachReadiness(str, Enum):
+    """How ready a lead is for outreach — separate from lead_score/evidence."""
+
+    READY = "READY"                     # verified opportunity + company + verified contact
+    ROLE_ONLY = "ROLE_ONLY"             # role identified, no verified person
+    RESEARCH_REQUIRED = "RESEARCH_REQUIRED"
+    HOLD = "HOLD"                        # stale / contradictory evidence
+
+
 class CareerSourceStatus(str, Enum):
     """State of a discovered company career/ATS source.
 
@@ -678,6 +735,85 @@ class CompanyCareerSource(Base):
     data_provenance: Mapped[DataProvenance] = mapped_column(
         SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
     )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class DecisionMaker(Base):
+    """A REAL person and/or business contact linked to a company from a permitted,
+    traceable source. Never fabricated: a row exists only when an actual source
+    provides the identity/contact. Personal data is minimized (business contacts
+    preferred). Recommended ROLES (no person) are computed separately and are NOT
+    stored here.
+
+    Confidence is split into distinct axes (identity/role/company/contact) plus
+    verification status and freshness — never collapsed. Corroborating sources are
+    kept in ``source_references``; name-alone never merges distinct people."""
+
+    __tablename__ = "decision_makers"
+    __table_args__ = (
+        UniqueConstraint("company_id", "normalized_name", "normalized_role",
+                         name="uq_decision_maker_company_person_role"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    normalized_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    job_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    normalized_role: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    role_category: Mapped[RoleCategory] = mapped_column(
+        SAEnum(RoleCategory, native_enum=False, length=24), default=RoleCategory.OTHER
+    )
+    department: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    seniority: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    geography: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    # Profiles / business contact — exact source values only (never guessed/constructed).
+    profile_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    professional_network_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    business_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    business_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    contact_type: Mapped[ContactType] = mapped_column(
+        SAEnum(ContactType, native_enum=False, length=32), default=ContactType.OTHER
+    )
+    email_status: Mapped[EmailStatus | None] = mapped_column(
+        SAEnum(EmailStatus, native_enum=False, length=24), nullable=True
+    )
+
+    # Provenance (mandatory — never stored without a source).
+    contact_source: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_record_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    collector_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    source_references: Mapped[list[dict]] = mapped_column(JSON, default=list)
+
+    # Distinct confidence axes (never collapsed).
+    identity_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    role_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    company_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    contact_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    freshness_score: Mapped[int] = mapped_column(Integer, default=0)
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        SAEnum(VerificationStatus, native_enum=False, length=24),
+        default=VerificationStatus.UNVERIFIED, index=True,
+    )
+    match_status: Mapped[PersonMatchStatus] = mapped_column(
+        SAEnum(PersonMatchStatus, native_enum=False, length=24),
+        default=PersonMatchStatus.NO_MATCH,
+    )
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
