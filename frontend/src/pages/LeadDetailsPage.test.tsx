@@ -24,6 +24,71 @@ vi.mock('@/services/decisionMakers', async (importOriginal) => {
 import { fetchLeadStakeholders, type LeadStakeholders } from '@/services/decisionMakers';
 const fetchLeadStakeholdersMock = vi.mocked(fetchLeadStakeholders);
 
+// AI intelligence panel self-fetches. Keep the real display helpers; mock the
+// network fn with a deterministic baseline (1 fact + 1 inference + 1 unknown).
+// The mock object is built INSIDE the factory to avoid hoisting errors.
+vi.mock('@/services/ai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/ai')>();
+  const deterministic: import('@/services/ai').AIIntelligence = {
+    id: 1,
+    subject_type: 'lead',
+    subject_id: 1,
+    company_id: null,
+    lead_id: 1,
+    executive_summary: 'Deterministic baseline summary for this lead.',
+    opportunity_explanation: 'Project-driven hiring indicates capacity demand.',
+    urgency_reason: 'Recent award suggests near-term staffing need.',
+    business_problem_hypothesis: 'Scaling delivery capacity.',
+    recommended_action: 'Engage engineering leadership.',
+    next_best_action: 'Reach out to the VP of Engineering.',
+    sales_angle: 'Position managed engineering pods.',
+    sales_pitch: 'We noticed your modernization project…',
+    verified_facts: [
+      {
+        claim_text: 'Company won a digital banking transformation project.',
+        claim_type: 'FACT',
+        support_level: 'STRONG',
+        evidence_ids: [123],
+        validation_status: null,
+      },
+    ],
+    inferred_insights: [
+      {
+        claim_text: 'They likely need additional Java engineers soon.',
+        claim_type: 'INFERENCE',
+        support_level: 'MODERATE',
+        evidence_ids: [],
+        validation_status: null,
+      },
+    ],
+    unknowns: ['Exact budget for the initiative is unknown.'],
+    risk_flags: [],
+    target_roles: ['Head of Engineering'],
+    evidence_ids: [123],
+    source_ids: ['press-release-1'],
+    confidence: 62,
+    analysis_status: 'DETERMINISTIC',
+    ai_generated: false,
+    unsupported_claim_count: 0,
+    provider: null,
+    model_name: null,
+    prompt_version: null,
+    generated_at: null,
+  };
+  return {
+    ...actual,
+    fetchLeadAI: vi.fn().mockResolvedValue(deterministic),
+    fetchCompanyAI: vi.fn().mockResolvedValue(deterministic),
+    fetchAIStatus: vi.fn().mockResolvedValue({
+      provider: null,
+      model: null,
+      status: 'NOT_CONFIGURED',
+      deterministic_baseline_available: true,
+      note: 'No LLM configured; using deterministic baseline.',
+    }),
+  };
+});
+
 function makeStakeholders(p: Partial<LeadStakeholders> = {}): LeadStakeholders {
   return {
     lead_id: 1,
@@ -268,6 +333,28 @@ describe('LeadDetailsPage', () => {
     getLeadMock.mockResolvedValue(makeLead());
     renderDetail();
     expect(await screen.findByRole('link', { name: /back to leads/i })).toHaveAttribute('href', '/leads');
+  });
+
+  it('renders AI intelligence with facts and inferences visually distinct', async () => {
+    getLeadMock.mockResolvedValue(makeLead());
+    renderDetail();
+    await screen.findByRole('heading', { level: 2, name: /northstar/i });
+
+    // Panel heading and deterministic-baseline provenance.
+    expect(await screen.findByText('AI Intelligence')).toBeInTheDocument();
+    expect(screen.getByText('Deterministic baseline')).toBeInTheDocument();
+    expect(screen.getByText('Deterministic', { selector: 'span.badge' })).toBeInTheDocument();
+
+    // A FACT and an INFERENCE are rendered with explicit, distinct labels.
+    const factLabel = screen.getByText('Fact');
+    const inferenceLabel = screen.getByText('Inference');
+    expect(factLabel).toBeInTheDocument();
+    expect(inferenceLabel).toBeInTheDocument();
+    expect(factLabel.className).not.toEqual(inferenceLabel.className);
+
+    // Fact shows its evidence id; unknown is listed.
+    expect(screen.getByText('evidence #123')).toBeInTheDocument();
+    expect(screen.getByText(/exact budget for the initiative is unknown/i)).toBeInTheDocument();
   });
 
   it('shows the stakeholders panel with roles, readiness and honest empty people states', async () => {

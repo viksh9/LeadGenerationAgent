@@ -516,6 +516,95 @@ business-relevant, source-linked, minimized data. There is **no SMTP probing** a
 > enricher is unit-tested with real-shaped HTML over a mocked transport; no
 > credentials are required by the default test suite.
 
+## AI reasoning layer
+
+A new **AI reasoning and prioritization** layer sits *over* the real,
+already-verified data. It is a **reasoning layer, never a source of facts**: it
+cannot invent companies, people, jobs, numbers, dates, values, technologies, or
+intent. Full detail: [docs/ai-reasoning-layer.md](docs/ai-reasoning-layer.md).
+
+> **No AI provider is configured in this environment.** Status is
+> `NOT_CONFIGURED` and **no live AI request has been executed.** All AI
+> intelligence shown is the **deterministic grounded baseline** produced purely
+> from real DB records — nothing here means an LLM ran.
+
+- **Deterministic baseline, always on** (`ai/deterministic.py`). With **no
+  provider configured**, the layer still produces the same structured output
+  purely from real DB records — executive summary, `verified_facts` (each with
+  `evidence_ids`), `inferred_insights` (labelled as inference, hedged),
+  `unknowns`, opportunity explanation, urgency reason, business-problem
+  hypothesis, recommended action, next best action, sales angle, risk flags, and
+  an AI reasoning confidence. It is stamped `model_name="deterministic-1.0"`,
+  `ai_generated=false`. AI unavailable ⇒ deterministic intelligence with a clear
+  indication, **never fabricated content**.
+- **Fact vs inference vs unknown** (`ai/schema.py`). Every `AIClaim` carries a
+  `claim_type` (`FACT` / `INFERENCE` / `UNKNOWN`), a `support_level` (`DIRECT` /
+  `SUPPORTED_INFERENCE` / `UNSUPPORTED` / `CONTRADICTED`), and `evidence_ids`.
+  Facts cite real evidence; inference and unknown are **never** shown as fact.
+- **Grounded, minimized input context** (`ai/context.py`). The
+  `LeadIntelligenceContext` / company context is assembled **only from real
+  records** (scoring, canonical jobs, technologies, signals, tenders, evidence
+  with `evidence_ids`, decision-makers, conflicts, provenance), **sanitized**
+  (HTML/scripts stripped, length-capped) and **minimized** (no secrets, no raw
+  payloads, no unnecessary personal data). A `context_hash` supports caching.
+- **Provider abstraction + truthful status** (`ai/provider.py`). `BaseAIProvider`
+  + `OpenAICompatibleProvider` work with any OpenAI-compatible
+  `/chat/completions` endpoint, configured **only** from the environment
+  (`AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_API_BASE_URL`,
+  `AI_TIMEOUT_SECONDS`, `AI_MAX_OUTPUT_TOKENS`, `AI_TEMPERATURE`, `AI_ENABLED`) —
+  **no credentials in code**. Status is truthful: `NOT_CONFIGURED` / `CONFIGURED`
+  / `CONNECTED` / `AUTHENTICATION_FAILED` / `RATE_LIMITED` / `ERROR` / `DISABLED`
+  — `CONNECTED` **only after a real model request (probe) succeeds**. Model
+  responses are strict JSON, Pydantic-validated; malformed output is rejected.
+- **Prompt-injection defense** (`ai/prompts.py`). System rules are authoritative;
+  source/context is passed inside a delimited **UNTRUSTED** block the model is
+  told to treat as **data, not instructions**. `prompt_version` is tracked.
+- **Hallucination validator** (`ai/validator.py`). AI `FACT` claims' numbers and
+  named people are compared against the real context; anything ungrounded is
+  marked `UNSUPPORTED_CLAIM` and the `FACT` is **downgraded to inference** so the
+  UI can never show it as fact.
+- **Caching, versioning & cost control** (`ai/service.py`). Orchestration is
+  build context → (LLM if configured + connected + eligible, else deterministic)
+  → validate → persist a **versioned** `AIIntelligenceResult`
+  (`context_hash` / `output_hash` / `prompt_version` / model). The cached result
+  is returned when `context_hash` + `prompt_version` are unchanged (**the
+  provider is not called on every request**). The LLM runs only for **HOT / WARM**
+  leads or an explicit force; others get the deterministic baseline. On provider
+  failure it **falls back to deterministic** (status `UNAVAILABLE`) — no
+  fabrication. Every attempt writes an `AIAnalysisAudit` (no sensitive data). AI
+  reasoning confidence is a **separate axis** from `lead_score`,
+  `evidence_confidence`, and `contact_confidence`.
+- **Human review — no autonomous actions.** AI output is data / recommendation
+  only. It **cannot** execute code, run a shell, access credentials, make HTTP
+  requests, modify the schema, or send communications. High-impact actions are
+  human-decided. The deterministic systems remain authoritative for source data,
+  normalization, resolution, dedup, evidence verification, signal classification,
+  lead score, opportunity type, and contact verification.
+
+### AI APIs (`api/routes/ai.py`)
+
+No secrets are exposed. `GET` returns the cached result (deterministic baseline on
+the first call); `POST` forces a fresh analysis.
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /ai/status` | Truthful AI provider status (currently `NOT_CONFIGURED`) |
+| `GET /leads/{id}/ai-intelligence` | Cached AI intelligence for a lead (deterministic baseline first) |
+| `POST /leads/{id}/ai-analyze` | Force a fresh analysis for a lead |
+| `GET /companies/{id}/ai-intelligence` | Cached AI intelligence for a company |
+| `POST /companies/{id}/ai-analyze` | Force a fresh analysis for a company |
+
+**AI provider status.** No provider is configured here, so `GET /ai/status`
+reports `NOT_CONFIGURED` and no live AI request has run:
+
+| Provider | Implementation | Status | Notes |
+| --- | --- | --- | --- |
+| OpenAI-compatible (`ai/provider.py`) | implemented | `NOT_CONFIGURED` | Set `AI_PROVIDER` / `AI_MODEL` / `AI_API_KEY` / `AI_API_BASE_URL` (+ `AI_ENABLED`); `CONNECTED` only after a real model probe. Deterministic baseline works with none set |
+
+**Live AI tests.** The default `pytest` suite makes **no external AI calls**.
+Optional live tests are opt-in via `RUN_LIVE_AI_TESTS=true` and validate only
+schema + safety, not exact wording.
+
 ## Business signals & tenders
 
 Hiring is one signal; this layer adds structured **business events** and

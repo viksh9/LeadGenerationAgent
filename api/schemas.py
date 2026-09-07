@@ -771,3 +771,67 @@ class EnrichRunResponse(BaseModel):
     duplicates: int = 0
     pages_fetched: int = 0
     message: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# AI reasoning layer
+# ---------------------------------------------------------------------------
+
+
+class AIClaimResponse(BaseModel):
+    claim_text: str
+    claim_type: str = "INFERENCE"
+    support_level: str = "SUPPORTED_INFERENCE"
+    evidence_ids: list[int] = Field(default_factory=list)
+    validation_status: Optional[str] = None
+
+
+class AIIntelligenceResponse(BaseModel):
+    """AI (or deterministic-baseline) reasoning over real data. Facts and inferences
+    are kept distinct; AI confidence is separate from lead_score/evidence_confidence."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    subject_type: str
+    subject_id: int
+    company_id: Optional[int] = None
+    lead_id: Optional[int] = None
+    executive_summary: Optional[str] = None
+    opportunity_explanation: Optional[str] = None
+    urgency_reason: Optional[str] = None
+    business_problem_hypothesis: Optional[str] = None
+    recommended_action: Optional[str] = None
+    next_best_action: Optional[str] = None
+    sales_angle: Optional[str] = None
+    sales_pitch: Optional[str] = None
+    verified_facts: list[AIClaimResponse] = Field(default_factory=list)
+    inferred_insights: list[AIClaimResponse] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    target_roles: list[str] = Field(default_factory=list)
+    evidence_ids: list[int] = Field(default_factory=list)
+    source_ids: list[str] = Field(default_factory=list)
+    confidence: int = 0
+    analysis_status: str = "DETERMINISTIC"
+    ai_generated: bool = False
+    unsupported_claim_count: int = 0
+    provider: Optional[str] = None
+    model_name: Optional[str] = None
+    prompt_version: Optional[str] = None
+    generated_at: Optional[datetime] = None
+
+    @field_validator("analysis_status", mode="before")
+    @classmethod
+    def _ev(cls, v):
+        return v.value if hasattr(v, "value") else v
+
+
+class AIStatusResponse(BaseModel):
+    """Truthful AI provider status. CONNECTED only after a real model request."""
+
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    status: str = "NOT_CONFIGURED"
+    deterministic_baseline_available: bool = True
+    note: str = ""

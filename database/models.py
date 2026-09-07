@@ -526,6 +526,43 @@ class OutreachReadiness(str, Enum):
     HOLD = "HOLD"                        # stale / contradictory evidence
 
 
+class AIProviderStatus(str, Enum):
+    """Truthful AI provider connectivity (CONNECTED only after a real model call)."""
+
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+    CONFIGURED = "CONFIGURED"
+    CONNECTED = "CONNECTED"
+    AUTHENTICATION_FAILED = "AUTHENTICATION_FAILED"
+    RATE_LIMITED = "RATE_LIMITED"
+    ERROR = "ERROR"
+    DISABLED = "DISABLED"
+
+
+class ClaimType(str, Enum):
+    """Every AI statement is classified — inference/unknown never become fact."""
+
+    FACT = "FACT"                     # evidence directly supports this
+    INFERENCE = "INFERENCE"           # reasonable interpretation of evidence
+    UNKNOWN = "UNKNOWN"               # evidence insufficient
+
+
+class ClaimSupportLevel(str, Enum):
+    DIRECT = "DIRECT"
+    SUPPORTED_INFERENCE = "SUPPORTED_INFERENCE"
+    UNSUPPORTED = "UNSUPPORTED"
+    CONTRADICTED = "CONTRADICTED"
+
+
+class AIAnalysisStatus(str, Enum):
+    """How an AIIntelligenceResult was produced / validated."""
+
+    DETERMINISTIC = "DETERMINISTIC"   # grounded baseline, no LLM (always safe)
+    AI_VALIDATED = "AI_VALIDATED"     # LLM output that passed grounding validation
+    AI_FLAGGED = "AI_FLAGGED"         # LLM output with unsupported/contradicted claims
+    UNAVAILABLE = "UNAVAILABLE"       # provider not configured/failed; baseline shown
+    ERROR = "ERROR"
+
+
 class CareerSourceStatus(str, Enum):
     """State of a discovered company career/ATS source.
 
@@ -1409,3 +1446,86 @@ class CompanyEvent(Base):
         SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class AIIntelligenceResult(Base):
+    """Persisted AI (or deterministic-baseline) reasoning over REAL data for a
+    lead or company. The AI layer NEVER creates facts: every factual assertion is
+    a grounded AIClaim referencing evidence. AI reasoning confidence is a SEPARATE
+    axis from lead_score / evidence_confidence. Versioned + cached by context_hash.
+    """
+
+    __tablename__ = "ai_intelligence_results"
+    __table_args__ = (
+        UniqueConstraint("subject_type", "subject_id", name="uq_ai_result_subject"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subject_type: Mapped[str] = mapped_column(String(16), index=True)   # LEAD | COMPANY
+    subject_id: Mapped[int] = mapped_column(Integer, index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+    executive_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opportunity_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    urgency_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    business_problem_hypothesis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recommended_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_best_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sales_angle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sales_pitch: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Grounded claims (each: {text, type, support_level, evidence_ids, validation_status}).
+    verified_facts: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    inferred_insights: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    unknowns: Mapped[list[str]] = mapped_column(JSON, default=list)
+    risk_flags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    target_roles: Mapped[list[str]] = mapped_column(JSON, default=list)
+    evidence_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    source_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+    # AI reasoning confidence — independent of lead_score/evidence_confidence.
+    confidence: Mapped[int] = mapped_column(Integer, default=0)
+    analysis_status: Mapped[AIAnalysisStatus] = mapped_column(
+        SAEnum(AIAnalysisStatus, native_enum=False, length=16),
+        default=AIAnalysisStatus.DETERMINISTIC, index=True,
+    )
+    ai_generated: Mapped[bool] = mapped_column(default=False)   # True only if an LLM produced it
+    unsupported_claim_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    provider: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model_version: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    context_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
+    )
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class AIAnalysisAudit(Base):
+    """Operational audit of each AI analysis attempt (no sensitive data)."""
+
+    __tablename__ = "ai_analysis_audits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subject_type: Mapped[str] = mapped_column(String(16), index=True)
+    subject_id: Mapped[int] = mapped_column(Integer, index=True)
+    provider: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    context_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[AIAnalysisStatus] = mapped_column(
+        SAEnum(AIAnalysisStatus, native_enum=False, length=16), default=AIAnalysisStatus.DETERMINISTIC
+    )
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    unsupported_claim_count: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

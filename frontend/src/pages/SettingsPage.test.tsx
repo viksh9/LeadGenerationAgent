@@ -16,6 +16,24 @@ vi.mock('@/services/sources', async () => {
 import { fetchSources } from '@/services/sources';
 const fetchSourcesMock = vi.mocked(fetchSources);
 
+// AI provider status. Keep real display helpers; mock the network fn with a
+// NOT_CONFIGURED status. The mock object is built INSIDE the factory (hoisting).
+vi.mock('@/services/ai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/ai')>();
+  return {
+    ...actual,
+    fetchAIStatus: vi.fn().mockResolvedValue({
+      provider: null,
+      model: null,
+      status: 'NOT_CONFIGURED',
+      deterministic_baseline_available: true,
+      note: 'No LLM configured; using deterministic baseline.',
+    }),
+  };
+});
+import { fetchAIStatus } from '@/services/ai';
+const fetchAIStatusMock = vi.mocked(fetchAIStatus);
+
 const HEALTH = {
   status: 'healthy',
   app: 'LeadGenerationAgent',
@@ -121,6 +139,14 @@ beforeEach(() => {
   getHealthMock.mockReset();
   fetchSourcesMock.mockReset();
   fetchSourcesMock.mockResolvedValue(SOURCES);
+  fetchAIStatusMock.mockReset();
+  fetchAIStatusMock.mockResolvedValue({
+    provider: null,
+    model: null,
+    status: 'NOT_CONFIGURED',
+    deterministic_baseline_available: true,
+    note: 'No LLM configured; using deterministic baseline.',
+  });
   localStorage.clear();
 });
 afterEach(() => {
@@ -165,6 +191,18 @@ describe('SettingsPage', () => {
     // Data mode badge from the list response.
     expect(screen.getByText('Data mode: REAL_ONLY')).toBeInTheDocument();
     expect(fetchSourcesMock).toHaveBeenCalled();
+  });
+
+  it('renders the AI provider status from /ai/status', async () => {
+    getHealthMock.mockResolvedValue(HEALTH);
+    renderWithProviders(<SettingsPage />, { route: '/settings' });
+
+    expect(await screen.findByText('AI provider')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Not configured', { selector: 'span.badge' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/using deterministic baseline/i)).toBeInTheDocument();
+    expect(fetchAIStatusMock).toHaveBeenCalled();
   });
 
   it('shows a connected status and backend info from /health', async () => {

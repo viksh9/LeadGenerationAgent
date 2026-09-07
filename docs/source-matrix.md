@@ -674,6 +674,38 @@ has succeeded.
 - Live tests make minimal calls (e.g. a single `results_per_page=1` request) and
   are skipped entirely unless explicitly enabled.
 
+## AI reasoning layer (not a data source)
+
+The AI layer is a **reasoning and prioritization** pass over already-verified real
+data — **never a source of facts**, and **never** a data collector. It appears here
+only so its provider status is tracked in the same truthful way as the sources
+above. Full detail: [ai-reasoning-layer.md](ai-reasoning-layer.md).
+
+| Provider | Implementation | Status | Notes |
+| --- | --- | --- | --- |
+| OpenAI-compatible AI provider (`ai/provider.py`, `OpenAICompatibleProvider`) | IMPLEMENTED | `NOT_CONFIGURED` | Any OpenAI-compatible `/chat/completions`. `CONNECTED` only after a real model probe succeeds. **No provider is configured in this environment and no live AI request has been executed** — all AI intelligence is the deterministic grounded baseline (`ai/deterministic.py`). |
+
+Truthful status values mirror the source model: `NOT_CONFIGURED` / `CONFIGURED` /
+`CONNECTED` / `AUTHENTICATION_FAILED` / `RATE_LIMITED` / `ERROR` / `DISABLED`.
+`GET /ai/status` reports the live truth (currently `NOT_CONFIGURED`).
+
+**Environment (credentials env-only; never committed):**
+
+| Variable | Purpose |
+| --- | --- |
+| `AI_PROVIDER` | Provider selector |
+| `AI_MODEL` | Model name |
+| `AI_API_KEY` | API key (env only; never logged/committed) |
+| `AI_API_BASE_URL` | OpenAI-compatible base URL (e.g. `https://api.openai.com/v1`) |
+| `AI_TIMEOUT_SECONDS` | Request timeout |
+| `AI_MAX_OUTPUT_TOKENS` | Output token cap |
+| `AI_TEMPERATURE` | Sampling temperature |
+| `AI_ENABLED` | Master on/off switch |
+
+The deterministic baseline works with **none** of these set. Default `pytest` makes
+no external AI calls; live AI tests are opt-in via `RUN_LIVE_AI_TESTS=true`
+(schema + safety only).
+
 ## Data provenance
 
 Every real record carries `data_provenance = REAL` and traces back to a source

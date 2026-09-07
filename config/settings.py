@@ -60,7 +60,19 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ENFORCE_REAL_DATA", "REAL_DATA_ONLY"),
     )
 
-    @field_validator("show_synthetic_leads", "enforce_real_data", mode="before")
+    # AI reasoning layer (optional). No provider is required — a deterministic,
+    # evidence-grounded baseline always works. Credentials come from the env only.
+    ai_provider: str | None = Field(default=None, validation_alias=AliasChoices("AI_PROVIDER"))
+    ai_model: str | None = Field(default=None, validation_alias=AliasChoices("AI_MODEL"))
+    ai_api_key: str | None = Field(default=None, validation_alias=AliasChoices("AI_API_KEY"))
+    ai_api_base_url: str = Field(
+        default="https://api.openai.com/v1", validation_alias=AliasChoices("AI_API_BASE_URL"))
+    ai_timeout_seconds: float = Field(default=30.0, validation_alias=AliasChoices("AI_TIMEOUT_SECONDS"))
+    ai_max_output_tokens: int = Field(default=1200, validation_alias=AliasChoices("AI_MAX_OUTPUT_TOKENS"))
+    ai_temperature: float = Field(default=0.2, validation_alias=AliasChoices("AI_TEMPERATURE"))
+    ai_enabled: bool | None = Field(default=None, validation_alias=AliasChoices("AI_ENABLED"))
+
+    @field_validator("show_synthetic_leads", "enforce_real_data", "ai_enabled", mode="before")
     @classmethod
     def _empty_str_is_none(cls, value):
         """Treat an unset/empty env var (e.g. `ENFORCE_REAL_DATA=` in .env) as None
@@ -93,6 +105,19 @@ class Settings(BaseSettings):
         if self.enforce_real_data is not None:
             return self.enforce_real_data
         return self.environment.lower() in {"production", "prod", "staging", "stage"}
+
+    @property
+    def ai_config_status(self) -> str:
+        """Config-level AI provider status (NOT a live connectivity check).
+
+        DISABLED when explicitly off; CONFIGURED when a provider+model+key are set;
+        else NOT_CONFIGURED. CONNECTED is only set by a real model request elsewhere.
+        """
+        if self.ai_enabled is False:
+            return "DISABLED"
+        if self.ai_api_key and self.ai_model and (self.ai_provider or self.ai_api_base_url):
+            return "CONFIGURED"
+        return "NOT_CONFIGURED"
 
 
 @lru_cache
