@@ -1009,3 +1009,279 @@ class MonitoringDashboardResponse(BaseModel):
     recent_alerts: list[AlertResponse] = Field(default_factory=list)
     unread_alerts: int = 0
     job_change_summary: list[MonitoringChangeSummary] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# CRM & outreach lifecycle (Prompt 39)
+# ---------------------------------------------------------------------------
+def _ev(v):
+    return v.value if hasattr(v, "value") else v
+
+
+class LeadStatusHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    lead_id: int
+    old_status: Optional[str] = None
+    new_status: str
+    changed_by: str = "SYSTEM"
+    reason: Optional[str] = None
+    source: Optional[str] = None
+    created_at: datetime
+
+
+class LeadStatusTransitionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    new_status: str
+    reason: Optional[str] = None
+
+
+class CRMActivityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    lead_id: Optional[int] = None
+    company_id: Optional[int] = None
+    contact_id: Optional[int] = None
+    opportunity_id: Optional[int] = None
+    activity_type: str
+    direction: str
+    subject: Optional[str] = None
+    body_reference: Optional[str] = None
+    status: str
+    source: Optional[str] = None
+    external_id: Optional[str] = None
+    is_system_event: bool = False
+    occurred_at: datetime
+    created_by: str = "SYSTEM"
+
+    @field_validator("activity_type", "direction", "status", mode="before")
+    @classmethod
+    def _e(cls, v):
+        return _ev(v)
+
+
+class CRMActivityListResponse(BaseModel):
+    items: list[CRMActivityResponse]
+    total: int
+
+
+class ActivityCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    activity_type: str = "NOTE"
+    lead_id: Optional[int] = None
+    company_id: Optional[int] = None
+    contact_id: Optional[int] = None
+    opportunity_id: Optional[int] = None
+    subject: Optional[str] = None
+    body_reference: Optional[str] = None
+
+
+class TimelineItem(BaseModel):
+    kind: str                      # SYSTEM_EVENT | HUMAN_ACTIVITY
+    category: str
+    event_type: str
+    title: str
+    detail: Optional[str] = None
+    occurred_at: datetime
+    source: Optional[str] = None
+
+
+class LeadTimelineResponse(BaseModel):
+    lead_id: int
+    items: list[TimelineItem]
+    total: int
+
+
+class OutreachDraftResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    lead_id: Optional[int] = None
+    company_id: Optional[int] = None
+    contact_id: Optional[int] = None
+    target_role: Optional[str] = None
+    channel: str
+    subject: Optional[str] = None
+    message: Optional[str] = None
+    evidence_ids: list[int] = Field(default_factory=list)
+    ai_generated: bool = False
+    grounding_ok: bool = True
+    confidence: int = 0
+    status: str
+    recipient_email: Optional[str] = None
+    provider: Optional[str] = None
+    provider_message_id: Optional[str] = None
+    error: Optional[str] = None
+    created_by: str = "SYSTEM"
+    approved_by: Optional[str] = None
+    created_at: datetime
+    approved_at: Optional[datetime] = None
+    sent_at: Optional[datetime] = None
+
+    @field_validator("channel", "status", mode="before")
+    @classmethod
+    def _e(cls, v):
+        return _ev(v)
+
+
+class OutreachDraftListResponse(BaseModel):
+    items: list[OutreachDraftResponse]
+    total: int
+
+
+class GenerateDraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    lead_id: int
+    channel: str = "EMAIL"
+    contact_id: Optional[int] = None
+
+
+class DraftEditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    subject: Optional[str] = None
+    message: Optional[str] = None
+
+
+class FollowUpTaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    lead_id: Optional[int] = None
+    contact_id: Optional[int] = None
+    company_id: Optional[int] = None
+    due_at: Optional[datetime] = None
+    task_type: str
+    title: str
+    reason: Optional[str] = None
+    status: str
+    created_by: str = "SYSTEM"
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    @field_validator("task_type", "status", mode="before")
+    @classmethod
+    def _e(cls, v):
+        return _ev(v)
+
+
+class FollowUpTaskListResponse(BaseModel):
+    items: list[FollowUpTaskResponse]
+    total: int
+
+
+class FollowUpStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: str
+
+
+class SalesOpportunityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: Optional[int] = None
+    lead_id: Optional[int] = None
+    opportunity_candidate_id: Optional[int] = None
+    opportunity_type: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    estimated_team_scale: Optional[str] = None
+    estimated_value: Optional[float] = None
+    estimated_value_currency: Optional[str] = None
+    value_source: str = "NOT_AVAILABLE"
+    confidence: int = 0
+    evidence_ids: list[int] = Field(default_factory=list)
+    stage: str
+    probability: Optional[int] = None
+    expected_close_date: Optional[datetime] = None
+    owner: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("stage", mode="before")
+    @classmethod
+    def _e(cls, v):
+        return _ev(v)
+
+
+class SalesOpportunityListResponse(BaseModel):
+    items: list[SalesOpportunityResponse]
+    total: int
+
+
+class PipelineStageColumn(BaseModel):
+    stage: str
+    count: int
+    opportunities: list[SalesOpportunityResponse] = Field(default_factory=list)
+
+
+class PipelineBoardResponse(BaseModel):
+    columns: list[PipelineStageColumn]
+    total: int
+
+
+class SalesOpportunityCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    company_id: Optional[int] = None
+    lead_id: Optional[int] = None
+    opportunity_type: Optional[str] = None
+    description: Optional[str] = None
+    estimated_team_scale: Optional[str] = None
+    estimated_value: Optional[float] = None
+    estimated_value_currency: Optional[str] = None
+    value_source: str = "NOT_AVAILABLE"
+
+
+class SalesStageUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    stage: str
+    reason: Optional[str] = None
+
+
+class ConversionMetricResponse(BaseModel):
+    label: str
+    numerator: int
+    denominator: int
+    rate: object = None   # float or "INSUFFICIENT_DATA"
+
+
+class CRMAnalyticsResponse(BaseModel):
+    generated_at: datetime
+    total_leads: int
+    lead_status_counts: dict = Field(default_factory=dict)
+    sales_stage_counts: dict = Field(default_factory=dict)
+    activity_counts: dict = Field(default_factory=dict)
+    real_contacted: int = 0
+    real_replies: int = 0
+    real_meetings: int = 0
+    conversion: list[ConversionMetricResponse] = Field(default_factory=list)
+    pipeline_value: object = "NOT_AVAILABLE"
+    pipeline_value_currency: Optional[str] = None
+    pipeline_value_opportunities: int = 0
+    open_opportunities: int = 0
+    won: int = 0
+    lost: int = 0
+
+
+class ProviderStatusResponse(BaseModel):
+    email_provider: Optional[str] = None
+    email_status: str = "NOT_CONFIGURED"
+    email_from: Optional[str] = None
+    crm_provider: str = "INTERNAL"
+    crm_status: str = "CONNECTED"
+    webhook_configured: bool = False
+    note: str = ""
+
+
+class WebhookAck(BaseModel):
+    received: bool = True
+    processed: bool = False
+    duplicate: bool = False
+    detail: Optional[str] = None
+
+
+class NextBestActionResponse(BaseModel):
+    lead_id: int
+    next_best_action: str
+
+
+class ReadinessResponse(BaseModel):
+    status: str                    # ready | not_ready
+    checks: dict = Field(default_factory=dict)

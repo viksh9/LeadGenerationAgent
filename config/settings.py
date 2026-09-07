@@ -88,6 +88,36 @@ class Settings(BaseSettings):
     # X-Admin-Key header. Unset (None) => allowed (local single-user default).
     admin_api_key: str | None = Field(default=None, validation_alias=AliasChoices("ADMIN_API_KEY"))
 
+    # --- CRM / outreach lifecycle (Prompt 39) ------------------------------ #
+    # Email provider. NOT_CONFIGURED unless a provider + from-address are set.
+    # No message is ever sent unless a provider is configured AND a human approves.
+    email_provider: str | None = Field(default=None, validation_alias=AliasChoices("EMAIL_PROVIDER"))
+    email_from: str | None = Field(default=None, validation_alias=AliasChoices("EMAIL_FROM"))
+    email_api_key: str | None = Field(default=None, validation_alias=AliasChoices("EMAIL_API_KEY"))
+    smtp_host: str | None = Field(default=None, validation_alias=AliasChoices("SMTP_HOST"))
+    smtp_port: int = Field(default=587, validation_alias=AliasChoices("SMTP_PORT"))
+    smtp_username: str | None = Field(default=None, validation_alias=AliasChoices("SMTP_USERNAME"))
+    smtp_password: str | None = Field(default=None, validation_alias=AliasChoices("SMTP_PASSWORD"))
+    smtp_use_tls: bool = Field(default=True, validation_alias=AliasChoices("SMTP_USE_TLS"))
+    # Daily send cap + per-minute rate limit (safety; never mass-sends).
+    email_daily_limit: int = Field(default=100, validation_alias=AliasChoices("EMAIL_DAILY_LIMIT"))
+    email_rate_per_minute: int = Field(default=10, validation_alias=AliasChoices("EMAIL_RATE_PER_MINUTE"))
+    # Require a source-verified business email before sending (safety, §10).
+    outreach_require_verified_email: bool = Field(
+        default=True, validation_alias=AliasChoices("OUTREACH_REQUIRE_VERIFIED_EMAIL"))
+
+    # CRM provider. INTERNAL is always available; external connectors only when
+    # explicitly configured. CONNECTED only after a real provider connection.
+    crm_provider: str = Field(default="INTERNAL", validation_alias=AliasChoices("CRM_PROVIDER"))
+    crm_api_key: str | None = Field(default=None, validation_alias=AliasChoices("CRM_API_KEY"))
+    crm_base_url: str | None = Field(default=None, validation_alias=AliasChoices("CRM_BASE_URL"))
+
+    # Webhook signing secret (HMAC). When unset, signed webhook endpoints reject
+    # all requests rather than trusting unsigned payloads.
+    webhook_secret: str | None = Field(default=None, validation_alias=AliasChoices("WEBHOOK_SECRET"))
+    webhook_tolerance_seconds: int = Field(
+        default=300, validation_alias=AliasChoices("WEBHOOK_TOLERANCE_SECONDS"))
+
     @field_validator(
         "show_synthetic_leads", "enforce_real_data", "ai_enabled", "scheduler_enabled",
         mode="before",
@@ -124,6 +154,28 @@ class Settings(BaseSettings):
         if self.enforce_real_data is not None:
             return self.enforce_real_data
         return self.environment.lower() in {"production", "prod", "staging", "stage"}
+
+    @property
+    def email_config_status(self) -> str:
+        """Config-level email-provider status (NOT a live check). CONNECTED is only
+        set after a real provider operation elsewhere."""
+        provider = (self.email_provider or "").strip().upper()
+        if not provider:
+            return "NOT_CONFIGURED"
+        if provider == "SMTP":
+            ok = bool(self.smtp_host and self.email_from)
+        else:  # API-key providers (SendGrid, Graph, Gmail API, ...)
+            ok = bool(self.email_api_key and self.email_from)
+        return "CONFIGURED" if ok else "NOT_CONFIGURED"
+
+    @property
+    def crm_config_status(self) -> str:
+        """INTERNAL CRM is always CONFIGURED (local). External connectors are
+        CONFIGURED only when credentials are present; CONNECTED needs a real call."""
+        provider = (self.crm_provider or "INTERNAL").strip().upper()
+        if provider == "INTERNAL":
+            return "CONFIGURED"
+        return "CONFIGURED" if self.crm_api_key else "NOT_CONFIGURED"
 
     @property
     def scheduler_active(self) -> bool:

@@ -1,0 +1,52 @@
+# LeadGenerationAgent — single-service Compose file.
+#
+# Builds the multi-stage Dockerfile and runs the FastAPI backend. Configuration
+# comes entirely from .env (env_file below) — NO credentials are inlined here.
+# The SQLite database is persisted in a named volume so it survives restarts.
+#
+#   docker compose up --build        # build + run
+#   docker compose logs -f app       # tail logs
+#   docker compose down              # stop (named volume + data are kept)
+#
+# NOTE: SQLite is the default and is fine for a single-instance deployment. To
+# move to Postgres later, add a `db:` service and point DATABASE_URL at it in
+# .env (e.g. postgresql+psycopg://user:pass@db:5432/leads) — the app reads the
+# URL from the environment; no code change is required. (A Postgres driver would
+# then need adding to requirements.txt.)
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: leadgenerationagent:latest
+    # All config via env. Copy .env.example → .env and fill in as needed.
+    # Missing optional providers are a valid, healthy state.
+    env_file:
+      - .env
+    environment:
+      # Container-safe defaults (overridable in .env). Bind inside the container
+      # to all interfaces; the host controls exposure via the port mapping below.
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      DATABASE_URL: sqlite:////app/data/leads.db
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist the SQLite DB (and any file-based data) across restarts.
+      - app-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      # Mirrors the Dockerfile HEALTHCHECK; hits GET /health via stdlib.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  app-data:

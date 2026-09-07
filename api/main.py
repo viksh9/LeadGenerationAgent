@@ -21,11 +21,14 @@ from api.routes import (
     career_sources,
     companies,
     contacts,
+    crm,
     health,
     leads,
+    outreach,
     scheduler,
     signals,
     sources,
+    webhooks,
 )
 from api.schemas import ErrorBody
 from config import configure_logging, get_settings
@@ -94,3 +97,6 @@ app.include_router(contacts.router)
 app.include_router(ai.router)
 app.include_router(scheduler.router)
 app.include_router(alerts.router)
+app.include_router(crm.router)
+app.include_router(outreach.router)
+app.include_router(webhooks.router)

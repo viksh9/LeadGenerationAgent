@@ -58,6 +58,7 @@ class LeadPriority(str, Enum):
 class LeadStatus(str, Enum):
     NEW = "NEW"
     RESEARCHED = "RESEARCHED"
+    OUTREACH_READY = "OUTREACH_READY"
     CONTACTED = "CONTACTED"
     REPLIED = "REPLIED"
     MEETING = "MEETING"
@@ -66,6 +67,7 @@ class LeadStatus(str, Enum):
     WON = "WON"
     LOST = "LOST"
     NURTURE = "NURTURE"
+    DISQUALIFIED = "DISQUALIFIED"
 
 
 class DataProvenance(str, Enum):
@@ -1918,3 +1920,443 @@ class NotificationPreference(Base):
     channels: Mapped[list[str]] = mapped_column(JSON, default=list)   # e.g. ["IN_APP"]
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+# ===================================================================== #
+# CRM & outreach lifecycle (Prompt 39)
+#
+# Real-data-only: every record here is derived from REAL collected data or a
+# REAL human/provider action. The system NEVER fabricates outreach history,
+# replies, meetings, revenue, or conversion metrics. An activity is only SENT
+# when a real provider confirms it; a reply/meeting/win is only recorded when a
+# real event/provider response/human action supports it (§68, §69).
+# ===================================================================== #
+
+
+# ---- CRM / outreach enums -------------------------------------------- #
+class ActivityType(str, Enum):
+    NOTE = "NOTE"
+    EMAIL = "EMAIL"
+    EMAIL_REPLY = "EMAIL_REPLY"
+    CALL = "CALL"
+    MEETING = "MEETING"
+    LINKEDIN_MESSAGE = "LINKEDIN_MESSAGE"
+    LINKEDIN_REPLY = "LINKEDIN_REPLY"
+    TASK = "TASK"
+    STATUS_CHANGE = "STATUS_CHANGE"
+    RESEARCH = "RESEARCH"
+    OTHER = "OTHER"
+
+
+class ActivityDirection(str, Enum):
+    INBOUND = "INBOUND"
+    OUTBOUND = "OUTBOUND"
+    INTERNAL = "INTERNAL"
+
+
+class ActivityStatus(str, Enum):
+    PLANNED = "PLANNED"
+    ATTEMPTED = "ATTEMPTED"
+    SENT = "SENT"
+    DELIVERED = "DELIVERED"
+    REPLIED = "REPLIED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class OutreachChannel(str, Enum):
+    EMAIL = "EMAIL"
+    LINKEDIN = "LINKEDIN"
+    CALL = "CALL"
+    WEBHOOK = "WEBHOOK"
+    OTHER = "OTHER"
+
+
+class OutreachDraftStatus(str, Enum):
+    DRAFT = "DRAFT"
+    READY_FOR_REVIEW = "READY_FOR_REVIEW"
+    APPROVED = "APPROVED"
+    SENT = "SENT"
+    CANCELLED = "CANCELLED"
+    FAILED = "FAILED"
+
+
+class SalesStage(str, Enum):
+    IDENTIFIED = "IDENTIFIED"
+    RESEARCHED = "RESEARCHED"
+    OUTREACH_READY = "OUTREACH_READY"
+    CONTACTED = "CONTACTED"
+    ENGAGED = "ENGAGED"
+    QUALIFIED = "QUALIFIED"
+    DISCOVERY = "DISCOVERY"
+    PROPOSAL = "PROPOSAL"
+    NEGOTIATION = "NEGOTIATION"
+    WON = "WON"
+    LOST = "LOST"
+    NURTURE = "NURTURE"
+
+
+class FollowUpStatus(str, Enum):
+    OPEN = "OPEN"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    SNOOZED = "SNOOZED"
+
+
+class FollowUpType(str, Enum):
+    REVIEW_REPLY = "REVIEW_REPLY"
+    PREPARE_PROPOSAL = "PREPARE_PROPOSAL"
+    FOLLOW_UP = "FOLLOW_UP"
+    CHECK_TENDER_DEADLINE = "CHECK_TENDER_DEADLINE"
+    RESEARCH_DECISION_MAKER = "RESEARCH_DECISION_MAKER"
+    REVIEW_LEAD = "REVIEW_LEAD"
+    OTHER = "OTHER"
+
+
+class EmailProviderStatus(str, Enum):
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+    CONFIGURED = "CONFIGURED"
+    CONNECTED = "CONNECTED"
+    RATE_LIMITED = "RATE_LIMITED"
+    ERROR = "ERROR"
+    DISABLED = "DISABLED"
+
+
+class CRMSyncStatus(str, Enum):
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+    CONFIGURED = "CONFIGURED"
+    CONNECTED = "CONNECTED"
+    SYNCING = "SYNCING"
+    SYNCED = "SYNCED"
+    ERROR = "ERROR"
+    DISABLED = "DISABLED"
+
+
+class ReplyClassification(str, Enum):
+    POSITIVE = "POSITIVE"
+    NEGATIVE = "NEGATIVE"
+    INTERESTED = "INTERESTED"
+    REQUEST_MORE_INFO = "REQUEST_MORE_INFO"
+    MEETING_REQUEST = "MEETING_REQUEST"
+    NOT_NOW = "NOT_NOW"
+    NOT_RELEVANT = "NOT_RELEVANT"
+    OUT_OF_OFFICE = "OUT_OF_OFFICE"
+    UNKNOWN = "UNKNOWN"
+
+
+class SyncResolution(str, Enum):
+    LOCAL_WINS = "LOCAL_WINS"
+    EXTERNAL_WINS = "EXTERNAL_WINS"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
+class WebhookStatus(str, Enum):
+    RECEIVED = "RECEIVED"
+    PROCESSED = "PROCESSED"
+    DUPLICATE = "DUPLICATE"
+    INVALID = "INVALID"
+    FAILED = "FAILED"
+
+
+class UserRole(str, Enum):
+    ADMIN = "ADMIN"
+    SALES = "SALES"
+    RESEARCHER = "RESEARCHER"
+    VIEWER = "VIEWER"
+
+
+# ---- Lifecycle / audit ------------------------------------------------ #
+class LeadStatusHistory(Base):
+    """Append-only audit of every lead status transition (§3). Never rewritten."""
+
+    __tablename__ = "lead_status_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lead_id: Mapped[int] = mapped_column(Integer, index=True)
+    old_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    new_status: Mapped[str] = mapped_column(String(24))
+    changed_by: Mapped[str] = mapped_column(String(64), default="SYSTEM")   # SYSTEM | human | AI
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class AuditLog(Base):
+    """General CRM/action audit trail (§31). who/what/when/old/new/source/reason
+    + external provider id + correlation id. Sanitized — never stores secrets."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(48), index=True)
+    entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    actor: Mapped[str] = mapped_column(String(64), default="SYSTEM")
+    old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_provider_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+# ---- CRM activity ----------------------------------------------------- #
+class CRMActivity(Base):
+    """A real CRM activity (§4). ``status`` is only ``SENT`` when a real provider
+    confirms it; ``REPLIED``/``MEETING`` only when a real event is recorded."""
+
+    __tablename__ = "crm_activities"
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="uq_crm_activity_source_external"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    opportunity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    activity_type: Mapped[ActivityType] = mapped_column(
+        SAEnum(ActivityType, native_enum=False, length=24), index=True
+    )
+    direction: Mapped[ActivityDirection] = mapped_column(
+        SAEnum(ActivityDirection, native_enum=False, length=16), default=ActivityDirection.INTERNAL
+    )
+    subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    body_reference: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[ActivityStatus] = mapped_column(
+        SAEnum(ActivityStatus, native_enum=False, length=16), default=ActivityStatus.COMPLETED, index=True
+    )
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True)   # INTERNAL | provider name
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    is_system_event: Mapped[bool] = mapped_column(default=False, index=True)   # system vs human (§36)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(64), default="SYSTEM")
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+
+
+# ---- Outreach draft --------------------------------------------------- #
+class OutreachDraft(Base):
+    """A human-reviewable outreach message (§5). The system may generate a DRAFT
+    but NEVER silently sends: SENT requires human approval + a real provider
+    confirmation. Every factual claim maps to evidence_ids (§6, §7)."""
+
+    __tablename__ = "outreach_drafts"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_outreach_idempotency"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    target_role: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    channel: Mapped[OutreachChannel] = mapped_column(
+        SAEnum(OutreachChannel, native_enum=False, length=16), default=OutreachChannel.EMAIL
+    )
+    subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    ai_intelligence_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ai_generated: Mapped[bool] = mapped_column(default=False)
+    grounding_ok: Mapped[bool] = mapped_column(default=True)   # every claim maps to evidence
+    confidence: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[OutreachDraftStatus] = mapped_column(
+        SAEnum(OutreachDraftStatus, native_enum=False, length=20),
+        default=OutreachDraftStatus.DRAFT, index=True,
+    )
+    # Recipient snapshot (verified at send time; never guessed).
+    recipient_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(64), default="SYSTEM")
+    approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ---- Follow-up tasks -------------------------------------------------- #
+class FollowUpTask(Base):
+    """A task derived from real lead state (§16). Never invented busy-work."""
+
+    __tablename__ = "follow_up_tasks"
+    __table_args__ = (UniqueConstraint("dedup_key", name="uq_followup_dedup"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    task_type: Mapped[FollowUpType] = mapped_column(
+        SAEnum(FollowUpType, native_enum=False, length=32), default=FollowUpType.OTHER
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[FollowUpStatus] = mapped_column(
+        SAEnum(FollowUpStatus, native_enum=False, length=16), default=FollowUpStatus.OPEN, index=True
+    )
+    dedup_key: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    created_by: Mapped[str] = mapped_column(String(64), default="SYSTEM")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ---- Sales opportunity (CRM) ------------------------------------------ #
+class SalesOpportunity(Base):
+    """A managed sales opportunity with pipeline stage (§22, §23). Distinct from
+    the analytical ``OpportunityCandidate``: this is the human-managed CRM record.
+    ``estimated_value`` exists ONLY when evidence-supported or user-entered;
+    ``value_source`` records which. Deal value is NEVER invented (§22, §26)."""
+
+    __tablename__ = "sales_opportunities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    opportunity_candidate_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    opportunity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    estimated_team_scale: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    estimated_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    estimated_value_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # Where the value came from: USER | EVIDENCE | NOT_AVAILABLE. Never inferred.
+    value_source: Mapped[str] = mapped_column(String(16), default="NOT_AVAILABLE")
+    confidence: Mapped[int] = mapped_column(Integer, default=0)   # evidence/analysis confidence
+    evidence_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    stage: Mapped[SalesStage] = mapped_column(
+        SAEnum(SalesStage, native_enum=False, length=20), default=SalesStage.IDENTIFIED, index=True
+    )
+    probability: Mapped[int | None] = mapped_column(Integer, nullable=True)   # sales probability, NOT lead_score
+    expected_close_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    owner: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+# ---- Provider state + sync ------------------------------------------- #
+class EmailProviderState(Base):
+    """Persisted email-provider status/health (§38). CONNECTED only after a real
+    provider operation. Never stores credentials; last_error is sanitized."""
+
+    __tablename__ = "email_provider_state"
+    __table_args__ = (UniqueConstraint("provider", name="uq_email_provider"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(48), index=True)
+    status: Mapped[EmailProviderStatus] = mapped_column(
+        SAEnum(EmailProviderStatus, native_enum=False, length=20),
+        default=EmailProviderStatus.NOT_CONFIGURED,
+    )
+    configured: Mapped[bool] = mapped_column(default=False)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    sends_today: Mapped[int] = mapped_column(Integer, default=0)
+    rate_limit_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class CRMProviderState(Base):
+    """Persisted CRM-provider status (§20). CONNECTED only after a real connection."""
+
+    __tablename__ = "crm_provider_state"
+    __table_args__ = (UniqueConstraint("provider", name="uq_crm_provider"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(48), index=True)
+    status: Mapped[CRMSyncStatus] = mapped_column(
+        SAEnum(CRMSyncStatus, native_enum=False, length=16), default=CRMSyncStatus.NOT_CONFIGURED
+    )
+    configured: Mapped[bool] = mapped_column(default=False)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_sync_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class CRMSyncRecord(Base):
+    """Local↔external entity mapping for CRM sync (§19). Prevents duplicate CRM
+    records; tracks external_id / last_synced_at / sync_status / last_sync_error."""
+
+    __tablename__ = "crm_sync_records"
+    __table_args__ = (
+        UniqueConstraint("provider", "entity_type", "entity_id", name="uq_crm_sync_entity"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(48), index=True)
+    entity_type: Mapped[str] = mapped_column(String(32), index=True)
+    entity_id: Mapped[int] = mapped_column(Integer, index=True)
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    sync_status: Mapped[CRMSyncStatus] = mapped_column(
+        SAEnum(CRMSyncStatus, native_enum=False, length=16), default=CRMSyncStatus.CONFIGURED
+    )
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_sync_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    direction: Mapped[str] = mapped_column(String(16), default="LOCAL_TO_EXTERNAL")   # explicit sync direction
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class SyncConflict(Base):
+    """A detected divergence between local and external CRM state (§64). Never
+    silently overwritten; requires an explicit resolution."""
+
+    __tablename__ = "sync_conflicts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(48), index=True)
+    entity_type: Mapped[str] = mapped_column(String(32), index=True)
+    entity_id: Mapped[int] = mapped_column(Integer, index=True)
+    field: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    local_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution: Mapped[SyncResolution] = mapped_column(
+        SAEnum(SyncResolution, native_enum=False, length=16), default=SyncResolution.REVIEW_REQUIRED
+    )
+    resolved: Mapped[bool] = mapped_column(default=False, index=True)
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ---- Webhook events --------------------------------------------------- #
+class WebhookEvent(Base):
+    """A received provider webhook (§39, §40). Deduped by provider_event_id so
+    repeated deliveries never create duplicate CRM activities. Signature/timestamp
+    validated before processing; raw payloads are not stored (only a hash)."""
+
+    __tablename__ = "webhook_events"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_event_id", name="uq_webhook_provider_event"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(48), index=True)
+    event_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    provider_event_id: Mapped[str] = mapped_column(String(255), index=True)
+    signature_valid: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[WebhookStatus] = mapped_column(
+        SAEnum(WebhookStatus, native_enum=False, length=16), default=WebhookStatus.RECEIVED, index=True
+    )
+    payload_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    related_lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    related_draft_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

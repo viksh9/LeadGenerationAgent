@@ -1,0 +1,43 @@
+# Keep the build context small and free of secrets / host-only artefacts.
+
+# Secrets & local env — NEVER copy real credentials into an image.
+.env
+.env.*
+!.env.example
+.envrc
+
+# Local SQLite databases (the container uses its own volume).
+data/*.db
+data/*.db-journal
+data/*.sqlite
+
+# Python caches / build artefacts.
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tests are not needed in the runtime image.
+tests/
+
+# Frontend host artefacts — the image rebuilds these in stage 1.
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+frontend/tsconfig*.tsbuildinfo
+
+# Git / editor / OS noise.
+.git/
+.gitignore
+.DS_Store
+*.swp
+docs/
+*.md

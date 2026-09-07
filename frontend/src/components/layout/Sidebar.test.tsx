@@ -10,7 +10,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('LeadGenerationAgent')).toBeInTheDocument();
 
     const nav = screen.getByRole('navigation', { name: /primary/i });
-    for (const label of ['Dashboard', 'Leads', 'Companies', 'Opportunities', 'Contacts', 'Outreach', 'Analytics', 'Monitoring', 'Settings']) {
+    for (const label of ['Dashboard', 'Leads', 'Companies', 'Opportunities', 'Pipeline', 'CRM', 'Contacts', 'Outreach', 'Analytics', 'Monitoring', 'Settings']) {
       expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
     }
   });
