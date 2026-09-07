@@ -64,22 +64,41 @@ Per-source detail follows.
 - **Purpose**: Real IT job postings across India — the primary hiring-signal
   source for staffing/technology-service opportunities.
 - **Provider**: Adzuna (job aggregator). Docs: <https://developer.adzuna.com/>.
+  Official Search API reference: <https://developer.adzuna.com/docs/search>.
 - **Data provided (fields)**: job title, company, location, description, salary,
   posting/created date, job id, and the source URL. Capabilities:
   `jobs, companies, job_dates, job_locations, technologies, source_urls, source_ids`.
-- **Endpoint**: `GET https://api.adzuna.com/v1/api/jobs/{country}/search/{page}`
-  with query params `app_id`, `app_key`, `what`, `where`, `max_days_old`,
-  `results_per_page`, `sort_by=date`, `content-type=application/json`.
+- **Endpoint** (`collectors/jobs/client.py`):
+  `GET https://api.adzuna.com/v1/api/jobs/{country}/search/{page}`
+  with query params `app_id`, `app_key`, `what`, `where`, `results_per_page`,
+  `max_days_old`, `sort_by=date`, `content-type=application/json`. `{country}`
+  defaults to `in` (India).
 - **Authentication**: API **key pair** (`API_KEY_PAIR`) sent as query params —
-  `ADZUNA_APP_ID` + `ADZUNA_APP_KEY`.
+  `ADZUNA_APP_ID` + `ADZUNA_APP_KEY`. Read from the environment only; never logged
+  or committed.
+- **Query strategy** (`collectors/jobs/query_strategy.py`): a controlled strategy
+  replaces the old blind `roles × locations × pages` cartesian to protect the API
+  quota. `ADZUNA_SEARCH_MODE` selects the mode — `ROLE_FIRST` (default) /
+  `TECHNOLOGY_FIRST` issue **one India-wide search per term** (no per-city fan-out;
+  the country path already scopes to India), while `LOCATION_FIRST` issues one broad
+  IT search per major Indian city. `ADZUNA_MAX_REQUESTS_PER_RUN` (default `30`) is a
+  hard per-run request cap.
 - **Env vars**: `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `ADZUNA_COUNTRY` (default `in`),
-  plus tuning knobs (`ADZUNA_API_BASE_URL`, `ADZUNA_LOOKBACK_DAYS`,
-  `ADZUNA_RESULTS_PER_PAGE`, `ADZUNA_MAX_PAGES`, `ADZUNA_REQUESTS_PER_MINUTE`,
-  `ADZUNA_DAILY_REQUEST_LIMIT`, `ADZUNA_TIMEOUT_SECONDS`,
-  `ADZUNA_INTEGRATION_TEST`). See [`.env.example`](../.env.example).
+  `ADZUNA_SEARCH_MODE` (default `ROLE_FIRST`), `ADZUNA_MAX_REQUESTS_PER_RUN`
+  (default `30`), plus tuning knobs (`ADZUNA_API_BASE_URL`, `ADZUNA_SEARCH_TERMS`,
+  `ADZUNA_LOCATIONS`, `ADZUNA_LOOKBACK_DAYS`, `ADZUNA_RESULTS_PER_PAGE`,
+  `ADZUNA_MAX_PAGES`, `ADZUNA_REQUESTS_PER_MINUTE`, `ADZUNA_DAILY_REQUEST_LIMIT`,
+  `ADZUNA_TIMEOUT_SECONDS`, `ADZUNA_INTEGRATION_TEST`). See
+  [`.env.example`](../.env.example).
 - **Capabilities**: search (`what`), location filter (`where`), pagination, date
   recency filter (`max_days_old` — a recency window, **not** a true cursor),
   salary, job id.
+- **Ingestion metrics**: after a run, `GET /sources` and `GET /sources/status`
+  report per-source `last_ingestion_at`, `last_ingestion_records_fetched`, and
+  `last_ingestion_records_persisted` (`null` ⇒ "Not yet ingested"); the per-run
+  audit (`ingestion/ingestion_audit.py`) records the full actual counts on the
+  collection run. Ingestion is idempotent — re-running updates existing leads and
+  skips duplicate raw records.
 - **India support**: Yes. `ADZUNA_COUNTRY` defaults to `in` (India); configurable.
 - **Rate limits**: Governed by your Adzuna plan; the project applies conservative
   self-limits (`ADZUNA_REQUESTS_PER_MINUTE`, `ADZUNA_DAILY_REQUEST_LIMIT`).
@@ -255,6 +274,10 @@ python scripts/collect.py --list
 python scripts/collect.py --source adzuna
 python scripts/collect.py --source jooble --query "python developer" --location Bengaluru
 python scripts/collect.py --source adzuna --max-pages 2 --dry-run
+
+# Adzuna controlled query strategy + hard per-run request cap.
+python scripts/collect.py --source adzuna --mode ROLE_FIRST --max-requests 30
+python scripts/collect.py --source adzuna --mode LOCATION_FIRST --skip-aggregate
 ```
 
 `scripts/collect.py` exit codes: `0` OK · `1` error/unknown source · `2`
@@ -283,8 +306,8 @@ All GET endpoints make **no** network calls and **never** return credentials.
 
 | Method & path | Purpose |
 | --- | --- |
-| `GET /sources` | Truthful status for every catalogued source: implementation/config readiness, declared capabilities, licensing/commercial-use, and the last verified connectivity check (`connection_status` + `last_checked_at` / `last_success_at` / `last_failure_at`). |
-| `GET /sources/status` | Alias of `GET /sources` — same truthful payload. |
+| `GET /sources` | Truthful status for every catalogued source: implementation/config readiness, declared capabilities, licensing/commercial-use, the last verified connectivity check (`connection_status` + `last_checked_at` / `last_success_at` / `last_failure_at`), and per-source **ingestion metrics** (`last_ingestion_at`, `last_ingestion_records_fetched`, `last_ingestion_records_persisted`; `null` ⇒ "Not yet ingested"). |
+| `GET /sources/status` | Alias of `GET /sources` — same truthful payload (incl. ingestion metrics). |
 | `POST /sources/{id}/check` | Perform a real, credential-based connectivity check on demand and persist the outcome. Sources without credentials return `NOT_CONFIGURED` and make no network call. |
 
 A source becomes `CONNECTED` in these responses only after a verified live request

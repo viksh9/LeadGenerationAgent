@@ -103,8 +103,10 @@ holds placeholders only.
 | `SHOW_SYNTHETIC_LEADS` | Show synthetic leads (dev only). Unset ⇒ off in production | *(derived)* |
 | `API_HOST` / `API_PORT` | API bind address | `127.0.0.1` / `8000` |
 | `CORS_ORIGINS` | Comma-separated allowed origins | local dev servers |
-| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | Adzuna jobs API credentials (optional) | — |
+| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | Adzuna jobs API credentials (optional; env only, never logged/committed) | — |
 | `ADZUNA_COUNTRY` | Adzuna country code | `in` |
+| `ADZUNA_SEARCH_MODE` | Query strategy: `ROLE_FIRST`, `TECHNOLOGY_FIRST`, or `LOCATION_FIRST` | `ROLE_FIRST` |
+| `ADZUNA_MAX_REQUESTS_PER_RUN` | Hard cap on API requests per collection run | `30` |
 | `JOOBLE_API_KEY` | Jooble jobs API key (optional; per-country key) | — |
 | `JOOBLE_API_HOST` | Jooble host — use `in.jooble.org` for India | `jooble.org` |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | Reserved for a later outreach phase | — |
@@ -200,7 +202,7 @@ collector class is *not* the same as an active, verified real-data connection.
 
 | Source | Collector | Status | Notes |
 | --- | --- | --- | --- |
-| Adzuna Jobs API | implemented | `NOT_CONFIGURED` | Set `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`; verify live before use |
+| Adzuna Jobs API | implemented | `NOT_CONFIGURED` | Set `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`; verify live before use. Commercial use `REQUIRES_APPROVAL` |
 | Jooble Jobs API | implemented | `NOT_CONFIGURED` | Set `JOOBLE_API_KEY` (+ `JOOBLE_API_HOST=in.jooble.org` for India); verify live before use |
 | Company career pages | implemented | `REQUIRES_REVIEW` | Robots/ToS review per site before enabling |
 | Company newsroom (RSS) | implemented | `REQUIRES_REVIEW` | Per-feed review before enabling |
@@ -235,14 +237,67 @@ python scripts/source_check.py --all
 `collect.py` exit codes: `0` OK · `2` `NOT_CONFIGURED` (missing credentials, no
 network call) · `3` `NOT_IMPLEMENTED` (no runnable collector).
 
+### Adzuna real-data ingestion
+
+Adzuna is the primary hiring-signal source for Indian IT. Official API reference:
+<https://developer.adzuna.com/docs/search>.
+
+- **Endpoint** (`collectors/jobs/client.py`):
+  `GET https://api.adzuna.com/v1/api/jobs/{country}/search/{page}` with query params
+  `app_id`, `app_key`, `what`, `where`, `results_per_page`, `max_days_old`,
+  `sort_by=date`, `content-type=application/json`. `{country}` defaults to `in`
+  (India). Auth = `ADZUNA_APP_ID` + `ADZUNA_APP_KEY`, read from the environment
+  only — never logged or committed.
+- **Controlled query strategy** (`collectors/jobs/query_strategy.py`) — replaces the
+  old blind `roles × locations × pages` cartesian to protect the API quota.
+  Configured by `ADZUNA_SEARCH_MODE`:
+  - `ROLE_FIRST` (default) / `TECHNOLOGY_FIRST` — issue **one India-wide search per
+    term** (no per-city fan-out; the country path already scopes to India).
+  - `LOCATION_FIRST` — issue one broad IT search per major Indian city.
+
+  `ADZUNA_MAX_REQUESTS_PER_RUN` (default `30`) is a hard per-run request cap.
+  Keywords are configurable via `ADZUNA_SEARCH_TERMS`, cities via
+  `ADZUNA_LOCATIONS`, and pagination via `ADZUNA_MAX_PAGES`.
+- **CLI**:
+
+  ```bash
+  python scripts/collect.py --source adzuna \
+      [--mode ROLE_FIRST|TECHNOLOGY_FIRST|LOCATION_FIRST] \
+      [--max-requests N] [--max-pages N] [--query Q --location L] \
+      [--dry-run] [--skip-aggregate]
+  ```
+
+  `--dry-run` performs the **real** API request and validates/reports counts but
+  persists nothing.
+- **Per-run ingestion audit** (`ingestion/ingestion_audit.py`). After a run,
+  `collect.py` prints and persists (on the collection run record) the **actual**
+  counts: requests, raw fetched, raw persisted (new), duplicates skipped, canonical
+  jobs created/updated, companies aggregated, leads created/updated, companies with
+  a hiring signal, opportunities (evidence-backed), plus DB totals. Ingestion is
+  **idempotent** — re-running updates existing leads and skips duplicate raw records
+  rather than creating duplicates.
+- **Full pipeline (reused):** Adzuna API → `RawSourceRecord` (provenance `REAL`,
+  `source_url` + Adzuna id preserved) → normalization → canonical job dedup →
+  company resolution → evidence verification (four distinct scores; Adzuna jobs come
+  out `PARTIALLY_VERIFIED` with `source_reliability ≈ 72` for TIER_2) → signal
+  detection → company-level aggregation (observed openings vs estimated need kept
+  distinct) → opportunity → lead scoring → dashboard. **One company = one lead**
+  (not one-per-job).
+- **Licensing:** Adzuna commercial use **`REQUIRES_APPROVAL`** per their terms.
+  Being technically connectable is **not** the same as approved for commercial use —
+  do not treat production commercial use as approved.
+
 **Source status API** (GET endpoints make no network calls and never return
 credentials):
 
 | Method & path | Purpose |
 | --- | --- |
-| `GET /sources` | Truthful per-source status: implementation/config readiness, capabilities, licensing, and last verified connectivity check |
-| `GET /sources/status` | Alias of `GET /sources` |
+| `GET /sources` | Truthful per-source status: implementation/config readiness, capabilities, licensing, last verified connectivity check, **and per-source ingestion metrics** (`last_ingestion_at`, `last_ingestion_records_fetched`, `last_ingestion_records_persisted`; `null` ⇒ "Not yet ingested") |
+| `GET /sources/status` | Alias of `GET /sources` (same payload, incl. ingestion metrics) |
 | `POST /sources/{id}/check` | On-demand real connectivity check; persists the outcome. `NOT_CONFIGURED` sources make no network call |
+
+The Settings → Data sources UI surfaces these ingestion metrics alongside the
+connectivity status.
 
 **Live tests.** The default `pytest` suite makes **no** external network calls.
 Live integration tests are opt-in via `RUN_LIVE_SOURCE_TESTS=true` plus the

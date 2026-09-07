@@ -477,6 +477,10 @@ class SourceStatusResponse(BaseModel):
     last_success_at: Optional[datetime] = None
     last_failure_at: Optional[datetime] = None
     last_error: Optional[str] = None
+    # Ingestion metrics (from the last collection run for this source).
+    last_ingestion_at: Optional[datetime] = None
+    last_ingestion_records_fetched: Optional[int] = None
+    last_ingestion_records_persisted: Optional[int] = None
 
 
 class SourceStatusListResponse(BaseModel):

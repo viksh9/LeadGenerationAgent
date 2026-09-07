@@ -49,6 +49,13 @@ class AdzunaConfig(BaseModel):
     requests_per_minute: int = 20
     daily_request_limit: int = 200
     timeout_seconds: float = 15.0
+    # Controlled query strategy (avoids a blind roles×locations×pages explosion).
+    #   ROLE_FIRST       — one India-wide search per role term (breadth of roles)
+    #   TECHNOLOGY_FIRST — one India-wide search per technology term
+    #   LOCATION_FIRST   — one broad search per major Indian location
+    search_mode: str = "ROLE_FIRST"
+    # Hard cap on API requests per run (protects the daily quota).
+    max_requests_per_run: int = 30
 
     @property
     def is_configured(self) -> bool:
@@ -84,4 +91,6 @@ def load_adzuna_config() -> AdzunaConfig:
         requests_per_minute=_env_int("ADZUNA_REQUESTS_PER_MINUTE", 20),
         daily_request_limit=_env_int("ADZUNA_DAILY_REQUEST_LIMIT", 200),
         timeout_seconds=float(os.environ.get("ADZUNA_TIMEOUT_SECONDS", 15)),
+        search_mode=(os.environ.get("ADZUNA_SEARCH_MODE", "ROLE_FIRST").strip().upper() or "ROLE_FIRST"),
+        max_requests_per_run=_env_int("ADZUNA_MAX_REQUESTS_PER_RUN", 30),
     )

@@ -327,11 +327,14 @@ def test_credentials_never_logged(caplog):
 # --------------------------------------------------------------------------- #
 # plan_requests()
 # --------------------------------------------------------------------------- #
-def test_plan_requests_expands_terms_locations_pages():
+def test_plan_requests_uses_controlled_strategy():
+    # ROLE_FIRST (default) is India-wide: one base query per role term (no per-city
+    # fan-out), paginated — NOT the old roles×locations×pages cartesian.
     config = AdzunaConfig(
         app_id="i", app_key="k",
         search_terms=["Java Developer", "Python Developer"],
         locations=["Bengaluru", "Pune"],
+        search_mode="ROLE_FIRST", max_requests_per_run=30,
     )
 
     def handler(request):  # pragma: no cover - plan_requests makes no calls
@@ -339,8 +342,19 @@ def test_plan_requests_expands_terms_locations_pages():
 
     collector = _collector(handler, config=config)
     plan = collector.plan_requests(max_pages=2)
-    assert len(plan) == 2 * 2 * 2
+    assert len(plan) == 2 * 2                      # 2 terms × 2 pages, India-wide
+    assert {r.location for r in plan} == {None}     # no per-city fan-out
     assert all(isinstance(r, FetchRequest) for r in plan)
+
+
+def test_plan_requests_respects_request_cap():
+    config = AdzunaConfig(
+        app_id="i", app_key="k",
+        search_terms=["a", "b", "c", "d", "e"], locations=["X"],
+        max_requests_per_run=3,
+    )
+    collector = _collector(lambda r: None, config=config)
+    assert len(collector.plan_requests(max_pages=2)) == 3
 
 
 # --------------------------------------------------------------------------- #

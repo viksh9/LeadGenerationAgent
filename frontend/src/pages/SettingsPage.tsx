@@ -241,6 +241,17 @@ export function SettingsPage() {
                           {source.last_error && (
                             <p className="text-rose-600 dark:text-rose-400">Last error: {source.last_error}</p>
                           )}
+                          {source.last_ingestion_at ? (
+                            <>
+                              <p>Last ingestion: {formatDateTime(source.last_ingestion_at)}</p>
+                              <p>
+                                Records: {source.last_ingestion_records_fetched ?? 0} fetched ·{' '}
+                                {source.last_ingestion_records_persisted ?? 0} new
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-slate-400 dark:text-slate-500">Not yet ingested</p>
+                          )}
                         </div>
                       </div>
                       <span className={`badge shrink-0 ${display.className}`}>{display.label}</span>

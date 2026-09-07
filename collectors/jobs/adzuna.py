@@ -146,15 +146,25 @@ class AdzunaJobCollector(BaseCollector):
             return HealthCheckResult(source_id="adzuna", status=HealthStatus.UNAVAILABLE, message=str(exc))
         return HealthCheckResult(source_id="adzuna", status=HealthStatus.HEALTHY, message="OK")
 
-    def plan_requests(self, *, max_pages: Optional[int] = None) -> list[FetchRequest]:
-        """Build the full IT search plan (search_terms × locations × pages)."""
-        pages = max_pages or self.config.max_pages
-        plan: list[FetchRequest] = []
-        for term in self.config.search_terms:
-            for location in self.config.locations or [None]:
-                for page in range(1, pages + 1):
-                    plan.append(FetchRequest(query=term, location=location, page=page))
-        return plan
+    def plan_requests(
+        self, *, max_pages: Optional[int] = None,
+        mode: Optional[str] = None, max_requests: Optional[int] = None,
+    ) -> list[FetchRequest]:
+        """Build a bounded IT search plan using the configured query strategy.
+
+        Uses the controlled ROLE_FIRST / TECHNOLOGY_FIRST / LOCATION_FIRST strategy
+        (India-wide per term by default) capped at ``max_requests_per_run`` — never
+        the old blind roles×locations×pages cartesian.
+        """
+        from collectors.jobs.query_strategy import build_plan
+
+        return build_plan(
+            mode=mode or self.config.search_mode,
+            search_terms=self.config.search_terms,
+            locations=self.config.locations,
+            max_pages=max_pages or self.config.max_pages,
+            max_requests=max_requests or self.config.max_requests_per_run,
+        )
 
 
 # --------------------------------------------------------------------------- #
