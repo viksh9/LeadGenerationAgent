@@ -229,3 +229,6 @@ class RawSourceRecord(Base):
     raw_status: Mapped[RawStatus] = mapped_column(
         SAEnum(RawStatus, native_enum=False, length=16), default=RawStatus.NEW, index=True
     )
+    # Set once a raw record has been normalized into a Lead (soft link, no FK
+    # constraint so raw records survive lead deletion for provenance).
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
