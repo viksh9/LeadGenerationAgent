@@ -1,0 +1,51 @@
+# Company career-page sources for the CareerPageCollector.
+#
+# IMPORTANT: every entry here is an EXAMPLE placeholder. None has been verified,
+# so all are `enabled: false` and `status: PLANNED`. A source may only become
+# `status: CONNECTED` after it has actually been tested end-to-end (access,
+# parser, mapping, robots/terms review) — never set CONNECTED speculatively.
+#
+# collection_method: API | RSS | JSON | PUBLIC_HTML | CAREER_PLATFORM
+# robots_status:     ALLOWED | DISALLOWED | UNKNOWN
+# terms_status:      ALLOWED | REQUIRES_REVIEW | RESTRICTED | UNKNOWN
+# status:            PLANNED | NOT_CONFIGURED | REQUIRES_REVIEW | CONNECTED | RESTRICTED | NOT_SUPPORTED | ERROR
+#
+# To add a real source, see collectors/company/README.md.
+
+companies:
+  - source_id: example_structured_careers
+    company_name: Example IT Company
+    company_domain: example.com
+    career_url: https://example.com/careers
+    collection_method: PUBLIC_HTML
+    parser_type: generic
+    enabled: false
+    robots_status: UNKNOWN
+    terms_status: REQUIRES_REVIEW
+    status: PLANNED
+    country: IN
+    industry: Software
+    requires_js: false
+    requests_per_minute: 6
+    notes: >-
+      Example only. Public careers page that exposes schema.org JobPosting
+      JSON-LD. Not verified, not connected. Review robots.txt and terms before
+      enabling for development.
+
+  - source_id: example_js_only_careers
+    company_name: Example JS-Only Company
+    company_domain: example.org
+    career_url: https://example.org/jobs
+    collection_method: PUBLIC_HTML
+    parser_type: generic
+    enabled: false
+    robots_status: UNKNOWN
+    terms_status: UNKNOWN
+    status: NOT_SUPPORTED
+    country: IN
+    industry: SaaS
+    requires_js: true
+    notes: >-
+      Example only. Renders jobs client-side via JavaScript. This collector does
+      NOT execute page JavaScript, so the source is marked NOT_SUPPORTED. A
+      browser-based collector would need separate review and approval.

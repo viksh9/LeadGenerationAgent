@@ -31,14 +31,9 @@ DEFAULT_LOCATIONS: tuple[str, ...] = (
 )
 
 # Lightweight IT-relevance terms (collection optimization only — the Signal
-# Detection Engine remains the authority for business-signal classification).
-IT_RELEVANCE_TERMS: tuple[str, ...] = (
-    "software", "developer", "engineer", "cloud", "aws", "azure", "gcp", "devops",
-    "java", "python", "javascript", "typescript", "react", "angular", "node",
-    ".net", "c#", "kubernetes", "docker", "qa", "sdet", "automation", "data",
-    "ai", "artificial intelligence", "machine learning", "ml", "technology",
-    "technical", "backend", "frontend", "full stack", "sre", "platform", "architect",
-)
+# Detection Engine remains the authority). Centralized in collectors.it_taxonomy
+# so all collectors share one list rather than each keeping their own.
+from collectors.it_taxonomy import HIGH_RELEVANCE_TERMS as IT_RELEVANCE_TERMS  # noqa: E402,F401
 
 
 class AdzunaConfig(BaseModel):

@@ -55,12 +55,19 @@ sources:
     data_quality: HIGH
     commercial_use_status: RESTRICTED
     compliance:
-      terms_status: RESTRICTED
+      terms_status: REQUIRES_REVIEW
       robots_status: REQUIRES_APPROVAL
       api_terms_reviewed: false
       commercial_use_status: RESTRICTED
-      data_retention_notes: Respect each site's robots.txt and terms; only permitted pages.
-    notes: Per-company careers pages; only where robots/terms permit.
+      data_retention_notes: >-
+        Respect each site's robots.txt and terms; collect only permitted public
+        pages and store no personal data. See docs/sources/company-career-pages.md.
+    notes: >-
+      Generic CareerPageCollector implemented (collectors/company/career_page.py):
+      structured-data-first (JSON-LD / embedded JSON), robots-aware, SSRF-guarded,
+      no JavaScript execution. Per-company sources live in config/career_sources.yaml
+      and are all PLANNED/disabled — no company source is CONNECTED until verified
+      end-to-end. Status stays PLANNED at the aggregate level.
 
   - source_id: government_open_data
     name: Government Open Data / Tenders

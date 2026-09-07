@@ -120,6 +120,7 @@ class HealthStatus(str, Enum):
     DEGRADED = "DEGRADED"
     UNAVAILABLE = "UNAVAILABLE"
     NOT_CONFIGURED = "NOT_CONFIGURED"
+    RESTRICTED = "RESTRICTED"
 
 
 class HealthCheckResult(BaseModel):
