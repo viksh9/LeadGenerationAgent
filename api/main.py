@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.dependencies import get_session  # re-exported for tests/overrides
 from api.errors import register_exception_handlers
-from api.routes import career_sources, companies, contacts, health, leads, signals, sources
+from api.routes import ai, career_sources, companies, contacts, health, leads, signals, sources
 from api.schemas import ErrorBody
 from config import configure_logging, get_settings
 from config.dotenv import load_dotenv
@@ -65,3 +65,4 @@ app.include_router(sources.router)
 app.include_router(career_sources.router)
 app.include_router(signals.router)
 app.include_router(contacts.router)
+app.include_router(ai.router)

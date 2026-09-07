@@ -8,6 +8,8 @@ import { usePreferences } from '@/hooks/usePreferences';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { useHealth } from '@/hooks/useHealth';
 import { useSources } from '@/hooks/useSources';
+import { useAiStatus } from '@/hooks/useAi';
+import { aiProviderStatusDisplay } from '@/services/ai';
 import type { ThemePreference } from '@/types/settings';
 import { API_BASE_URL } from '@/services/api';
 import { PAGE_SIZE_OPTIONS } from '@/constants/leads';
@@ -29,6 +31,7 @@ export function SettingsPage() {
   const { theme, setTheme } = useThemeContext();
   const health = useHealth();
   const sources = useSources();
+  const aiStatus = useAiStatus();
   const queryClient = useQueryClient();
   const [cacheCleared, setCacheCleared] = useState(false);
 
@@ -170,6 +173,66 @@ export function SettingsPage() {
             hint="Authentication and multi-user accounts are not part of this phase."
             control={<span className="text-sm text-slate-500 dark:text-slate-400">Local, single user</span>}
           />
+        </SettingsSection>
+
+        <SettingsSection
+          title="AI provider"
+          description="AI intelligence is grounded on real data. When no provider is configured, a deterministic baseline is used instead of fabricated content."
+        >
+          {aiStatus.isLoading ? (
+            <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">Checking AI provider…</p>
+          ) : aiStatus.isError ? (
+            <div className="flex items-center justify-between gap-3 py-2.5">
+              <p className="text-sm text-rose-600 dark:text-rose-400">Unable to load AI provider status.</p>
+              <button type="button" className="btn-ghost text-sm" onClick={() => aiStatus.refetch()}>
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Retry
+              </button>
+            </div>
+          ) : aiStatus.data ? (
+            <>
+              <SettingRow
+                label="Status"
+                control={
+                  <span className={`badge ${aiProviderStatusDisplay(aiStatus.data.status).className}`}>
+                    {aiProviderStatusDisplay(aiStatus.data.status).label}
+                  </span>
+                }
+              />
+              <SettingRow
+                label="Provider"
+                control={
+                  <span className="text-sm text-slate-700 dark:text-slate-300">
+                    {aiStatus.data.provider ?? 'None'}
+                  </span>
+                }
+              />
+              <SettingRow
+                label="Model"
+                control={
+                  <span className="text-sm text-slate-700 dark:text-slate-300">
+                    {aiStatus.data.model ?? 'Not configured'}
+                  </span>
+                }
+              />
+              <SettingRow
+                label="Deterministic baseline"
+                hint="Honest rule-derived analysis used when no LLM is available."
+                control={
+                  <span className="text-sm text-slate-700 dark:text-slate-300">
+                    {aiStatus.data.deterministic_baseline_available ? 'Available' : 'Unavailable'}
+                  </span>
+                }
+              />
+              {aiStatus.data.note && (
+                <p className="border-t border-slate-100 dark:border-slate-800 pt-3 text-xs text-slate-500 dark:text-slate-400">
+                  {aiStatus.data.note}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">AI provider status unavailable.</p>
+          )}
         </SettingsSection>
 
         <div className="lg:col-span-2">
