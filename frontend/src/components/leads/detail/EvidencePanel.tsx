@@ -1,6 +1,7 @@
 import { DetailCard, Field } from '@/components/leads/detail/DetailCard';
 import { ExternalLinkValue } from '@/components/leads/detail/primitives';
 import { formatDate, formatDateTime } from '@/utils/format';
+import { sourceKind, sourceKindDisplay } from '@/services/careerSources';
 import type { Lead } from '@/types/lead';
 
 /**
@@ -45,22 +46,28 @@ export function EvidencePanel({ lead }: { lead: Lead }) {
             Supporting job postings ({evidence.length})
           </p>
           <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-md border border-slate-200 dark:border-slate-800">
-            {shown.map((ev, i) => (
-              <li key={ev.external_id ?? `${ev.source}-${i}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                <span className="min-w-0">
-                  <span className="block truncate text-slate-800 dark:text-slate-200" title={ev.job_title ?? undefined}>
-                    {ev.job_title ?? 'Untitled role'}
+            {shown.map((ev, i) => {
+              const kind = sourceKindDisplay(sourceKind(ev.source));
+              return (
+                <li key={ev.external_id ?? `${ev.source}-${i}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <span className="min-w-0">
+                    <span className="block truncate text-slate-800 dark:text-slate-200" title={ev.job_title ?? undefined}>
+                      {ev.job_title ?? 'Untitled role'}
+                    </span>
+                    <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
+                      <span>
+                        {ev.source ?? 'source'}
+                        {ev.duplicate_of_prior_source ? ' · confirms another source' : ''}
+                      </span>
+                      {kind && <span className={`badge ${kind.className}`}>{kind.label}</span>}
+                    </span>
                   </span>
-                  <span className="text-xs text-slate-400 dark:text-slate-500">
-                    {ev.source ?? 'source'}
-                    {ev.duplicate_of_prior_source ? ' · confirms another source' : ''}
+                  <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                    {formatDate(ev.published_at ?? null)}
                   </span>
-                </span>
-                <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
-                  {formatDate(ev.published_at ?? null)}
-                </span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
           {extra > 0 && (
             <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">+{extra} more posting(s)</p>

@@ -250,6 +250,75 @@ Per-source detail follows.
 > canonical dedup → company resolution → evidence verification → signal →
 > opportunity → lead).
 
+## Company → ATS discovery & verification
+
+The Greenhouse and Lever collectors above run against a **known** board token / site
+handle. This layer establishes *which* official ATS a company we already track
+actually uses, and verifies that company-to-ATS relationship **safely** — without
+guessing board ids or crawling the open web.
+
+- **Service**: `collectors/company/career_source_discovery.py`.
+- **Input**: a **real company already in the DB** that has a domain/website. Discovery
+  is never run against an arbitrary URL.
+- **What it probes**: **only the company's own domain and its declared careers URL**.
+  The candidate URLs are deterministic — the declared `{careers_url}`,
+  `https://{domain}/careers`, `https://{domain}/jobs`, and the domain root. It **never**
+  fetches arbitrary third-party URLs and **never** blindly crawls the internet.
+- **How it fetches**: through the existing `SafeHttpClient` — HTTPS upgrade, SSRF
+  guard, private-network block, validated redirects, response-size cap, polite rate
+  limiting, transient-only retries, no credentials sent or logged.
+- **How a relationship is verified**: discovery detects a Greenhouse `board_token` or
+  Lever site handle **found on the company's own careers page** (a link) or reached
+  **via a redirect from it**, and only then marks the relationship **VERIFIED**. It
+  **never** fabricates a board id. The `discovery_method` is recorded as either
+  `careers_page_link` or `careers_page_redirect`.
+
+### `company_career_sources` registry
+
+A verified relationship is persisted in the `company_career_sources` table
+(`CompanyCareerSource`): `company_id` link, `ats_provider`, `board_identifier`,
+`careers_url`, `discovery_method`, and `status`. Status lifecycle:
+
+| Status | Meaning |
+| --- | --- |
+| `DISCOVERY_REQUIRED` | No board/site is known for the company yet. |
+| `CONFIGURED` | A relationship has been discovered and verified. |
+| `CONNECTED` | A real collection/health request against that board has actually succeeded. |
+
+Discovery and collection are **incremental and idempotent** — re-running updates the
+existing relationship and skips duplicate raw records rather than creating duplicates.
+
+### Career-source API
+
+Implemented in `api/routes/career_sources.py`. GET endpoints make **no** network calls
+and never return credentials.
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /career-sources` | List all discovered/registered company career sources. |
+| `GET /career-sources/{id}` | Detail for one career source. |
+| `GET /companies/{id}/career-sources` | Career sources registered for one company. |
+| `POST /companies/{id}/discover-career-source` | Run the real, safe own-domain discovery for a company and register any verified relationship. |
+| `POST /career-sources/{id}/check` | Real connectivity health check for that board; updates `status`. |
+| `POST /career-sources/{id}/collect` | Real collection for that board through the full pipeline; returns actual counts. |
+
+### Direct-official vs aggregator evidence
+
+An official company source is **`TIER_1`** evidence — higher-confidence **direct**
+evidence than the Adzuna / Jooble aggregators (**`TIER_2`**). Official-source jobs flow
+through the **same** pipeline (raw → normalize → canonical dedup → company resolution →
+evidence verification → signal → opportunity → lead). One canonical job may carry
+multiple source references across the official ATS + Adzuna + Jooble; syndicated copies
+of the same posting are **one** evidence group — **not** independent confirmations.
+Company-level intelligence therefore shows **canonical job counts, not the sum of
+per-source counts**.
+
+No unrestricted URL fetching is exposed anywhere — discovery only follows the company's
+own domain, robots.txt and site terms are respected, and no credentials are logged.
+Public, no-auth, board/site format-validated, IT-relevance filtered, provenance `REAL`;
+commercial / ongoing reuse remains `REQUIRES_REVIEW`. More detail:
+[`docs/career-source-discovery.md`](career-source-discovery.md).
+
 ## Company Career Pages
 
 - **Purpose**: High-confidence hiring signals collected directly from a company's

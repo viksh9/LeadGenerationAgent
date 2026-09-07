@@ -15,6 +15,7 @@ import { CompanyOpportunities } from '@/components/companies/CompanyOpportunitie
 import { DecisionMakerRecommendations } from '@/components/companies/DecisionMakerRecommendations';
 import { RelatedLeads } from '@/components/companies/RelatedLeads';
 import { CompanyEvidence } from '@/components/companies/CompanyEvidence';
+import { CareerSources } from '@/components/companies/CareerSources';
 import { AccountAction } from '@/components/companies/AccountAction';
 import { useCompany } from '@/hooks/useCompanies';
 
@@ -138,6 +139,7 @@ export function CompanyDetailsPage() {
             <ProjectIntelligence company={company} />
             <CompanyOpportunities company={company} />
             <RelatedLeads company={company} />
+            <CareerSources company={company} />
             <CompanyEvidence company={company} />
           </div>
 

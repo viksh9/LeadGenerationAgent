@@ -10,6 +10,14 @@ vi.mock('@/services/leads', () => ({ getLeads: vi.fn() }));
 import { getLeads } from '@/services/leads';
 const getLeadsMock = vi.mocked(getLeads);
 
+// Keep the honest display helpers real; only stub the network fetch.
+vi.mock('@/services/careerSources', async () => {
+  const actual = await vi.importActual<typeof import('@/services/careerSources')>(
+    '@/services/careerSources',
+  );
+  return { ...actual, fetchCareerSources: vi.fn().mockResolvedValue({ items: [], total: 0 }) };
+});
+
 function makeLead(p: Partial<Lead> & Pick<Lead, 'id' | 'company_name'>): Lead {
   return {
     normalized_company_name: null,

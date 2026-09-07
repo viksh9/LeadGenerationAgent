@@ -503,3 +503,71 @@ class SourceCheckResponse(BaseModel):
     message: Optional[str] = None
     performed_request: bool
     checked_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Official company career / ATS sources
+# ---------------------------------------------------------------------------
+
+
+class CareerSourceResponse(BaseModel):
+    """A discovered official company career / ATS source (Greenhouse, Lever, …)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    ats_provider: str
+    board_identifier: Optional[str] = None
+    careers_url: Optional[str] = None
+    discovery_method: Optional[str] = None
+    status: str
+    enabled: bool = False
+    evidence_tier: str = "TIER_1"          # official company source
+    last_checked_at: Optional[datetime] = None
+    last_success_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @field_validator("ats_provider", "status", mode="before")
+    @classmethod
+    def _enum_value(cls, v):
+        return v.value if hasattr(v, "value") else v
+
+
+class CareerSourceListResponse(BaseModel):
+    items: list[CareerSourceResponse]
+    total: int
+
+
+class DiscoverCareerSourceResponse(BaseModel):
+    """Result of a company→ATS discovery attempt (real, safe fetch)."""
+
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    found: bool
+    verified: bool
+    provider: Optional[str] = None
+    board_identifier: Optional[str] = None
+    careers_url: Optional[str] = None
+    discovery_method: Optional[str] = None
+    detail: str
+    career_source: Optional[CareerSourceResponse] = None
+
+
+class CareerSourceCollectResponse(BaseModel):
+    """Result of a real collection run for one career source."""
+
+    source_id: int
+    provider: str
+    board_identifier: Optional[str] = None
+    status: str
+    requests: int = 0
+    records_fetched: int = 0
+    records_persisted: int = 0
+    canonical_jobs_created: int = 0
+    leads_created: int = 0
+    leads_updated: int = 0
+    message: Optional[str] = None

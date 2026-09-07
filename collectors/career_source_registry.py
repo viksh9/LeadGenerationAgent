@@ -74,3 +74,38 @@ def register_career_source(
 
 def list_career_sources(session: Session) -> list[CompanyCareerSource]:
     return list(session.scalars(select(CompanyCareerSource).order_by(CompanyCareerSource.id)))
+
+
+def get_career_source(session: Session, source_id: int) -> Optional[CompanyCareerSource]:
+    return session.get(CompanyCareerSource, source_id)
+
+
+def list_for_company(session: Session, company_id: int) -> list[CompanyCareerSource]:
+    return list(session.scalars(
+        select(CompanyCareerSource).where(CompanyCareerSource.company_id == company_id)
+        .order_by(CompanyCareerSource.id)
+    ))
+
+
+def register_from_discovery(session: Session, result) -> Optional[CompanyCareerSource]:
+    """Persist a verified DiscoveryResult as a CONFIGURED career source.
+
+    Returns the row, or None if discovery found nothing (never fabricates a board).
+    Status is CONFIGURED (relationship verified) — CONNECTED only after a real
+    collection succeeds (register_career_source at collect time).
+    """
+    if not (result.verified and result.provider and result.board_identifier):
+        return None
+    row = register_career_source(
+        session,
+        ats_provider=result.provider,
+        board_identifier=result.board_identifier,
+        status=CareerSourceStatus.CONFIGURED,
+        company_name=result.company_name,
+        careers_url=result.careers_url,
+        discovery_method=result.discovery_method or "discovery",
+    )
+    if result.company_id and not row.company_id:
+        row.company_id = result.company_id
+        session.commit()
+    return row
