@@ -40,9 +40,11 @@ def build_business_signals(session: Session, *, provenance: DataProvenance = Dat
                            now: Optional[datetime] = None):
     now = now or datetime.now(timezone.utc).replace(tzinfo=None)
     is_synth = provenance is DataProvenance.SYNTHETIC
+    # News articles AND tenders/RFPs both become BusinessSignals (a tender is a
+    # procurement signal); the tender-specific structured view is TenderRecord.
     stmt = (
         select(RawSourceRecord)
-        .where(RawSourceRecord.record_type == RecordType.NEWS_ARTICLE)
+        .where(RawSourceRecord.record_type.in_((RecordType.NEWS_ARTICLE, RecordType.TENDER)))
         .where(RawSourceRecord.is_synthetic.is_(is_synth))
     )
     normalizer = BusinessSignalNormalizationService()

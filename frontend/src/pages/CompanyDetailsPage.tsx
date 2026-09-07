@@ -9,6 +9,7 @@ import { CompanyOverview } from '@/components/companies/CompanyOverview';
 import { AccountOpportunitySummary } from '@/components/companies/AccountOpportunitySummary';
 import { TechnologyLandscape } from '@/components/companies/TechnologyLandscape';
 import { SignalTimeline } from '@/components/companies/SignalTimeline';
+import { BusinessTimeline } from '@/components/companies/BusinessTimeline';
 import { HiringIntelligence } from '@/components/companies/HiringIntelligence';
 import { ProjectIntelligence } from '@/components/companies/ProjectIntelligence';
 import { CompanyOpportunities } from '@/components/companies/CompanyOpportunities';
@@ -135,6 +136,7 @@ export function CompanyDetailsPage() {
           <div className="space-y-4 lg:col-span-2">
             <AccountOpportunitySummary company={company} />
             <SignalTimeline company={company} />
+            <BusinessTimeline company={company} />
             <TechnologyLandscape company={company} />
             <ProjectIntelligence company={company} />
             <CompanyOpportunities company={company} />

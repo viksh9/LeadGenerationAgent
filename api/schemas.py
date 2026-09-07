@@ -571,3 +571,113 @@ class CareerSourceCollectResponse(BaseModel):
     leads_created: int = 0
     leads_updated: int = 0
     message: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Business signals, tenders, company timeline
+# ---------------------------------------------------------------------------
+
+
+def _enum_val(v):
+    return v.value if hasattr(v, "value") else v
+
+
+class SignalResponse(BaseModel):
+    """A real business/market signal (project, contract, tender, expansion, …)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    signal_type: str
+    signal_title: Optional[str] = None
+    signal_description: Optional[str] = None
+    signal_url: Optional[str] = None
+    published_at: Optional[datetime] = None
+    technologies: list[str] = Field(default_factory=list)
+    location: Optional[str] = None
+    signal_strength: str
+    source_id: str
+    source_count: int = 1
+    evidence_confidence: int = 0
+    commercial_intent: str = "UNKNOWN"
+    data_provenance: str = "REAL"
+
+    @field_validator("signal_type", "signal_strength", "commercial_intent", "data_provenance", mode="before")
+    @classmethod
+    def _ev(cls, v):
+        return _enum_val(v)
+
+
+class SignalListResponse(BaseModel):
+    items: list[SignalResponse]
+    total: int
+    page: int = 1
+    page_size: int = 20
+    total_pages: int = 0
+
+
+class TenderResponse(BaseModel):
+    """A government/procurement tender or RFP (real source only)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source_id: str
+    source_record_id: Optional[str] = None
+    title: Optional[str] = None
+    organization_name: Optional[str] = None
+    department: Optional[str] = None
+    organization_type: Optional[str] = None
+    location: Optional[str] = None
+    issue_date: Optional[datetime] = None
+    publication_date: Optional[datetime] = None
+    closing_date: Optional[datetime] = None
+    award_date: Optional[datetime] = None
+    estimated_value: Optional[float] = None
+    currency: Optional[str] = None
+    estimated_value_text: Optional[str] = None
+    category: Optional[str] = None
+    technologies: list[str] = Field(default_factory=list)
+    scope_summary: Optional[str] = None
+    tender_status: str
+    source_url: Optional[str] = None
+    company_id: Optional[int] = None
+    target_company_id: Optional[int] = None
+    signal_origin_organization: Optional[str] = None
+    evidence_confidence: int = 0
+    freshness_score: int = 0
+    commercial_intent: str = "UNKNOWN"
+    data_provenance: str = "REAL"
+    first_seen_at: Optional[datetime] = None
+    last_seen_at: Optional[datetime] = None
+
+    @field_validator("tender_status", "commercial_intent", "data_provenance", mode="before")
+    @classmethod
+    def _ev(cls, v):
+        return _enum_val(v)
+
+
+class TenderListResponse(BaseModel):
+    items: list[TenderResponse]
+    total: int
+    page: int = 1
+    page_size: int = 20
+    total_pages: int = 0
+
+
+class TimelineEventResponse(BaseModel):
+    date: Optional[datetime] = None
+    category: str
+    event_type: str
+    title: str
+    detail: Optional[str] = None
+    source: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class TimelineResponse(BaseModel):
+    company_id: int
+    events: list[TimelineEventResponse]
+    total: int

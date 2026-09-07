@@ -57,7 +57,8 @@ a source produces real data.
 | Lever Postings API | Lever (official, public) | JOB / ATS | `collectors/ats/lever.py` | IMPLEMENTED | `DISCOVERY_REQUIRED` | TIER_1 |
 | Company Career Pages | Public web (per company) | COMPANY | `collectors/company/career_page.py` | IMPLEMENTED (per-source config; not `source_id`-runnable) | `NOT_CONFIGURED` | Not yet assigned |
 | Company Newsroom / RSS | Official company feeds | NEWS | `collectors/business/collector.py` | IMPLEMENTED (per-source config; not `source_id`-runnable) | `NOT_CONFIGURED` | Not yet assigned |
-| Government Procurement / Open Data | Government open-data portals | GOVERNMENT / TENDER | — | NOT_IMPLEMENTED | `NOT_CONFIGURED` | Not yet assigned |
+| Government Open Data (data.gov.in OGD API) | data.gov.in (OGD Platform) | GOVERNMENT / TENDER | adapter (per-dataset) | NOT_CONFIGURED | `NOT_CONFIGURED` | Not yet assigned |
+| Government Procurement (CPPP / GeM) | NIC / MoF (CPPP), GeM | TENDER | manual import only | NOT_IMPLEMENTED / MANUAL_SOURCE_REQUIRED | `NOT_CONFIGURED` | Not yet assigned |
 | Project / Contract Registry | Public registries | PROJECT | — | NOT_IMPLEMENTED | `NOT_CONFIGURED` | Not yet assigned |
 | Business / Company Database | Third-party (commercial) | BUSINESS_DATABASE | — | NOT_IMPLEMENTED | `NOT_CONFIGURED` | Not yet assigned |
 
@@ -372,22 +373,61 @@ commercial / ongoing reuse remains `REQUIRES_REVIEW`. More detail:
 - **Connection status**: `NOT_CONFIGURED` (no reviewed/verified feed).
 - **Evidence tier**: Not yet assigned.
 
-## Government Procurement / Open Data
+## Government Open Data (data.gov.in OGD API)
 
-- **Purpose**: Public technology tenders/RFPs and award signals from government
-  open-data / e-procurement portals. (A tender is classified first and is never
-  treated as a sales opportunity on its own.)
-- **Provider**: Government open-data / e-procurement portals.
-- **Data provided (fields)**: tender/award records (project, dates, location) —
-  fields depend on the specific portal.
-- **Authentication**: typically none (open data); confirm per portal.
-- **Env vars**: none defined yet.
-- **Capabilities (planned)**: search, pagination, date filter, incremental fetch.
+> **Purpose**: Public technology tenders/RFPs and award signals from India's Open
+> Government Data platform. (A tender is classified first and is never treated as a
+> sales opportunity on its own.)
+
+- **Provider**: data.gov.in (OGD Platform India).
+- **Access reality (verified 2026)**: data.gov.in exposes a **legitimate open-data
+  API** — this is the sanctioned government path (unlike CPPP, which has no public
+  API).
+- **Endpoint**:
+  `GET https://api.data.gov.in/resource/{resource_id}?api-key=<KEY>&format=json`.
+- **Data provided (fields)**: tender/dataset records — **per-dataset field names
+  vary**, so the adapter must be configured **per dataset**.
+- **Authentication**: a **free API key** (`API_KEY`) plus a **specific dataset
+  `resource_id`**.
+- **Env vars**: `DATA_GOV_IN_API_KEY`, `DATA_GOV_IN_TENDER_RESOURCE_ID`. Read from
+  the environment only; never logged or committed.
+- **Capabilities**: search, pagination, date filter, incremental fetch (per the
+  catalogue); actual availability depends on the chosen dataset.
+- **India support**: Yes — Indian government open data.
+- **Rate limits**: Conservative catalogue defaults (`requests_per_minute: 15`,
+  `requests_per_day: 2000`).
+- **Licensing / commercial use**: **Government Open Data License – India (GODL)**;
+  commercial use **`REQUIRES_REVIEW`** — confirm the **specific dataset's** GODL
+  terms before commercial reuse. Terms:
+  <https://data.gov.in/government-open-data-license-india>.
+- **Implementation status**: `NOT_CONFIGURED` — stays so until
+  `DATA_GOV_IN_API_KEY` + a vetted tender `DATA_GOV_IN_TENDER_RESOURCE_ID` are set
+  and the dataset's field mapping/licence are reviewed. Tenders then flow through
+  the standard tender pipeline.
+- **Connection status**: `NOT_CONFIGURED` (no verified live request).
+- **Evidence tier**: Not yet assigned.
+
+## Government Procurement / Tenders (CPPP / GeM)
+
+> **Purpose**: Public technology tenders/RFPs from India's central e-procurement
+> portals. (A tender is classified first and is never treated as a sales
+> opportunity on its own.)
+
+- **Provider**: NIC / Ministry of Finance (CPPP, `eprocure.gov.in`), GeM.
+- **Access reality (verified 2026)**: the CPPP (`eprocure.gov.in`) portal publishes
+  **NO documented public developer API**. The only programmatic access is via
+  **third-party scrapers, which this project does NOT use** (no unauthorized
+  scraping).
+- **How tenders enter**: **manual import only** — an operator exports tenders they
+  obtained through a permitted method and imports them via
+  `python scripts/import_tender.py tenders.json` (provenance `REAL`). See
+  [Manual ingestion (CLIs)](#manual-ingestion-clis).
+- **Authentication**: none applicable (no public API).
+- **Env vars**: none.
 - **India support**: Target is Indian government technology tenders/RFPs.
-- **Rate limits**: Per-portal; conservative defaults to be set when implemented.
-- **Licensing / commercial use**: `ALLOWED` in principle (open-data licences
-  usually permit reuse with attribution); verify the specific portal's licence.
-- **Implementation status**: `NOT_IMPLEMENTED` (catalogued/planned; no collector).
+- **Licensing / commercial use**: `REQUIRES_REVIEW`.
+- **Implementation status**: `NOT_IMPLEMENTED` / **`MANUAL_SOURCE_REQUIRED`** — no
+  permitted public API exists; there is no automated collector.
 - **Connection status**: `NOT_CONFIGURED`.
 - **Evidence tier**: Not yet assigned.
 
@@ -476,6 +516,49 @@ network call.
 # Real-data-only compliance audit of the database.
 python scripts/db_audit.py
 ```
+
+### Manual tender import
+
+Government procurement portals with no permitted public API (CPPP / GeM) are
+ingested by an operator-driven import of **REAL** tenders obtained through a
+permitted method — never scraping. Input is a JSON array; required fields are
+`source_id`, `external_id`/`id`, `title`; absent fields stay `NULL`. Imported
+tenders run through the same business + tender pipelines (provenance `REAL`).
+
+```bash
+python scripts/import_tender.py tenders.json            # ingest REAL tenders
+python scripts/import_tender.py tenders.json --dry-run  # validate + report, persist nothing
+```
+
+## Tenders & business signals
+
+Both **news** and **tenders** become `BusinessSignal`s — the business pipeline
+processes `RecordType.NEWS_ARTICLE` **and** `RecordType.TENDER`. Tenders also
+produce a structured `TenderRecord` (idempotent upsert by
+`(source_id, source_record_id)`; history preserved, status/freshness refreshed on
+re-run) with a lifecycle (`OPEN` / `CLOSING_SOON` / `CLOSED` / `CANCELLED` /
+`AWARDED` / `UNKNOWN`), freshness (`verification.freshness`), deterministically
+extracted technologies, and a separate **commercial-intent** axis. The issuing
+buyer is kept separate from any named awarded vendor. A tender's signal type flows
+through the existing evidence verifier (four distinct scores kept separate), and a
+tender is classified first — never a sales opportunity on its own. Full detail:
+[`docs/business-signals-and-tenders.md`](business-signals-and-tenders.md).
+
+### Business-signal, tender & timeline API
+
+Implemented in `api/routes/signals.py`; read-only over stored real data, empty when
+no real data exists.
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /signals` | List business signals; filters `signal_type` / `company` / `technology` / `source`; paginated. |
+| `GET /signals/{id}` | One business signal. |
+| `GET /tenders` | List tenders; filters `status` / `technology` / `organization` / `category`; paginated. |
+| `GET /tenders/{id}` | One tender. |
+| `GET /companies/{id}/tenders` | Tenders for one company (issuer or target). |
+| `GET /companies/{id}/timeline` | One company's chronological business-event timeline. |
+
+`GET /companies/{id}/signals` (a company's business signals) already existed.
 
 ## Source status API
 

@@ -212,7 +212,8 @@ collector class is *not* the same as an active, verified real-data connection.
 | Company career pages | implemented | `REQUIRES_REVIEW` | Robots/ToS review per site before enabling |
 | Company newsroom (RSS) | implemented | `REQUIRES_REVIEW` | Per-feed review before enabling |
 | RSS business/tech news | implemented | `NOT_CONFIGURED` | No reviewed feeds configured |
-| Government open data / procurement | planned | `PLANNED` | No collector yet |
+| Government procurement (CPPP / GeM) | manual only | `PLANNED` / `MANUAL_SOURCE_REQUIRED` | No documented public API; no scraping. Tenders enter via the manual import CLI only. Commercial use `REQUIRES_REVIEW` |
+| data.gov.in open data (OGD API) | adapter (per-dataset) | `NOT_CONFIGURED` | Legitimate open-data API under GODL. Needs `DATA_GOV_IN_API_KEY` + `DATA_GOV_IN_TENDER_RESOURCE_ID`; per-dataset field mapping. Commercial use `REQUIRES_REVIEW` |
 | Project / contract registry | planned | `PLANNED` | No collector yet |
 | Business database (3rd-party) | planned | `PLANNED` | Requires commercial licence |
 
@@ -400,6 +401,99 @@ Discovery only follows the company's own domain — **no unrestricted URL fetchi
 exposed anywhere**. robots.txt and site terms are respected, and no credentials are
 logged. Public, no-auth, board/site format-validated, IT-relevance filtered,
 provenance `REAL`; commercial / ongoing reuse remains `REQUIRES_REVIEW`.
+
+## Business signals & tenders
+
+Hiring is one signal; this layer adds structured **business events** and
+**tenders**, a separate **commercial-intent** axis, and a per-company **timeline**,
+then combines them into conservative company-level opportunity candidates. The
+business-signal engine already existed; **new** here are a structured tender domain
++ pipeline, commercial-intent classification, the company timeline, and the
+signals/tenders/timeline APIs. Full detail:
+[docs/business-signals-and-tenders.md](docs/business-signals-and-tenders.md).
+
+> A tender or news article never becomes a Lead on its own. A tender is classified
+> first and is never treated as a sales opportunity by itself.
+
+- **Signal types.** The deterministic detector (no LLM) classifies text into
+  `BusinessSignalType` values — project awards, contracts, tenders/RFPs
+  (incl. government), digital-transformation / cloud / modernization / AI /
+  cybersecurity initiatives, partnerships, expansions (delivery-center /
+  engineering), vendor requirements, outsourcing, and acquisitions. Both **news**
+  and **tenders** become `BusinessSignal`s (the business pipeline processes
+  `RecordType.NEWS_ARTICLE` **and** `RecordType.TENDER`). Tender signals flow
+  through the **existing** evidence verifier — the four scores stay distinct.
+- **Tender lifecycle + freshness.** `TenderRecord` stores only what the source
+  states (absent values stay `NULL`, never computed). Status is `OPEN` /
+  `CLOSING_SOON` / `CLOSED` / `CANCELLED` / `AWARDED` / `UNKNOWN` — from the
+  source's explicit status, else from a real `closing_date` (past → `CLOSED`,
+  within 7 days → `CLOSING_SOON`, future → `OPEN`); **never** inferred `OPEN` just
+  because a page is reachable. Freshness uses `verification.freshness` (an expired
+  or closed tender is stale). The issuing buyer (`company_id`) is kept **separate**
+  from any named awarded vendor (`target_company_id`). Idempotent upsert by
+  `(source_id, source_record_id)`; history is preserved (status/freshness refreshed
+  on re-run, never deleted). Technologies are extracted deterministically from the
+  tender content.
+- **Commercial intent (separate axis).** A deterministic
+  `VERY_HIGH` / `HIGH` / `MEDIUM` / `LOW` / `UNKNOWN` band from recency, source
+  quality, project/tender/vendor evidence, hiring volume, technology relevance, and
+  signal combination — **separate from** evidence confidence and the lead score.
+  With no qualifying evidence the result is **`UNKNOWN`, not `LOW`**.
+- **Company timeline.** A chronological, real-events-only timeline per company —
+  business signals + tenders + observed hiring (the **canonical** job count, not a
+  sum of per-source counts). It never fabricates events.
+- **Cross-signal opportunity.** The core feature: strong hiring **plus** a live
+  tender or fresh project/transformation signal is a stronger opportunity candidate
+  than any single signal. Syndicated copies are one evidence group, not independent
+  confirmations. Candidates are never auto-promoted to Leads.
+
+### Business-signal, tender & timeline APIs
+
+Read-only over stored real data (`api/routes/signals.py`); empty when no real data
+exists.
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /signals` | List business signals; filters `signal_type` / `company` / `technology` / `source`; paginated |
+| `GET /signals/{id}` | One business signal |
+| `GET /tenders` | List tenders; filters `status` / `technology` / `organization` / `category`; paginated |
+| `GET /tenders/{id}` | One tender |
+| `GET /companies/{id}/tenders` | Tenders for one company (issuer or target) |
+| `GET /companies/{id}/timeline` | One company's business-event timeline |
+
+`GET /companies/{id}/signals` (a company's business signals) already existed.
+
+### Manual tender import CLI
+
+Government procurement portals with no permitted public API are ingested via an
+operator-driven import of REAL tenders (permitted source), never scraping:
+
+```bash
+python scripts/import_tender.py tenders.json            # ingest a JSON array of REAL tenders
+python scripts/import_tender.py tenders.json --dry-run  # validate + report, persist nothing
+```
+
+Required fields: `source_id`, `external_id`/`id`, `title`. Absent fields stay
+`NULL`. Provenance is `REAL`; nothing is fabricated. Imported tenders run through
+the same business + tender pipelines.
+
+### Government-source reality (verified 2026)
+
+**No live government source is connected or executed.**
+
+- **CPPP / GeM (`eprocure.gov.in`)** — **no documented public developer API**; the
+  only programmatic access is third-party scrapers, which this project does **not**
+  use. Registered `PLANNED` / **`MANUAL_SOURCE_REQUIRED`**, commercial use
+  `REQUIRES_REVIEW`. Tenders enter **only** via the manual import CLI, using data an
+  operator obtained through a permitted method.
+- **data.gov.in (OGD Platform)** — a **legitimate open-data API**
+  (`GET https://api.data.gov.in/resource/{resource_id}?api-key=&format=json`) under
+  the **Government Open Data License – India (GODL)**. Needs a free API key + a
+  specific dataset `resource_id`, and per-dataset field names vary (adapter
+  configured per dataset). Registered **`NOT_CONFIGURED`** (env
+  `DATA_GOV_IN_API_KEY` + `DATA_GOV_IN_TENDER_RESOURCE_ID`), commercial use
+  `REQUIRES_REVIEW` — confirm the specific dataset's GODL terms before commercial
+  reuse.
 
 ### Jooble request budget
 
