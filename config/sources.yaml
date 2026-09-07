@@ -105,14 +105,16 @@ sources:
     category: NEWS
     source_type: RSS
     base_url: null
-    status: PLANNED
+    status: NOT_CONFIGURED
     enabled: false
     requires_api_key: false
+    priority: 3
     rate_limit: { requests_per_minute: 20, requests_per_day: 2000 }
     supports_search: false
     supports_pagination: false
     supports_incremental_fetch: true
     supports_date_filter: true
+    supports_location: false
     data_quality: MEDIUM
     commercial_use_status: RESTRICTED
     compliance:
@@ -168,3 +170,53 @@ sources:
       commercial_use_status: REQUIRES_APPROVAL
       data_retention_notes: Commercial licence required; review before enabling.
     notes: Company-identity/firmographics enrichment candidate (requires approval).
+
+  - source_id: company_newsroom
+    name: Company Newsroom / Press Releases (official RSS)
+    category: NEWS
+    source_type: RSS
+    base_url: null
+    status: REQUIRES_REVIEW
+    enabled: false
+    requires_api_key: false
+    priority: 1
+    rate_limit: { requests_per_minute: 10, requests_per_day: 500 }
+    supports_incremental_fetch: true
+    supports_date_filter: true
+    data_quality: HIGH
+    commercial_use_status: REQUIRES_APPROVAL
+    compliance:
+      terms_status: REQUIRES_REVIEW
+      robots_status: UNKNOWN
+      api_terms_reviewed: false
+      commercial_use_status: REQUIRES_APPROVAL
+      data_retention_notes: Official announcements; high source confidence. Review each site's terms.
+    notes: >-
+      Official company newsroom/press-release feeds (highest source confidence).
+      BusinessSignalCollector reads permitted RSS/Atom only. Per-company feed URLs
+      are configured per source; PLANNED until a specific feed is reviewed + tested.
+
+  - source_id: government_procurement
+    name: Government Procurement / Tenders (open data)
+    category: TENDER
+    source_type: OPEN_DATA
+    base_url: null
+    status: PLANNED
+    enabled: false
+    requires_api_key: false
+    priority: 2
+    rate_limit: { requests_per_minute: 15, requests_per_day: 1500 }
+    supports_search: true
+    supports_pagination: true
+    supports_date_filter: true
+    data_quality: HIGH
+    commercial_use_status: ALLOWED
+    compliance:
+      terms_status: REQUIRES_REVIEW
+      robots_status: ALLOWED
+      api_terms_reviewed: false
+      commercial_use_status: ALLOWED
+      data_retention_notes: Government open data; verify the specific portal's licence and attribution.
+    notes: >-
+      Indian government technology tenders/RFPs (e-procurement open data). A tender
+      is classified first and never treated as a sales opportunity on its own.
