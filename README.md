@@ -343,6 +343,64 @@ signal → opportunity → lead).
   Greenhouse and Lever terms before enabling ongoing commercial use. Being publicly
   reachable is **not** the same as approved for commercial reuse.
 
+### Company → ATS source discovery
+
+The Greenhouse and Lever collectors above run against a **known** board token /
+site handle. The discovery layer answers the prior question — *which* official ATS
+(if any) a company we already track actually uses — and does so **safely**, without
+guessing board ids or crawling the open web.
+
+- **Own-domain-only, deterministic probing** (`collectors/company/career_source_discovery.py`).
+  Given a **real company already in the DB** (one that has a domain/website), the
+  service probes **only that company's own domain and its declared careers URL**. The
+  candidate URLs are deterministic: the declared `{careers_url}`, `https://{domain}/careers`,
+  `https://{domain}/jobs`, and the domain root. It **never** fetches arbitrary
+  third-party URLs and **never** blindly crawls the internet.
+- **Safe fetching.** All requests go through the existing `SafeHttpClient` — HTTPS
+  upgrade, SSRF guard, private-network block, validated redirects, response-size cap,
+  polite rate limiting, transient-only retries, and no credentials sent or logged.
+- **Verified relationship, never fabricated.** Discovery detects a Greenhouse
+  `board_token` or Lever site handle **found on the company's own careers page** (a
+  link) or reached **via a redirect from it**, and only then marks the relationship
+  **VERIFIED**. It **never** fabricates a board id. The `discovery_method` is recorded
+  as either `careers_page_link` or `careers_page_redirect`.
+- **Persistence & status lifecycle.** A verified relationship is stored in the
+  `company_career_sources` table (`CompanyCareerSource`) — `company_id`, `ats_provider`,
+  `board_identifier`, `careers_url`, `discovery_method`, `status`. The status lifecycle is:
+  - `DISCOVERY_REQUIRED` — no board/site is known for the company yet.
+  - `CONFIGURED` — a relationship has been discovered and verified.
+  - `CONNECTED` — a real collection/health request against that board has actually
+    succeeded.
+- **Evidence tier.** An official company source is `TIER_1` evidence — higher-confidence
+  **direct** evidence than the Adzuna / Jooble aggregators (`TIER_2`).
+
+New API endpoints (`api/routes/career_sources.py`):
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /career-sources` | List all discovered/registered company career sources |
+| `GET /career-sources/{id}` | Detail for one career source |
+| `GET /companies/{id}/career-sources` | Career sources registered for one company |
+| `POST /companies/{id}/discover-career-source` | Run the real, safe own-domain discovery for a company and register any verified relationship |
+| `POST /career-sources/{id}/check` | Real connectivity health check for that board → updates `status` |
+| `POST /career-sources/{id}/collect` | Real collection for that board → full pipeline → returns actual counts |
+
+Discovery and collection are **incremental and idempotent** — re-running updates the
+existing relationship and skips duplicate raw records rather than creating duplicates.
+
+**Direct-official vs aggregator evidence.** Official-source jobs flow through the
+**same** pipeline as everything else (raw → normalize → canonical dedup → company
+resolution → evidence verification → signal → opportunity → lead). One canonical job
+may carry **multiple** source references across the official ATS + Adzuna + Jooble.
+Syndicated copies of the same posting are **one** evidence group — **not** independent
+confirmations. Company-level intelligence therefore shows **canonical job counts, not
+the sum of per-source counts**.
+
+Discovery only follows the company's own domain — **no unrestricted URL fetching is
+exposed anywhere**. robots.txt and site terms are respected, and no credentials are
+logged. Public, no-auth, board/site format-validated, IT-relevance filtered,
+provenance `REAL`; commercial / ongoing reuse remains `REQUIRES_REVIEW`.
+
 ### Jooble request budget
 
 Jooble's free REST plan is a **hard 500-request lifetime cap per key** (absolute,
