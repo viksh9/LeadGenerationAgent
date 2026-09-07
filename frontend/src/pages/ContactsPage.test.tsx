@@ -10,6 +10,16 @@ vi.mock('@/services/leads', () => ({ getLeads: vi.fn() }));
 import { getLeads } from '@/services/leads';
 const getLeadsMock = vi.mocked(getLeads);
 
+// Mock only the network fns; keep the real display helpers (verificationDisplay…).
+vi.mock('@/services/decisionMakers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/decisionMakers')>();
+  return { ...actual, fetchContacts: vi.fn(), fetchLeadStakeholders: vi.fn() };
+});
+import { fetchContacts, type DecisionMakerList } from '@/services/decisionMakers';
+const fetchContactsMock = vi.mocked(fetchContacts);
+
+const emptyContacts: DecisionMakerList = { items: [], total: 0, page: 1, page_size: 20, total_pages: 0 };
+
 const FIXED_NOW = Date.parse('2026-09-30T00:00:00Z');
 
 function makeLead(p: Partial<Lead> & Pick<Lead, 'id' | 'company_name'>): Lead {
@@ -107,6 +117,8 @@ const table = () => screen.getByRole('table');
 let nowSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   getLeadsMock.mockReset();
+  fetchContactsMock.mockReset();
+  fetchContactsMock.mockResolvedValue(emptyContacts);
   nowSpy = vi.spyOn(Date, 'now').mockReturnValue(FIXED_NOW);
 });
 afterEach(() => {
@@ -260,5 +272,63 @@ describe('ContactsPage', () => {
     getLeadsMock.mockResolvedValue(response([makeLead({ id: 9, company_name: 'NoRole', poc_title: null })]));
     renderPage();
     expect(await screen.findByText(/no decision-maker recommendations yet/i)).toBeInTheDocument();
+  });
+
+  it('shows the verified people & contacts section with an honest empty state', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    renderPage();
+    const section = await screen.findByTestId('verified-contacts-section');
+    expect(within(section).getByText(/verified people & contacts/i)).toBeInTheDocument();
+    expect(within(section).getByText(/no verified people or contacts yet/i)).toBeInTheDocument();
+    // The derived section is clearly relabelled as NOT verified people.
+    expect(screen.getByText(/recommended roles \(not verified people\)/i)).toBeInTheDocument();
+  });
+
+  it('renders real verified people/contacts from the backend', async () => {
+    getLeadsMock.mockResolvedValue(response(LEADS));
+    fetchContactsMock.mockResolvedValue({
+      ...emptyContacts,
+      total: 1,
+      items: [
+        {
+          id: 'dm-1',
+          company_id: 1,
+          company_name: 'NorthStar Banking',
+          full_name: 'Asha Verma',
+          job_title: 'VP Engineering',
+          normalized_role: 'vp_engineering',
+          role_category: 'TECHNICAL',
+          department: 'Engineering',
+          seniority: 'VP',
+          profile_url: null,
+          professional_network_url: null,
+          business_email: 'asha@northstar.example',
+          business_phone: null,
+          contact_type: 'PERSON',
+          email_status: 'VALID',
+          contact_source: 'Company site',
+          source_type: 'WEBSITE',
+          source_url: 'https://northstar.example/team',
+          identity_confidence: 90,
+          role_confidence: 85,
+          company_confidence: 88,
+          contact_confidence: 80,
+          evidence_confidence: 82,
+          freshness_score: 75,
+          verification_status: 'VERIFIED',
+          match_status: null,
+          data_provenance: 'REAL',
+          last_verified_at: '2026-09-01T00:00:00Z',
+        },
+      ],
+    });
+    renderPage();
+    const section = await screen.findByTestId('verified-contacts-section');
+    expect(within(section).getByText('Asha Verma')).toBeInTheDocument();
+    expect(within(section).getByText('Verified')).toBeInTheDocument();
+    expect(within(section).getByRole('link', { name: /company site/i })).toHaveAttribute(
+      'href',
+      'https://northstar.example/team',
+    );
   });
 });

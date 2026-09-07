@@ -400,3 +400,65 @@ sources:
       import path (scripts/import_tender.py) using data an operator obtains under a
       permitted method. A tender is classified first and never treated as a sales
       opportunity on its own.
+
+  - source_id: official_company_people
+    name: Official Company Leadership / Team Pages (people + contacts)
+    category: COMPANY
+    source_type: PUBLIC_WEB
+    provider: Official company website
+    base_url: null
+    documentation_url: null
+    status: REQUIRES_REVIEW
+    enabled: false
+    requires_api_key: false
+    authentication_type: NONE
+    credential_env_vars: []
+    capabilities: [decision_makers, contacts, source_urls]
+    supports_india: true
+    reliability_tier: TIER_1
+    robots_required: true
+    priority: 1
+    rate_limit: { requests_per_minute: 10, requests_per_day: 500 }
+    licensing_notes: >-
+      People/contact data carries privacy + terms obligations. Only publicly
+      published schema.org Person entities and business (role-based / on-domain)
+      email addresses are extracted — never guessed, never personal data. Review
+      each site's terms/robots before enabling. Commercial reuse REQUIRES_REVIEW.
+    commercial_use_status: REQUIRES_REVIEW
+    compliance:
+      terms_status: REQUIRES_REVIEW
+      robots_status: REQUIRES_REVIEW
+      api_terms_reviewed: false
+      commercial_use_status: REQUIRES_REVIEW
+      data_retention_notes: Store only source-linked, business-relevant, minimized data.
+    notes: >-
+      Enricher implemented (enrichment/person_enricher.py, OfficialCompanySourceEnricher):
+      SSRF-safe, own-domain-only, extracts real people (JSON-LD Person) + published
+      business contacts. No fabrication, no scraping of third-party/private profiles,
+      no guessed emails/URLs. Run via POST /companies/{id}/enrich.
+
+  - source_id: business_contact_provider
+    name: Licensed B2B Contact Provider (third-party)
+    category: BUSINESS_DATABASE
+    source_type: THIRD_PARTY_API
+    provider: (unset — licensed provider)
+    base_url: null
+    status: PLANNED
+    enabled: false
+    requires_api_key: true
+    authentication_type: API_KEY
+    credential_env_vars: [SOURCE_BUSINESS_CONTACT_PROVIDER_API_KEY]
+    capabilities: [decision_makers, contacts]
+    supports_india: true
+    reliability_tier: TIER_2
+    commercial_use_status: REQUIRES_APPROVAL
+    compliance:
+      terms_status: REQUIRES_APPROVAL
+      robots_status: UNKNOWN
+      api_terms_reviewed: false
+      commercial_use_status: REQUIRES_APPROVAL
+      data_retention_notes: Commercial licence + DPA required before enabling.
+    notes: >-
+      NOT_IMPLEMENTED placeholder for a permitted licensed contact-data provider.
+      No provider is wired; requires a commercial licence + credentials + usage
+      policy before any activation. Pluggable via BaseContactEnricher.

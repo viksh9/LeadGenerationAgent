@@ -13,6 +13,7 @@ import { ContactCard } from '@/components/contacts/ContactCard';
 import { CompanyRoleGroup } from '@/components/contacts/CompanyRoleGroup';
 import { TopTargetRoles } from '@/components/contacts/TopTargetRoles';
 import { ContactRecommendationDetails } from '@/components/contacts/ContactRecommendationDetails';
+import { VerifiedContactsSection } from '@/components/contacts/VerifiedContactsSection';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useContacts } from '@/hooks/useContacts';
 import {
@@ -145,15 +146,17 @@ export function ContactsPage() {
     </PageContainer>
   );
 
-  if (isLoading) return header(<Skeleton />);
-  if (isError)
-    return header(
+  let rolesContent: React.ReactNode;
+  if (isLoading) {
+    rolesContent = <Skeleton />;
+  } else if (isError) {
+    rolesContent = (
       <Card>
         <ErrorState message="Unable to load decision-maker recommendations." onRetry={() => refetch()} />
-      </Card>,
+      </Card>
     );
-  if (isEmpty || base.length === 0)
-    return header(
+  } else if (isEmpty || base.length === 0) {
+    rolesContent = (
       <Card>
         <EmptyState
           title="No decision-maker recommendations yet."
@@ -164,16 +167,12 @@ export function ContactsPage() {
             </Link>
           }
         />
-      </Card>,
+      </Card>
     );
-
-  return header(
+  } else {
+    rolesContent = (
     <div className="space-y-4">
       <ContactSummaryCards summary={summary} />
-      <p className="text-xs text-slate-400 dark:text-slate-500">
-        Phase 1 shows recommended decision-maker <strong>roles</strong>, not verified people.
-        Relevance reflects the related lead's opportunity score.
-      </p>
 
       <ContactFilters
         filters={filters}
@@ -270,6 +269,27 @@ export function ContactsPage() {
       </div>
 
       <ContactRecommendationDetails contact={selected} onClose={() => setSelected(null)} />
+    </div>
+    );
+  }
+
+  return header(
+    <div className="space-y-6">
+      <VerifiedContactsSection />
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            Recommended roles (not verified people)
+          </h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Verified people and contacts now come from the backend (above when available). The
+            recommendations below are decision-maker <strong>roles</strong> derived from lead
+            signals — not verified people. Relevance reflects the related lead's opportunity score.
+          </p>
+        </div>
+        {rolesContent}
+      </section>
     </div>,
   );
 }

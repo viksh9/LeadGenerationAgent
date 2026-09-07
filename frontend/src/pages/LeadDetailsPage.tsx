@@ -11,6 +11,7 @@ import { SignalPanel } from '@/components/leads/detail/SignalPanel';
 import { OpportunityPanel } from '@/components/leads/detail/OpportunityPanel';
 import { TechnologyList } from '@/components/leads/detail/TechnologyList';
 import { POCPanel } from '@/components/leads/detail/POCPanel';
+import { StakeholdersPanel } from '@/components/leads/detail/StakeholdersPanel';
 import { EvidencePanel } from '@/components/leads/detail/EvidencePanel';
 import { VerificationPanel } from '@/components/leads/detail/VerificationPanel';
 import { OutreachPanel } from '@/components/leads/detail/OutreachPanel';
@@ -127,6 +128,7 @@ export function LeadDetailsPage() {
           <div className="space-y-4">
             <RecommendationCard lead={lead} />
             <POCPanel lead={lead} />
+            <StakeholdersPanel leadId={lead.id} />
           </div>
         </div>
       </div>

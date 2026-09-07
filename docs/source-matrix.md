@@ -61,6 +61,8 @@ a source produces real data.
 | Government Procurement (CPPP / GeM) | NIC / MoF (CPPP), GeM | TENDER | manual import only | NOT_IMPLEMENTED / MANUAL_SOURCE_REQUIRED | `NOT_CONFIGURED` | Not yet assigned |
 | Project / Contract Registry | Public registries | PROJECT | — | NOT_IMPLEMENTED | `NOT_CONFIGURED` | Not yet assigned |
 | Business / Company Database | Third-party (commercial) | BUSINESS_DATABASE | — | NOT_IMPLEMENTED | `NOT_CONFIGURED` | Not yet assigned |
+| Official Company People (`official_company_people`) | Company's own official pages | PEOPLE / CONTACT | `enrichment/person_enricher.py` (`OfficialCompanySourceEnricher`) | IMPLEMENTED · `REQUIRES_REVIEW` | `NOT_CONFIGURED` | TIER_1 |
+| Business Contact Provider (`business_contact_provider`) | Third-party (commercial, licensed) | CONTACT | — | NOT_IMPLEMENTED / PLANNED | `NOT_CONFIGURED` | Not yet assigned |
 
 Per-source detail follows.
 
@@ -465,6 +467,77 @@ commercial / ongoing reuse remains `REQUIRES_REVIEW`. More detail:
 - **Connection status**: `NOT_CONFIGURED`.
 - **Evidence tier**: Not yet assigned.
 
+## Official Company People (`official_company_people`)
+
+> **Purpose**: Enrich a company with its **recommended decision-maker roles**,
+> plus any **real people** and **published business contacts** that the company
+> discloses on its **own** official pages. Kept strictly separate: a recommended
+> role is **not** a person, a person is **not** a verified contact, and none of
+> these is outreach permission.
+
+- **Provider**: the company's **own** official website only.
+- **Enricher**: `enrichment/person_enricher.py` (`OfficialCompanySourceEnricher`),
+  a `BasePersonEnricher` / `BaseContactEnricher` implementation. Role
+  recommendation is provided by `enrichment/poc_finder.py` (wrapped by
+  `enrichment/stakeholder.py`); persistence/resolution by
+  `enrichment/enrichment_service.py`; outreach readiness by
+  `enrichment/outreach.py`.
+- **What it fetches**: **only** the company's own pages — `/`, `/about`,
+  `/leadership`, `/team`, `/management`, `/contact` — through the existing
+  `SafeHttpClient` (HTTPS, SSRF guard, private-network block, response-size cap, no
+  credentials). It **never** fetches arbitrary third-party URLs and **never**
+  crawls the open web.
+- **Data provided (fields)**: **real people** from schema.org JSON-LD `Person`
+  entries (name + jobTitle); **real business contacts** from published `mailto:`
+  addresses that are role-based (`info@`, `sales@`, `careers@`, `procurement@`, …)
+  or on the company's own domain. Absent data stays **NULL**.
+- **Never**: fabricates a person/email/phone/profile, guesses
+  `firstname.lastname@` addresses, constructs LinkedIn/profile URLs from a name, or
+  scrapes third-party/private profiles or bypasses auth/robots. Personal-looking
+  addresses (e.g. a random Gmail) are rejected. No SMTP probing, no credential
+  verification — email is format-validated only.
+- **Confidence & verification**: `DecisionMaker` rows carry **distinct** axes —
+  `identity_confidence`, `role_confidence`, `company_confidence`,
+  `contact_confidence`, `evidence_confidence` — plus `verification_status`
+  (`VERIFIED` / `PARTIALLY_VERIFIED` / `UNVERIFIED` / `STALE` / `CONTRADICTED`),
+  `freshness_score`, and `provenance = REAL`. Freshness reuses
+  `verification.freshness`. Resolution is deterministic: name alone never merges
+  distinct people; same person + different observed role → `REVIEW_REQUIRED`;
+  idempotent upsert with corroborating sources kept in `source_references`.
+- **Authentication**: none — public official pages only. **No key.**
+- **Env vars**: none required (reuses the `SafeHttpClient` safety knobs).
+- **India support**: depends on the specific company page configured.
+- **Rate limits**: conservative `SafeHttpClient` self-limits; own-domain only.
+- **Licensing / commercial use**: `REQUIRES_REVIEW` — a privacy/terms review is
+  required before enabling.
+- **Implementation status**: `IMPLEMENTED`, status `REQUIRES_REVIEW`.
+- **Connection status**: `NOT_CONFIGURED` — **no live enrichment has been run
+  against a real company**. The enricher is unit-tested with real-shaped HTML over
+  a mocked transport. Real careers/leadership pages are frequently JS-rendered SPAs
+  whose people are not in the server HTML, so server-HTML extraction finds people
+  only when published as JSON-LD (no browser automation, per policy).
+- **Evidence tier**: `TIER_1` (official company source — stronger than aggregators).
+- **More detail**: [`docs/decision-maker-enrichment.md`](decision-maker-enrichment.md).
+
+## Business Contact Provider (`business_contact_provider`)
+
+> **Purpose**: A **placeholder** for a future **licensed** third-party B2B contact
+> provider, behind the same `BaseContactEnricher` interface.
+
+- **Provider**: a commercial, licensed B2B contact provider (candidate; none
+  chosen or wired).
+- **Data provided (fields)**: business contacts — fields depend on the eventual
+  provider.
+- **Authentication**: commercial credentials (required; provider-specific).
+- **Env vars**: none defined yet.
+- **India support**: depends on the eventual provider.
+- **Licensing / commercial use**: requires a **commercial licence + credentials +
+  usage policy**; commercial use is **`REQUIRES_APPROVAL`**.
+- **Implementation status**: **`PLANNED` / `NOT_IMPLEMENTED`** — a placeholder
+  only. **No paid provider is wired.**
+- **Connection status**: `NOT_CONFIGURED`.
+- **Evidence tier**: Not yet assigned.
+
 ---
 
 ## Manual ingestion (CLIs)
@@ -559,6 +632,23 @@ no real data exists.
 | `GET /companies/{id}/timeline` | One company's chronological business-event timeline. |
 
 `GET /companies/{id}/signals` (a company's business signals) already existed.
+
+## Decision-maker & contact enrichment API
+
+Read-only over stored real data, plus one action endpoint that runs the real,
+safe, official-source fetch. **Provider credentials are never exposed.** Recommended
+roles, verified people, and verified contacts are kept distinct — a recommended role
+is never presented as a person or a verified contact. Full detail:
+[`docs/decision-maker-enrichment.md`](decision-maker-enrichment.md).
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /contacts` | List verified contacts; filters `company` / `role_category` / `verification_status` / `people_only`; paginated. |
+| `GET /contacts/{id}` | One contact / decision-maker record. |
+| `GET /companies/{id}/decision-makers` | Decision-maker rows for one company. |
+| `GET /companies/{id}/contacts` | Verified contacts for one company. |
+| `GET /leads/{id}/stakeholders` | Recommended roles + verified people/contacts + outreach readiness for a lead. |
+| `POST /companies/{id}/enrich` | Run the real, safe, official-source fetch for a company (own official pages only). |
 
 ## Source status API
 
