@@ -7,10 +7,11 @@ import { SettingRow, SettingsSection } from '@/components/settings/SettingsSecti
 import { usePreferences } from '@/hooks/usePreferences';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { useHealth } from '@/hooks/useHealth';
+import { useSources } from '@/hooks/useSources';
 import type { ThemePreference } from '@/types/settings';
 import { API_BASE_URL } from '@/services/api';
 import { PAGE_SIZE_OPTIONS } from '@/constants/leads';
-import { PLANNED_DATA_SOURCES } from '@/constants/dataSources';
+import { sourceStatusDisplay } from '@/services/sources';
 
 function ConnectionDot({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'idle' }) {
   const color = tone === 'ok' ? 'bg-emerald-500' : tone === 'bad' ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600';
@@ -26,6 +27,7 @@ export function SettingsPage() {
   const { prefs, update, reset } = usePreferences();
   const { theme, setTheme } = useThemeContext();
   const health = useHealth();
+  const sources = useSources();
   const queryClient = useQueryClient();
   const [cacheCleared, setCacheCleared] = useState(false);
 
@@ -172,21 +174,39 @@ export function SettingsPage() {
         <div className="lg:col-span-2">
           <SettingsSection
             title="Data sources"
-            description="Real-data collection is in progress. Sources are connected only after their collectors are implemented and verified."
+            description="Source connectivity reflects real configuration. A source is only 'Connected' after a verified live check."
           >
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-              {PLANNED_DATA_SOURCES.map((source) => (
-                <li key={source.id} className="flex items-center justify-between gap-3 py-2.5">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{source.name}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">{source.category}</p>
-                  </div>
-                  <span className="badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    {source.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {sources.isLoading ? (
+              <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">Checking source connectivity…</p>
+            ) : sources.isError ? (
+              <div className="flex items-center justify-between gap-3 py-2.5">
+                <p className="text-sm text-rose-600 dark:text-rose-400">Unable to load source connectivity.</p>
+                <button type="button" className="btn-ghost text-sm" onClick={() => sources.refetch()}>
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  Retry
+                </button>
+              </div>
+            ) : !sources.data || sources.data.items.length === 0 ? (
+              <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">No data sources are registered.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {sources.data.items.map((source) => {
+                  const display = sourceStatusDisplay(source.status);
+                  return (
+                    <li key={source.source_id} className="flex items-start justify-between gap-3 py-2.5">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{source.name}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{source.category}</p>
+                        {source.detail && (
+                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{source.detail}</p>
+                        )}
+                      </div>
+                      <span className={`badge shrink-0 ${display.className}`}>{display.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </SettingsSection>
         </div>
       </div>

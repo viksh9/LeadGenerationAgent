@@ -1,8 +1,8 @@
 """Reusable SYNTHETIC lead builders for tests.
 
 Each builder returns a raw lead dict (LeadAnalyzeRequest fields + a relative
-`signal_age_days`) shaped exactly like data/sample_leads.json. All data is
-synthetic — role-only POCs, fictional companies, no real personal data.
+`signal_age_days`) shaped exactly like tests/fixtures/sample_leads.json. All data
+is synthetic — role-only POCs, fictional companies, no real personal data.
 """
 
 from __future__ import annotations

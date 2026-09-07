@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm import Session
 
 from config.exceptions import ValidationError
+from database.integrity import guard_lead_fields
 from database.models import Lead, LeadPriority, LeadStatus, utcnow
 from database.session import create_session_factory, get_engine, init_db, session_scope
 
@@ -106,6 +107,10 @@ def create_lead(session: Session, **fields: Any) -> Lead:
     payload["company_name"] = company_name
     payload.setdefault("technologies", [])
     payload.setdefault("hiring_roles", [])
+
+    # Real-data-only guard: in production/staging reject synthetic provenance and
+    # REAL leads that carry no source-backed evidence. No-op in dev/test.
+    guard_lead_fields(payload)
 
     lead = Lead(**payload)
     session.add(lead)

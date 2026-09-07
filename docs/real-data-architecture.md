@@ -125,11 +125,12 @@ keys/tokens/cookies; credential-bearing URLs are redacted.
 
 ## Real vs synthetic mode
 
-Production/default = REAL. Synthetic is opt-in (`SHOW_SYNTHETIC_LEADS`/non-prod
-env) and always labelled. `scripts/build_company_leads.py` runs the real pipeline
-(raw → canonical → company leads); `scripts/seed_demo_companies.py` seeds clearly
-labelled synthetic demo companies. Since no real source is connected, the
-production dashboard currently shows the honest empty state.
+Production/default = REAL. `scripts/build_company_leads.py` runs the real pipeline
+(raw → canonical → company leads) over already-collected REAL job records. There
+is no production seed/demo command — synthetic data exists only in the test suite
+(`tests/fixtures/`) and is rejected by the production write-guards. Since no real
+source is connected, the production dashboard currently shows the honest empty
+state. See `docs/development-data.md`.
 
 ## Testing
 

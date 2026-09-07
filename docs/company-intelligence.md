@@ -34,8 +34,9 @@ and an honest empty state ("No verified Indian IT signals available yet.") when
 no real data is connected. **It is better to show no data than misleading data.**
 
 Because no real collector is connected yet, the production dashboard currently
-shows the empty state; the demo (`scripts/seed_demo_companies.py`) populates
-SYNTHETIC company opportunities to exercise the pipeline.
+shows the empty state. The pipeline is exercised only by SYNTHETIC fixtures inside
+the test suite (`tests/fixtures/`, isolated per-test databases) — there is no
+production seed/demo command, and synthetic records are rejected by the write-guards.
 
 ## Company aggregation (`intelligence/company_aggregator.py`)
 
@@ -101,8 +102,8 @@ aggregated `technologies`, `hiring_roles`, and a `primary_target_role`
 # Production step: aggregate REAL collected jobs into company leads.
 python scripts/build_company_leads.py
 
-# Development demo: synthetic company opportunities (clearly labelled).
-python scripts/seed_demo_companies.py --reset --yes
+# Audit / clean the database (real-data-only compliance).
+python scripts/db_audit.py --fail-on-synthetic
 ```
 
 ## What the dashboard shows after the next real collector

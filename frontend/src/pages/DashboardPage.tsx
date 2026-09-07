@@ -58,7 +58,7 @@ export function DashboardPage() {
     body = (
       <EmptyState
         title="No verified Indian IT signals available yet."
-        description="No real data source is connected. Connect a collector and aggregate company-level opportunities, or explore demo data in development."
+        description="No real data source is connected yet. Configure and verify a collector, then aggregate company-level opportunities from real collected jobs."
         action={
           <Link to="/leads/analyze" className="btn-primary">
             Analyze a Company

@@ -5,11 +5,11 @@ This is the production aggregation step of the pipeline:
   collected raw job records (REAL) -> company aggregation -> REAL company leads.
 
 It fabricates nothing. If no real job data has been collected yet, it creates no
-leads (the dashboard then shows the honest empty state).
+leads (the dashboard then shows the honest empty state). This is a real-data-only
+runner: it always produces REAL leads from already-collected REAL job records.
 
 Usage:
     python scripts/build_company_leads.py
-    python scripts/build_company_leads.py --provenance synthetic   # rebuild demo
 """
 
 from __future__ import annotations
@@ -33,11 +33,10 @@ logger = logging.getLogger("build_company_leads")
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    parser = argparse.ArgumentParser(description="Aggregate raw job records into company-level leads.")
-    parser.add_argument("--provenance", choices=["real", "synthetic"], default="real")
-    args = parser.parse_args(argv)
+    parser = argparse.ArgumentParser(description="Aggregate REAL raw job records into company-level leads.")
+    parser.parse_args(argv)
 
-    provenance = DataProvenance.REAL if args.provenance == "real" else DataProvenance.SYNTHETIC
+    provenance = DataProvenance.REAL
     settings = get_settings()
     engine = get_engine(settings.database_url)
     init_db(engine)

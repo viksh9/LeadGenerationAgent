@@ -435,3 +435,36 @@ class ErrorDetail(BaseModel):
 
 class ErrorBody(BaseModel):
     error: ErrorDetail
+
+
+# ---------------------------------------------------------------------------
+# Real-data source connectivity status
+# ---------------------------------------------------------------------------
+
+
+class SourceStatusResponse(BaseModel):
+    """Truthful runtime status of one catalogued real-data source."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    source_id: str
+    name: str
+    category: str
+    source_type: str
+    collector_implemented: bool
+    requires_api_key: bool
+    status: str
+    detail: str
+    priority: int
+    commercial_use_status: str
+
+
+class SourceStatusListResponse(BaseModel):
+    """Source connectivity overview. ``any_connected`` is only ever true after a
+    real source has been verified live — never from configuration alone."""
+
+    items: list[SourceStatusResponse]
+    total: int
+    connected_count: int
+    configured_count: int
+    any_connected: bool

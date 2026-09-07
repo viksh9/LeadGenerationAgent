@@ -19,6 +19,7 @@ from company.normalization import normalize_domain, normalize_name
 from company.resolver import CompanyEntityResolver, CompanyResolutionResult, ObservedCompany
 from config.company import COMPANY_RESOLUTION_VERSION
 from config.locations_in import INDIAN_CITY_ALIASES
+from database.integrity import guard_provenance
 from database.models import (
     Company,
     CompanyMatchStatus,
@@ -67,6 +68,9 @@ class CompanyResolutionService:
     def resolve_and_upsert(self, obs: ObservedCompany, *, provenance: DataProvenance,
                            now: Optional[datetime] = None) -> tuple[Company, CompanyResolutionResult]:
         now = now or datetime.now(timezone.utc).replace(tzinfo=None)
+        # Real-data-only guard: never resolve/persist a synthetic company in a
+        # real-data-only environment. No-op in dev/test.
+        guard_provenance(provenance, entity="company")
         result = self.resolve(obs, provenance=provenance)
         domain = normalize_domain(obs.domain or obs.website)
 

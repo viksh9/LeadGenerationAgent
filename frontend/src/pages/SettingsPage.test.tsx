@@ -9,6 +9,13 @@ vi.mock('@/services/health', () => ({ getHealth: vi.fn() }));
 import { getHealth } from '@/services/health';
 const getHealthMock = vi.mocked(getHealth);
 
+vi.mock('@/services/sources', async () => {
+  const actual = await vi.importActual<typeof import('@/services/sources')>('@/services/sources');
+  return { ...actual, fetchSources: vi.fn() };
+});
+import { fetchSources } from '@/services/sources';
+const fetchSourcesMock = vi.mocked(fetchSources);
+
 const HEALTH = {
   status: 'healthy',
   app: 'LeadGenerationAgent',
@@ -16,8 +23,43 @@ const HEALTH = {
   version: '0.1.0',
 };
 
+const SOURCES = {
+  items: [
+    {
+      source_id: 'adzuna',
+      name: 'Adzuna Jobs API',
+      category: 'Job',
+      source_type: 'api',
+      collector_implemented: true,
+      requires_api_key: true,
+      status: 'CONFIGURED' as const,
+      detail: 'API key present; awaiting a verified live check.',
+      priority: 1,
+      commercial_use_status: 'allowed',
+    },
+    {
+      source_id: 'rss_news',
+      name: 'RSS / Business & Technology News',
+      category: 'News',
+      source_type: 'rss',
+      collector_implemented: false,
+      requires_api_key: false,
+      status: 'PLANNED' as const,
+      detail: 'Collector not yet implemented.',
+      priority: 5,
+      commercial_use_status: 'allowed',
+    },
+  ],
+  total: 2,
+  connected_count: 1,
+  configured_count: 1,
+  any_connected: true,
+};
+
 beforeEach(() => {
   getHealthMock.mockReset();
+  fetchSourcesMock.mockReset();
+  fetchSourcesMock.mockResolvedValue(SOURCES);
   localStorage.clear();
 });
 afterEach(() => {
@@ -34,6 +76,17 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Preferences')).toBeInTheDocument();
     expect(screen.getByText('Connection')).toBeInTheDocument();
     expect(screen.getByText('About')).toBeInTheDocument();
+  });
+
+  it('renders live source connectivity from /sources', async () => {
+    getHealthMock.mockResolvedValue(HEALTH);
+    renderWithProviders(<SettingsPage />, { route: '/settings' });
+
+    expect(await screen.findByText('Adzuna Jobs API')).toBeInTheDocument();
+    expect(screen.getByText('API key present; awaiting a verified live check.')).toBeInTheDocument();
+    expect(screen.getByText('Configured', { selector: 'span.badge' })).toBeInTheDocument();
+    expect(screen.getByText('Planned', { selector: 'span.badge' })).toBeInTheDocument();
+    expect(fetchSourcesMock).toHaveBeenCalled();
   });
 
   it('shows a connected status and backend info from /health', async () => {
