@@ -17,7 +17,7 @@ No LLM, no network (unless a caller explicitly opts into a live probe elsewhere)
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
@@ -45,7 +45,7 @@ class RuntimeSourceStatus(str, Enum):
 # Sources whose collectors are actually implemented in this codebase. Presence
 # here means "a real collector exists" — NOT that it is connected.
 _IMPLEMENTED_COLLECTORS: frozenset[str] = frozenset(
-    {"adzuna", "company_career_pages", "rss_news", "company_newsroom"}
+    {"adzuna", "jooble", "company_career_pages", "rss_news", "company_newsroom"}
 )
 
 
@@ -61,6 +61,14 @@ class SourceStatusReport:
     detail: str
     priority: int
     commercial_use_status: str
+    provider: Optional[str] = None
+    documentation_url: Optional[str] = None
+    terms_url: Optional[str] = None
+    authentication_type: str = "NONE"
+    credential_env_vars: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    supports_india: bool = False
+    reliability_tier: Optional[str] = None
 
 
 def _is_configured(defn: SourceDefinition) -> bool:
@@ -75,6 +83,10 @@ def _is_configured(defn: SourceDefinition) -> bool:
         from collectors.jobs.config import load_adzuna_config
 
         return load_adzuna_config().is_configured
+    if defn.source_id == "jooble":
+        from collectors.jobs.jooble import load_jooble_config
+
+        return load_jooble_config().is_configured
     if defn.requires_api_key:
         return bool(source_api_key(defn.source_id))
     # Keyless collectors (career pages, RSS feeds) require reviewed per-source
@@ -117,6 +129,14 @@ def source_runtime_status(defn: SourceDefinition) -> SourceStatusReport:
         detail=detail,
         priority=defn.priority,
         commercial_use_status=defn.commercial_use_status.value,
+        provider=defn.provider,
+        documentation_url=defn.documentation_url,
+        terms_url=defn.terms_url,
+        authentication_type=defn.authentication_type.value,
+        credential_env_vars=list(defn.credential_env_vars),
+        capabilities=[c.value for c in defn.capabilities],
+        supports_india=defn.supports_india,
+        reliability_tier=defn.reliability_tier,
     )
 
 

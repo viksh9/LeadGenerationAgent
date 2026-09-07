@@ -59,6 +59,36 @@ class ComplianceStatus(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class AuthenticationType(str, Enum):
+    """How a source authenticates. NONE = public/no credentials."""
+
+    NONE = "NONE"
+    API_KEY = "API_KEY"
+    API_KEY_PAIR = "API_KEY_PAIR"   # e.g. Adzuna app_id + app_key
+    OAUTH = "OAUTH"
+    BASIC = "BASIC"
+
+
+class SourceCapability(str, Enum):
+    """What evidence a source can actually provide (declared per source).
+
+    Lets downstream services judge evidence quality without guessing.
+    """
+
+    JOBS = "jobs"
+    COMPANIES = "companies"
+    COMPANY_DOMAINS = "company_domains"
+    JOB_STATUS = "job_status"
+    JOB_DATES = "job_dates"
+    JOB_LOCATIONS = "job_locations"
+    TECHNOLOGIES = "technologies"
+    PROJECT_SIGNALS = "project_signals"
+    TENDER_SIGNALS = "tender_signals"
+    EXPANSION_SIGNALS = "expansion_signals"
+    SOURCE_URLS = "source_urls"
+    SOURCE_IDS = "source_ids"
+
+
 class RateLimit(BaseModel):
     """Per-source polite request limits (respected by future collectors)."""
 
@@ -85,10 +115,26 @@ class SourceDefinition(BaseModel):
     name: str
     category: SourceCategory
     source_type: SourceType
+    provider: Optional[str] = None
     base_url: Optional[str] = None
+    documentation_url: Optional[str] = None
+    terms_url: Optional[str] = None
     status: SourceStatus = SourceStatus.PLANNED
     enabled: bool = False
     requires_api_key: bool = False
+    authentication_type: AuthenticationType = AuthenticationType.NONE
+    # Names of the environment variables that hold this source's credentials
+    # (documentation only — the values live in the environment, never here).
+    credential_env_vars: list[str] = Field(default_factory=list)
+    # What this source can actually provide (drives evidence-quality decisions).
+    capabilities: list[SourceCapability] = Field(default_factory=list)
+    # India-first: whether the source can serve Indian listings.
+    supports_india: bool = False
+    # Evidence reliability tier (TIER_1 = most authoritative). Mirrors config/evidence.
+    reliability_tier: Optional[str] = None
+    robots_required: bool = False
+    rate_limit_notes: Optional[str] = None
+    licensing_notes: Optional[str] = None
     rate_limit: RateLimit = Field(default_factory=RateLimit)
     supports_search: bool = False
     supports_pagination: bool = False

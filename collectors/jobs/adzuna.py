@@ -18,7 +18,12 @@ from typing import Optional
 import httpx
 
 from collectors.base import BaseCollector, CollectorResult, FetchRequest, HealthCheckResult, HealthStatus
-from collectors.jobs.client import AdzunaClient, CollectorError
+from collectors.jobs.client import (
+    AdzunaClient,
+    CollectorError,
+    SourceAuthError,
+    SourceRateLimitError,
+)
 from collectors.jobs.config import AdzunaConfig, load_adzuna_config
 from collectors.jobs.mapping import is_it_relevant, job_warnings, map_job
 from collectors.source_registry import SourceDefinition, get_registry
@@ -133,6 +138,10 @@ class AdzunaJobCollector(BaseCollector):
                 page=1,
                 params={"results_per_page": 1, "content-type": "application/json"},
             )
+        except SourceAuthError as exc:
+            return HealthCheckResult(source_id="adzuna", status=HealthStatus.AUTHENTICATION_FAILED, message=str(exc))
+        except SourceRateLimitError as exc:
+            return HealthCheckResult(source_id="adzuna", status=HealthStatus.RATE_LIMITED, message=str(exc))
         except CollectorError as exc:
             return HealthCheckResult(source_id="adzuna", status=HealthStatus.UNAVAILABLE, message=str(exc))
         return HealthCheckResult(source_id="adzuna", status=HealthStatus.HEALTHY, message="OK")

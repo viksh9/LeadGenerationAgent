@@ -104,9 +104,13 @@ holds placeholders only.
 | `API_HOST` / `API_PORT` | API bind address | `127.0.0.1` / `8000` |
 | `CORS_ORIGINS` | Comma-separated allowed origins | local dev servers |
 | `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | Adzuna jobs API credentials (optional) | — |
+| `ADZUNA_COUNTRY` | Adzuna country code | `in` |
+| `JOOBLE_API_KEY` | Jooble jobs API key (optional; per-country key) | — |
+| `JOOBLE_API_HOST` | Jooble host — use `in.jooble.org` for India | `jooble.org` |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | Reserved for a later outreach phase | — |
 
-See `.env.example` for the full list (Adzuna + career-page collector knobs).
+See `.env.example` for the full list (Adzuna, Jooble, and career-page collector
+knobs) and [docs/source-matrix.md](docs/source-matrix.md) for per-source detail.
 
 ## Database setup
 
@@ -197,6 +201,7 @@ collector class is *not* the same as an active, verified real-data connection.
 | Source | Collector | Status | Notes |
 | --- | --- | --- | --- |
 | Adzuna Jobs API | implemented | `NOT_CONFIGURED` | Set `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`; verify live before use |
+| Jooble Jobs API | implemented | `NOT_CONFIGURED` | Set `JOOBLE_API_KEY` (+ `JOOBLE_API_HOST=in.jooble.org` for India); verify live before use |
 | Company career pages | implemented | `REQUIRES_REVIEW` | Robots/ToS review per site before enabling |
 | Company newsroom (RSS) | implemented | `REQUIRES_REVIEW` | Per-feed review before enabling |
 | RSS business/tech news | implemented | `NOT_CONFIGURED` | No reviewed feeds configured |
@@ -206,3 +211,40 @@ collector class is *not* the same as an active, verified real-data connection.
 
 Actual real-source ingestion (authenticating, querying, and persisting real
 records) is the focus of the next phase.
+
+## Source status & ingestion
+
+The full catalogue — every candidate real source, its fields, authentication,
+capabilities, India support, rate limits, licensing, and truthful status — is
+documented in **[docs/source-matrix.md](docs/source-matrix.md)**. The application
+data mode is **`REAL_ONLY`**: there is no demo/mock/synthetic runtime path, and no
+source is reported `CONNECTED` until a real live request has actually succeeded.
+
+**Manual ingestion (CLIs).** Collectors run only when explicitly invoked; they
+persist only REAL records:
+
+```bash
+python scripts/collect.py --list                         # runnable sources
+python scripts/collect.py --source adzuna                # real collection
+python scripts/collect.py --source jooble --query "python developer" --location Bengaluru
+python scripts/collect.py --source adzuna --max-pages 2 --dry-run   # persist nothing
+python scripts/source_check.py --source adzuna           # real connectivity check → source_health
+python scripts/source_check.py --all
+```
+
+`collect.py` exit codes: `0` OK · `2` `NOT_CONFIGURED` (missing credentials, no
+network call) · `3` `NOT_IMPLEMENTED` (no runnable collector).
+
+**Source status API** (GET endpoints make no network calls and never return
+credentials):
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /sources` | Truthful per-source status: implementation/config readiness, capabilities, licensing, and last verified connectivity check |
+| `GET /sources/status` | Alias of `GET /sources` |
+| `POST /sources/{id}/check` | On-demand real connectivity check; persists the outcome. `NOT_CONFIGURED` sources make no network call |
+
+**Live tests.** The default `pytest` suite makes **no** external network calls.
+Live integration tests are opt-in via `RUN_LIVE_SOURCE_TESTS=true` plus the
+relevant per-source credentials (some also gated by per-source flags such as
+`ADZUNA_INTEGRATION_TEST`).

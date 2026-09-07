@@ -6,7 +6,7 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 if sys.version_info < (3, 11):
@@ -60,6 +60,15 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ENFORCE_REAL_DATA", "REAL_DATA_ONLY"),
     )
 
+    @field_validator("show_synthetic_leads", "enforce_real_data", mode="before")
+    @classmethod
+    def _empty_str_is_none(cls, value):
+        """Treat an unset/empty env var (e.g. `ENFORCE_REAL_DATA=` in .env) as None
+        so it derives from the environment rather than raising a parse error."""
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -70,6 +79,13 @@ class Settings(BaseSettings):
         if self.show_synthetic_leads is not None:
             return self.show_synthetic_leads
         return self.environment.lower() not in {"production", "prod"}
+
+    @property
+    def data_mode(self) -> str:
+        """The application data mode is always REAL_ONLY. There is deliberately no
+        DEMO / MOCK / SYNTHETIC mode: the production app cannot display fabricated
+        business data as real. (Tests use injected mocks inside the test suite only.)"""
+        return "REAL_ONLY"
 
     @property
     def real_data_only(self) -> bool:

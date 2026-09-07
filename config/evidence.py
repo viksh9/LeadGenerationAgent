@@ -21,6 +21,7 @@ SOURCE_TIER_BY_ID: dict[str, SourceTier] = {
     "government_procurement": SourceTier.TIER_1,
     "demo_career": SourceTier.TIER_1,
     "adzuna": SourceTier.TIER_2,          # licensed aggregator / official API
+    "jooble": SourceTier.TIER_2,          # third-party jobs aggregator API
     "stock_exchange_announcements": SourceTier.TIER_2,
     "business_news": SourceTier.TIER_2,
     "rss_news": SourceTier.TIER_3,

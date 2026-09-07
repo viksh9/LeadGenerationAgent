@@ -443,7 +443,13 @@ class ErrorBody(BaseModel):
 
 
 class SourceStatusResponse(BaseModel):
-    """Truthful runtime status of one catalogued real-data source."""
+    """Truthful runtime status of one catalogued real-data source.
+
+    ``status`` is the configuration-level readiness (NOT_CONFIGURED / CONFIGURED /
+    REQUIRES_REVIEW / PLANNED / …). ``connection_status`` is the outcome of the
+    LAST real connectivity check (or null if never checked) — only it can say
+    CONNECTED, and only after a real request succeeded. Never exposes credentials.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -451,20 +457,45 @@ class SourceStatusResponse(BaseModel):
     name: str
     category: str
     source_type: str
+    provider: Optional[str] = None
     collector_implemented: bool
     requires_api_key: bool
+    authentication_type: str = "NONE"
+    credential_env_vars: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
+    supports_india: bool = False
+    reliability_tier: Optional[str] = None
     status: str
     detail: str
     priority: int
     commercial_use_status: str
+    documentation_url: Optional[str] = None
+    terms_url: Optional[str] = None
+    # Persisted connectivity health (from the last real check).
+    connection_status: Optional[str] = None
+    last_checked_at: Optional[datetime] = None
+    last_success_at: Optional[datetime] = None
+    last_failure_at: Optional[datetime] = None
+    last_error: Optional[str] = None
 
 
 class SourceStatusListResponse(BaseModel):
     """Source connectivity overview. ``any_connected`` is only ever true after a
     real source has been verified live — never from configuration alone."""
 
+    data_mode: str = "REAL_ONLY"
     items: list[SourceStatusResponse]
     total: int
     connected_count: int
     configured_count: int
     any_connected: bool
+
+
+class SourceCheckResponse(BaseModel):
+    """Result of an on-demand real connectivity check for one source."""
+
+    source_id: str
+    connection_status: str
+    message: Optional[str] = None
+    performed_request: bool
+    checked_at: datetime

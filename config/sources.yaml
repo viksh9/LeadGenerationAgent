@@ -11,12 +11,27 @@ sources:
     name: Adzuna Jobs API
     category: JOB
     source_type: THIRD_PARTY_API
+    provider: Adzuna
     base_url: https://api.adzuna.com/v1/api
+    documentation_url: https://developer.adzuna.com/
+    terms_url: https://developer.adzuna.com/terms
     status: NOT_CONFIGURED
     enabled: false
     requires_api_key: true
+    authentication_type: API_KEY_PAIR
+    credential_env_vars: [ADZUNA_APP_ID, ADZUNA_APP_KEY]
+    capabilities: [jobs, companies, job_dates, job_locations, technologies, source_urls, source_ids]
+    supports_india: true
+    reliability_tier: TIER_2
+    robots_required: false
     priority: 2
     rate_limit: { requests_per_minute: 20, requests_per_day: 200 }
+    rate_limit_notes: >-
+      Adzuna's published free tier is ~25 calls/min and 250/day (verify against
+      your plan). Conservative defaults are used here.
+    licensing_notes: >-
+      Commercial use requires review/approval per Adzuna's terms — keep
+      commercial_use_status REQUIRES_APPROVAL until confirmed.
     supports_search: true
     supports_pagination: true
     supports_incremental_fetch: true
@@ -42,6 +57,59 @@ sources:
       ADZUNA_APP_ID / ADZUNA_APP_KEY; status is NOT_CONFIGURED until both are set
       and only CONNECTED once verified against the live API. Incremental fetch is a
       recency window (max_days_old) + dedup, not a true cursor.
+
+  - source_id: jooble
+    name: Jooble Jobs API
+    category: JOB
+    source_type: THIRD_PARTY_API
+    provider: Jooble
+    base_url: https://jooble.org/api
+    documentation_url: https://help.jooble.org/en/support/solutions/articles/60001448238-rest-api-documentation
+    terms_url: https://jooble.org/info/terms
+    status: NOT_CONFIGURED
+    enabled: false
+    requires_api_key: true
+    authentication_type: API_KEY
+    credential_env_vars: [JOOBLE_API_KEY]
+    capabilities: [jobs, companies, job_locations, source_urls, source_ids]
+    supports_india: true
+    reliability_tier: TIER_2
+    robots_required: false
+    priority: 3
+    rate_limit: { requests_per_minute: 10, requests_per_day: 100 }
+    rate_limit_notes: >-
+      Jooble's FREE REST plan allows a TOTAL LIFETIME of 500 requests per key
+      (absolute, not per-period). Keys are per-country domain — an India key from
+      in.jooble.org is required for Indian listings (set JOOBLE_API_HOST). Use
+      sparingly; the daily cap here is a conservative self-limit only.
+    licensing_notes: >-
+      Commercial-use terms are not documented on the API reference page — treat as
+      REQUIRES_REVIEW until confirmed against Jooble's Terms of Service.
+    supports_search: true
+    supports_pagination: true
+    supports_incremental_fetch: false
+    supports_date_filter: false
+    supports_location: true
+    supports_salary: true
+    supports_job_id: true
+    data_quality: MEDIUM
+    commercial_use_status: REQUIRES_REVIEW
+    compliance:
+      terms_status: REQUIRES_REVIEW
+      robots_status: UNKNOWN
+      api_terms_reviewed: false
+      commercial_use_status: REQUIRES_REVIEW
+      data_retention_notes: >-
+        Store only API-returned fields with source_url attribution. Free plan is
+        capped at 500 lifetime requests/key; review commercial terms before
+        production use.
+    notes: >-
+      Jooble aggregates job postings from many boards. POST https://{host}/api/{key}
+      with a JSON body {keywords, location, radius, salary, page, SearchMode,
+      companysearch}. Response: {totalCount, jobs:[{id,title,location,snippet,salary,
+      source,type,link,company,updated}]}. Collector implemented
+      (collectors/jobs/jooble.py); status stays NOT_CONFIGURED until JOOBLE_API_KEY
+      is set and only CONNECTED after a verified live request.
 
   - source_id: company_career_pages
     name: Company Career Pages

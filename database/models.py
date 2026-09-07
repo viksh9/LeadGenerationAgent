@@ -442,6 +442,23 @@ class CollectionRunStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class SourceConnectionStatus(str, Enum):
+    """Truthful, persisted connectivity state of a real external source.
+
+    CONNECTED is only ever set after a real request actually succeeded. A
+    collector existing (implemented) is not the same as CONNECTED.
+    """
+
+    NOT_CONFIGURED = "NOT_CONFIGURED"                  # credentials/config absent
+    CONFIGURED = "CONFIGURED"                          # credentials present, unverified
+    CONNECTED = "CONNECTED"                            # a real request succeeded
+    AUTHENTICATION_FAILED = "AUTHENTICATION_FAILED"    # credentials rejected (401/403)
+    RATE_LIMITED = "RATE_LIMITED"                      # throttled (429)
+    TEMPORARILY_UNAVAILABLE = "TEMPORARILY_UNAVAILABLE"  # 5xx / network / timeout
+    DISABLED = "DISABLED"
+    ERROR = "ERROR"
+
+
 class JobRecord(Base):
     """A canonical (deduplicated) job posting.
 
@@ -567,6 +584,33 @@ class CollectionRun(Base):
         SAEnum(CollectionRunStatus, native_enum=False, length=16), default=CollectionRunStatus.RUNNING, index=True
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class SourceHealth(Base):
+    """Persisted connectivity health of a real external source (one row per source).
+
+    Updated by the connectivity service after a real check. Stores the last check
+    outcome and timestamps so the UI/API can report truthful status and history.
+    Never stores credentials; last_error is a safe, credential-free message.
+    """
+
+    __tablename__ = "source_health"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    connection_status: Mapped[SourceConnectionStatus] = mapped_column(
+        SAEnum(SourceConnectionStatus, native_enum=False, length=32),
+        default=SourceConnectionStatus.NOT_CONFIGURED,
+        index=True,
+    )
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    checks_total: Mapped[int] = mapped_column(Integer, default=0)
+    checks_ok: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 class BusinessSignalType(str, Enum):
