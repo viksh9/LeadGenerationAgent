@@ -121,6 +121,8 @@ class HealthStatus(str, Enum):
     UNAVAILABLE = "UNAVAILABLE"
     NOT_CONFIGURED = "NOT_CONFIGURED"
     RESTRICTED = "RESTRICTED"
+    AUTHENTICATION_FAILED = "AUTHENTICATION_FAILED"   # credentials present but rejected
+    RATE_LIMITED = "RATE_LIMITED"                     # throttled by the source
 
 
 class HealthCheckResult(BaseModel):

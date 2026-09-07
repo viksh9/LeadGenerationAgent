@@ -14,6 +14,14 @@ from typing import Any, Callable, Optional
 import httpx
 
 from collectors.base import RateLimiter, RetryConfig, TimeoutConfig
+# Re-export the shared error taxonomy so existing
+# `from collectors.jobs.client import CollectorError` imports keep working.
+from collectors.errors import (  # noqa: F401
+    CollectorError,
+    SourceAuthError,
+    SourceRateLimitError,
+    SourceUnavailableError,
+)
 from collectors.jobs.config import AdzunaConfig
 
 logger = logging.getLogger("collectors")
@@ -21,10 +29,6 @@ logger = logging.getLogger("collectors")
 # httpx/httpcore echo the full (credential-bearing) URL in their logs — quiet them.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
-
-
-class CollectorError(RuntimeError):
-    """Unrecoverable collector failure (config or non-retryable/exhausted HTTP)."""
 
 
 class AdzunaClient:
@@ -69,14 +73,22 @@ class AdzunaClient:
                 if status == 200:
                     logger.info("request_completed source_id=adzuna page=%s status=200", page)
                     return response.json()
+                # Credentials rejected — never retry, classify as auth failure.
+                if status in (401, 403):
+                    logger.error("collector_auth_failed source_id=adzuna status=%s", status)
+                    raise SourceAuthError(f"Adzuna authentication failed (HTTP {status}).")
                 if attempt < self.retry.max_attempts and (status == 429 or self.retry.is_retryable(status)):
                     wait = self._retry_after(response) if status == 429 else self.retry.backoff_for(attempt)
                     logger.warning("retry source_id=adzuna status=%s attempt=%s wait=%s", status, attempt, wait)
                     self._sleep(wait)
                     continue
                 logger.error("collector_failed source_id=adzuna status=%s", status)
+                if status == 429:
+                    raise SourceRateLimitError("Adzuna rate limit exceeded (HTTP 429).")
+                if self.retry.is_retryable(status):
+                    raise SourceUnavailableError(f"Adzuna temporarily unavailable (HTTP {status}).")
                 raise CollectorError(f"Adzuna request failed with HTTP {status}")
-            raise CollectorError("Adzuna request exhausted retries")
+            raise SourceUnavailableError("Adzuna request exhausted retries.")
         finally:
             if self._http is None:
                 client.close()
