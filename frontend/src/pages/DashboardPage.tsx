@@ -45,7 +45,7 @@ function RangeFilter({ value, onChange }: { value: DateRange; onChange: (v: Date
 
 export function DashboardPage() {
   const [range, setRange] = useState<DateRange>('all');
-  const { data, provenance, isLoading, isError, refetch, isEmpty } = useDashboard(range);
+  const { data, provenance, trust, isLoading, isError, refetch, isEmpty } = useDashboard(range);
 
   const subtitle = 'Company-level Indian IT hiring opportunities from real collected signals.';
 
@@ -109,6 +109,34 @@ export function DashboardPage() {
             accent="text-emerald-600"
             note={datasetNote}
           />
+        </section>
+
+        <section className="mt-6 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Data trust — verified vs unverified intelligence
+            </h2>
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              {trust.ready} production-ready of {trust.total}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {([
+              ['Verified', trust.counts.VERIFIED, 'text-emerald-600'],
+              ['Partial', trust.counts.PARTIALLY_VERIFIED, 'text-amber-600'],
+              ['Unverified', trust.counts.UNVERIFIED, 'text-slate-500'],
+              ['Stale', trust.counts.STALE, 'text-zinc-500'],
+              ['Contradicted', trust.counts.CONTRADICTED, 'text-rose-600'],
+            ] as const).map(([label, count, color]) => (
+              <div key={label} className="rounded-md bg-slate-50 dark:bg-slate-800/60 p-3 text-center">
+                <p className={`text-xl font-semibold ${color}`}>{count}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+            Verification is independent of the commercial lead score.
+          </p>
         </section>
 
         <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

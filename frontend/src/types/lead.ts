@@ -28,6 +28,65 @@ export type SignalType =
 
 export type DataProvenance = 'REAL' | 'SYNTHETIC';
 
+export type VerificationStatus =
+  | 'VERIFIED'
+  | 'PARTIALLY_VERIFIED'
+  | 'UNVERIFIED'
+  | 'CONTRADICTED'
+  | 'STALE';
+
+export type LeadReadiness = 'READY' | 'REVIEW_REQUIRED' | 'HOLD' | 'DISCARD';
+
+export type SourceTier = 'TIER_1' | 'TIER_2' | 'TIER_3' | 'TIER_4';
+
+/** One evidence record supporting a lead. */
+export interface EvidenceRecord {
+  id: number;
+  evidence_type: string;
+  source_name: string | null;
+  source_url: string | null;
+  source_domain: string | null;
+  source_tier: SourceTier;
+  evidence_title: string | null;
+  published_at: string | null;
+  observed_at: string | null;
+  source_reliability_score: number;
+  freshness_score: number;
+  evidence_confidence: number;
+  independence_group_id: string | null;
+  verification_status: VerificationStatus;
+  data_provenance: DataProvenance;
+}
+
+export interface ConflictRecord {
+  id: number;
+  conflict_type: string;
+  severity: string;
+  description: string | null;
+  resolution_status: string;
+}
+
+/** GET /leads/{id}/verification — the four distinct scores. */
+export interface LeadVerification {
+  lead_id: number;
+  company_name: string;
+  lead_score: number;
+  lead_priority: LeadPriority;
+  source_reliability: number;
+  evidence_confidence: number;
+  signal_confidence: number | null;
+  freshness_score: number;
+  verification_status: VerificationStatus;
+  lead_readiness: LeadReadiness;
+  independent_support_count: number;
+  source_count: number;
+  verification_reason: string | null;
+  verified_at: string | null;
+  supporting_sources: EvidenceRecord[];
+  conflicts: ConflictRecord[];
+  data_provenance: DataProvenance;
+}
+
 export type HiringIntensity = 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
 
 export type CompanyType =
@@ -99,6 +158,16 @@ export interface Lead {
   source_count: number;
   evidence: LeadEvidence[];
   last_signal_date: string | null;
+  // Verification intelligence — separate from lead_score (optional on the type so
+  // older mocks stay valid; the API always populates them).
+  source_reliability?: number;
+  evidence_confidence?: number;
+  freshness_score?: number;
+  independent_support_count?: number;
+  verification_status?: VerificationStatus;
+  lead_readiness?: LeadReadiness;
+  verification_reason?: string | null;
+  verified_at?: string | null;
   status: LeadStatus;
   created_at: string | null;
   updated_at: string | null;

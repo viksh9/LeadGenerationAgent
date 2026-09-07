@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_session
 from api.schemas import (
+    ConflictResponse,
+    EvidenceResponse,
     LeadAnalyzeRequest,
     LeadCreate,
     LeadListResponse,
@@ -22,6 +24,7 @@ from api.schemas import (
     LeadUpdate,
     TechnologyDemandItem,
     TechnologyDemandResponse,
+    VerificationResponse,
 )
 from config.exceptions import NotFoundError
 from config.settings import get_settings
@@ -208,6 +211,54 @@ def get_lead_endpoint(lead_id: int, session: Session = Depends(get_session)) -> 
         logger.info("lead_not_found lead_id=%s", lead_id)
         raise NotFoundError(f"Lead with id {lead_id} was not found.")
     return LeadResponse.model_validate(lead)
+
+
+def _verification_response(session: Session, lead) -> VerificationResponse:
+    from verification.service import EvidenceVerificationService
+
+    svc = EvidenceVerificationService(session)
+    return VerificationResponse(
+        lead_id=lead.id, company_name=lead.company_name,
+        lead_score=lead.lead_score, lead_priority=lead.lead_priority,
+        source_reliability=lead.source_reliability, evidence_confidence=lead.evidence_confidence,
+        signal_confidence=lead.signal_confidence, freshness_score=lead.freshness_score,
+        verification_status=lead.verification_status, lead_readiness=lead.lead_readiness,
+        independent_support_count=lead.independent_support_count, source_count=lead.source_count,
+        verification_reason=lead.verification_reason, verified_at=lead.verified_at,
+        supporting_sources=[EvidenceResponse.model_validate(e) for e in svc.get_lead_evidence(lead.id)],
+        conflicts=[ConflictResponse.model_validate(c) for c in svc.get_lead_conflicts(lead.id)],
+        data_provenance=lead.data_provenance,
+    )
+
+
+@router.get("/{lead_id}/verification", response_model=VerificationResponse, summary="Lead verification")
+def lead_verification_endpoint(lead_id: int, session: Session = Depends(get_session)) -> VerificationResponse:
+    lead = get_lead(session, lead_id)
+    if lead is None:
+        raise NotFoundError(f"Lead with id {lead_id} was not found.")
+    return _verification_response(session, lead)
+
+
+@router.get("/{lead_id}/evidence", response_model=list[EvidenceResponse], summary="Lead evidence")
+def lead_evidence_endpoint(lead_id: int, session: Session = Depends(get_session)) -> list[EvidenceResponse]:
+    from verification.service import EvidenceVerificationService
+
+    lead = get_lead(session, lead_id)
+    if lead is None:
+        raise NotFoundError(f"Lead with id {lead_id} was not found.")
+    records = EvidenceVerificationService(session).get_lead_evidence(lead_id)
+    return [EvidenceResponse.model_validate(e) for e in records]
+
+
+@router.post("/{lead_id}/verify", response_model=VerificationResponse, summary="Re-verify a lead")
+def lead_verify_endpoint(lead_id: int, session: Session = Depends(get_session)) -> VerificationResponse:
+    from verification.service import EvidenceVerificationService
+
+    lead = get_lead(session, lead_id)
+    if lead is None:
+        raise NotFoundError(f"Lead with id {lead_id} was not found.")
+    EvidenceVerificationService(session).verify_lead(lead)   # idempotent
+    return _verification_response(session, lead)
 
 
 @router.put(

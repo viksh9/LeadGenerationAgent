@@ -4,6 +4,7 @@ import {
   createLead,
   deleteLead,
   getLead,
+  getLeadVerification,
   getLeads,
   updateLead,
 } from '@/services/leads';
@@ -41,6 +42,14 @@ export function useLead(id: number) {
   return useQuery({
     queryKey: leadKeys.detail(id),
     queryFn: ({ signal }) => getLead(id, signal),
+    enabled: Number.isFinite(id),
+  });
+}
+
+export function useLeadVerification(id: number) {
+  return useQuery({
+    queryKey: [...leadKeys.detail(id), 'verification'],
+    queryFn: ({ signal }) => getLeadVerification(id, signal),
     enabled: Number.isFinite(id),
   });
 }

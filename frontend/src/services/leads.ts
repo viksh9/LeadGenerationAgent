@@ -28,6 +28,14 @@ export async function getLead(id: number, signal?: AbortSignal): Promise<Lead> {
   return data;
 }
 
+export async function getLeadVerification(id: number, signal?: AbortSignal) {
+  const { data } = await api.get<import('@/types/lead').LeadVerification>(
+    `/leads/${id}/verification`,
+    { signal },
+  );
+  return data;
+}
+
 export async function getTechnologyDemand(
   params: { provenance?: 'real' | 'synthetic' | 'all'; limit?: number } = {},
   signal?: AbortSignal,
