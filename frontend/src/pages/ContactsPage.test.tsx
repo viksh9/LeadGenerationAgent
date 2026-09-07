@@ -279,7 +279,7 @@ describe('ContactsPage', () => {
     renderPage();
     const section = await screen.findByTestId('verified-contacts-section');
     expect(within(section).getByText(/verified people & contacts/i)).toBeInTheDocument();
-    expect(within(section).getByText(/no verified people or contacts yet/i)).toBeInTheDocument();
+    expect(await within(section).findByText(/no verified people or contacts yet/i)).toBeInTheDocument();
     // The derived section is clearly relabelled as NOT verified people.
     expect(screen.getByText(/recommended roles \(not verified people\)/i)).toBeInTheDocument();
   });
@@ -324,7 +324,7 @@ describe('ContactsPage', () => {
     });
     renderPage();
     const section = await screen.findByTestId('verified-contacts-section');
-    expect(within(section).getByText('Asha Verma')).toBeInTheDocument();
+    expect(await within(section).findByText('Asha Verma')).toBeInTheDocument();
     expect(within(section).getByText('Verified')).toBeInTheDocument();
     expect(within(section).getByRole('link', { name: /company site/i })).toHaveAttribute(
       'href',
