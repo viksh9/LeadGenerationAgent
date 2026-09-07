@@ -8,6 +8,7 @@ import { ContactsPage } from '@/pages/ContactsPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LeadDetailsPage } from '@/pages/LeadDetailsPage';
 import { LeadsPage } from '@/pages/LeadsPage';
+import { MonitoringPage } from '@/pages/MonitoringPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { OpportunitiesPage } from '@/pages/OpportunitiesPage';
 import { OutreachPage } from '@/pages/OutreachPage';
@@ -32,6 +33,7 @@ export function AppRoutes() {
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/outreach" element={<OutreachPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/monitoring" element={<MonitoringPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

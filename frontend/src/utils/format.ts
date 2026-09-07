@@ -58,6 +58,38 @@ export const priorityColor: Record<LeadPriority, string> = {
   LOW: '#64748b',
 };
 
+/**
+ * Fine-grained relative "time ago" label from an ISO timestamp (seconds up to
+ * days, then falls back to an absolute date). Used where minute/hour precision
+ * matters, e.g. live alerts and scheduler runs.
+ */
+export function relativeTime(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return formatDateTime(value);
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return 'Just now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const days = Math.floor(hr / 24);
+  if (days < 30) return `${days}d ago`;
+  return formatDate(value);
+}
+
+/** Duration in seconds → compact label (e.g. "1m 5s", "820ms"). */
+export function formatDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return '—';
+  if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
+  if (seconds < 60) return `${seconds % 1 === 0 ? seconds : seconds.toFixed(1)}s`;
+  const mins = Math.floor(seconds / 60);
+  const rem = Math.round(seconds % 60);
+  return rem ? `${mins}m ${rem}s` : `${mins}m`;
+}
+
 /** Relative "time ago" label from an ISO timestamp. */
 export function timeAgo(value: string | null | undefined): string {
   if (!value) return '—';

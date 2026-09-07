@@ -66,6 +66,29 @@ a source produces real data.
 
 Per-source detail follows.
 
+## Scheduled collection cadence (per source category)
+
+Collection can run on a schedule as well as on demand. The continuous monitoring
+& scheduling layer seeds one recurring `SOURCE_COLLECTION` job per runnable source
+and refreshes each source on a **configurable, per-category cadence**
+(`monitoring/config.py`, `DEFAULT_SOURCE_INTERVALS`):
+
+| Source category | Default cadence | Notes |
+| --- | --- | --- |
+| Jobs (Adzuna, Jooble, Greenhouse, Lever, career pages) | every 6h | frequent enough to detect new hiring |
+| Tenders (data.gov.in; manual imports are operator-driven) | every 6h | catch newly published opportunities / deadlines |
+| News / business (newsroom, RSS) | every 12h | official announcements |
+| default | every 12h | any other category |
+
+These are **seed** intervals only — once a `ScheduledJob` exists, its own
+`interval_seconds` always wins, and cadence is never hard-coded in business logic.
+**Scheduling changes nothing about the truthful status above:** the background
+runner is **OFF by default** (`SCHEDULER_ENABLED` unset), and a scheduled source
+**still collects only when it is actually configured** — an unconfigured or
+`NOT_CONFIGURED` source is recorded `SKIPPED` and collects nothing, exactly as
+with manual collection. Full detail:
+[`docs/monitoring-scheduler.md`](monitoring-scheduler.md).
+
 ---
 
 ## Adzuna Jobs API

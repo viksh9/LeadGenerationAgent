@@ -15,7 +15,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.dependencies import get_session  # re-exported for tests/overrides
 from api.errors import register_exception_handlers
-from api.routes import ai, career_sources, companies, contacts, health, leads, signals, sources
+from api.routes import (
+    ai,
+    alerts,
+    career_sources,
+    companies,
+    contacts,
+    health,
+    leads,
+    scheduler,
+    signals,
+    sources,
+)
 from api.schemas import ErrorBody
 from config import configure_logging, get_settings
 from config.dotenv import load_dotenv
@@ -37,7 +48,22 @@ async def lifespan(_app: FastAPI):
     load_dotenv()
     logger.info("startup app=%s env=%s version=%s", settings.app_name, settings.environment, settings.version)
     init_db()
+
+    # Continuous monitoring scheduler — started ONLY when explicitly enabled, so
+    # importing the app / running tests never spawns background work or network.
+    runner = None
+    if settings.scheduler_active:
+        from scheduler.runner import SchedulerRunner
+        runner = SchedulerRunner()
+        runner.start()
+        logger.info("scheduler enabled: background monitoring runner started")
+    else:
+        logger.info("scheduler disabled (set SCHEDULER_ENABLED=true to run it)")
+
     yield
+
+    if runner is not None:
+        await runner.stop()
     logger.info("shutdown")
 
 
@@ -66,3 +92,5 @@ app.include_router(career_sources.router)
 app.include_router(signals.router)
 app.include_router(contacts.router)
 app.include_router(ai.router)
+app.include_router(scheduler.router)
+app.include_router(alerts.router)

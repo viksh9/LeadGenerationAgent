@@ -5,6 +5,12 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Select } from '@/components/ui/Select';
 import { SettingRow, SettingsSection } from '@/components/settings/SettingsSection';
 import { usePreferences } from '@/hooks/usePreferences';
+import {
+  useNotificationPreferences,
+  useUpdateNotificationPreferences,
+} from '@/hooks/useAlerts';
+import { ALERT_TYPES, alertTypeLabel } from '@/services/alerts';
+import type { AlertSeverity } from '@/services/alerts';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { useHealth } from '@/hooks/useHealth';
 import { useSources } from '@/hooks/useSources';
@@ -23,6 +29,117 @@ function ConnectionDot({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'i
       <span className={`h-2.5 w-2.5 rounded-full ${color}`} aria-hidden="true" />
       {label}
     </span>
+  );
+}
+
+const SEVERITY_OPTIONS: AlertSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+
+function NotificationsSection() {
+  const prefsQuery = useNotificationPreferences();
+  const updatePrefs = useUpdateNotificationPreferences();
+  const prefs = prefsQuery.data;
+
+  const toggleAlertType = (type: string, checked: boolean) => {
+    if (!prefs) return;
+    const next = checked
+      ? [...prefs.enabled_alert_types, type]
+      : prefs.enabled_alert_types.filter((t) => t !== type);
+    updatePrefs.mutate({ enabled_alert_types: next });
+  };
+
+  return (
+    <SettingsSection
+      title="Notifications"
+      description="Control which monitoring alerts are raised. These preferences are stored on the server."
+    >
+      {prefsQuery.isLoading ? (
+        <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">Loading notification preferences…</p>
+      ) : prefsQuery.isError ? (
+        <div className="flex items-center justify-between gap-3 py-2.5">
+          <p className="text-sm text-rose-600 dark:text-rose-400">Unable to load notification preferences.</p>
+          <button type="button" className="btn-ghost text-sm" onClick={() => prefsQuery.refetch()}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Retry
+          </button>
+        </div>
+      ) : prefs ? (
+        <>
+          <SettingRow
+            label="Hot leads only"
+            hint="Only raise lead alerts for hot-priority leads."
+            control={
+              <input
+                type="checkbox"
+                aria-label="Hot leads only"
+                className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+                checked={prefs.hot_leads_only}
+                onChange={(e) => updatePrefs.mutate({ hot_leads_only: e.target.checked })}
+              />
+            }
+          />
+          <SettingRow
+            label="Minimum score increase"
+            hint="Suppress score-increase alerts below this delta."
+            control={
+              <input
+                type="number"
+                min={0}
+                aria-label="Minimum score increase"
+                className="input w-24"
+                defaultValue={prefs.min_score_increase}
+                onBlur={(e) => {
+                  const value = Number(e.target.value);
+                  if (Number.isFinite(value) && value !== prefs.min_score_increase) {
+                    updatePrefs.mutate({ min_score_increase: value });
+                  }
+                }}
+              />
+            }
+          />
+          <SettingRow
+            label="Minimum severity"
+            hint="Only raise alerts at or above this severity."
+            control={
+              <Select
+                aria-label="Minimum severity"
+                className="w-36"
+                value={prefs.min_severity}
+                onChange={(e) => updatePrefs.mutate({ min_severity: e.target.value as AlertSeverity })}
+              >
+                {SEVERITY_OPTIONS.map((sev) => (
+                  <option key={sev} value={sev}>
+                    {sev.charAt(0) + sev.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </Select>
+            }
+          />
+          <div className="border-t border-slate-100 dark:border-slate-800 py-3">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Enabled alert types</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              Choose which kinds of alerts to receive.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {ALERT_TYPES.map((type) => (
+                <label key={type} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+                    checked={prefs.enabled_alert_types.includes(type)}
+                    onChange={(e) => toggleAlertType(type, e.target.checked)}
+                  />
+                  {alertTypeLabel(type)}
+                </label>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">
+          Notification preferences unavailable.
+        </p>
+      )}
+    </SettingsSection>
   );
 }
 
@@ -234,6 +351,10 @@ export function SettingsPage() {
             <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">AI provider status unavailable.</p>
           )}
         </SettingsSection>
+
+        <div className="lg:col-span-2">
+          <NotificationsSection />
+        </div>
 
         <div className="lg:col-span-2">
           <SettingsSection

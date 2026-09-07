@@ -1,7 +1,8 @@
 import { useLocation } from 'react-router-dom';
-import { Bell, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { navItems } from '@/routes/navItems';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { AlertCenter } from '@/components/alerts/AlertCenter';
 
 function usePageTitle(): string {
   const { pathname } = useLocation();
@@ -26,9 +27,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
 
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
-        <button type="button" className="btn-ghost relative" aria-label="Notifications">
-          <Bell className="h-5 w-5" />
-        </button>
+        <AlertCenter />
         {/* User/profile placeholder — authentication not implemented yet. */}
         <div className="flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-800 py-1 pl-1 pr-3">
           <span

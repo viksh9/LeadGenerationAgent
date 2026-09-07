@@ -72,7 +72,26 @@ class Settings(BaseSettings):
     ai_temperature: float = Field(default=0.2, validation_alias=AliasChoices("AI_TEMPERATURE"))
     ai_enabled: bool | None = Field(default=None, validation_alias=AliasChoices("AI_ENABLED"))
 
-    @field_validator("show_synthetic_leads", "enforce_real_data", "ai_enabled", mode="before")
+    # Continuous monitoring / scheduler (Prompt 38). The in-process background
+    # runner is OFF by default so imports, tests and CI never spawn threads or
+    # make network calls; enable it explicitly to run scheduled collection.
+    scheduler_enabled: bool | None = Field(
+        default=None,
+        description="Run the in-process background scheduler. None => off (disabled).",
+        validation_alias=AliasChoices("SCHEDULER_ENABLED"),
+    )
+    scheduler_timezone: str = Field(
+        default="Asia/Kolkata", validation_alias=AliasChoices("SCHEDULER_TIMEZONE"))
+    scheduler_tick_seconds: int = Field(
+        default=60, validation_alias=AliasChoices("SCHEDULER_TICK_SECONDS"))
+    # First-ever admin guard. When set, mutating scheduler endpoints require the
+    # X-Admin-Key header. Unset (None) => allowed (local single-user default).
+    admin_api_key: str | None = Field(default=None, validation_alias=AliasChoices("ADMIN_API_KEY"))
+
+    @field_validator(
+        "show_synthetic_leads", "enforce_real_data", "ai_enabled", "scheduler_enabled",
+        mode="before",
+    )
     @classmethod
     def _empty_str_is_none(cls, value):
         """Treat an unset/empty env var (e.g. `ENFORCE_REAL_DATA=` in .env) as None
@@ -105,6 +124,12 @@ class Settings(BaseSettings):
         if self.enforce_real_data is not None:
             return self.enforce_real_data
         return self.environment.lower() in {"production", "prod", "staging", "stage"}
+
+    @property
+    def scheduler_active(self) -> bool:
+        """Whether the background scheduler runner should start. Off unless
+        explicitly enabled (never in tests/CI by default)."""
+        return bool(self.scheduler_enabled)
 
     @property
     def ai_config_status(self) -> str:
