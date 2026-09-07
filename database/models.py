@@ -105,6 +105,66 @@ class CompanyType(str, Enum):
     OTHER_TECHNOLOGY = "OTHER_TECHNOLOGY"
 
 
+class VerificationStatus(str, Enum):
+    """How strongly the evidence supports the claim (separate from lead score)."""
+
+    VERIFIED = "VERIFIED"
+    PARTIALLY_VERIFIED = "PARTIALLY_VERIFIED"
+    UNVERIFIED = "UNVERIFIED"
+    CONTRADICTED = "CONTRADICTED"
+    STALE = "STALE"
+
+
+class LeadReadiness(str, Enum):
+    """Whether a lead is ready for sales action, based on EVIDENCE quality."""
+
+    READY = "READY"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    HOLD = "HOLD"
+    DISCARD = "DISCARD"
+
+
+class SourceTier(str, Enum):
+    TIER_1 = "TIER_1"   # official (career page, company site, government, tender portal)
+    TIER_2 = "TIER_2"   # official ATS / licensed provider / reputable publication
+    TIER_3 = "TIER_3"   # secondary aggregator / syndication / unknown third-party
+    TIER_4 = "TIER_4"   # unknown / untrusted
+
+
+class EvidenceType(str, Enum):
+    JOB = "JOB"
+    BUSINESS_SIGNAL = "BUSINESS_SIGNAL"
+    NEWS = "NEWS"
+    PROJECT = "PROJECT"
+    TENDER = "TENDER"
+    COMPANY = "COMPANY"
+    OTHER = "OTHER"
+
+
+class ConflictType(str, Enum):
+    JOB_STATUS = "JOB_STATUS"
+    PROJECT_STATUS = "PROJECT_STATUS"
+    TENDER_STATUS = "TENDER_STATUS"
+    COMPANY_IDENTITY = "COMPANY_IDENTITY"
+    LOCATION = "LOCATION"
+    JOB_TITLE = "JOB_TITLE"
+    DATE = "DATE"
+    STAFFING_ESTIMATE = "STAFFING_ESTIMATE"
+    OTHER = "OTHER"
+
+
+class ConflictSeverity(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class EvidenceResolutionStatus(str, Enum):
+    UNRESOLVED = "UNRESOLVED"
+    RESOLVED = "RESOLVED"
+    IGNORED = "IGNORED"
+
+
 class Lead(Base):
     """Denormalized prospect row used across scoring, enrichment, and outreach."""
 
@@ -203,6 +263,24 @@ class Lead(Base):
     # external_id} — the job postings that support this company opportunity.
     evidence: Mapped[list[dict]] = mapped_column(JSON, default=list)
     last_signal_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Verification intelligence — kept STRICTLY SEPARATE from lead_score. A lead
+    # can be commercially HOT yet only PARTIALLY_VERIFIED (or vice versa).
+    source_reliability: Mapped[int] = mapped_column(Integer, default=0)
+    evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    freshness_score: Mapped[int] = mapped_column(Integer, default=0)
+    independent_support_count: Mapped[int] = mapped_column(Integer, default=0)
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        SAEnum(VerificationStatus, native_enum=False, length=24),
+        default=VerificationStatus.UNVERIFIED, index=True,
+    )
+    lead_readiness: Mapped[LeadReadiness] = mapped_column(
+        SAEnum(LeadReadiness, native_enum=False, length=16),
+        default=LeadReadiness.REVIEW_REQUIRED, index=True,
+    )
+    verification_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    verification_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Lifecycle
     status: Mapped[LeadStatus] = mapped_column(
@@ -383,6 +461,14 @@ class JobRecord(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     collected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
 
+    # Cross-source deduplication (processors/deduplication). Normalized title kept
+    # for matching; original titles from EVERY source retained; per-field source
+    # conflicts recorded rather than silently overwritten.
+    normalized_title: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
+    original_job_titles: Mapped[list[str]] = mapped_column(JSON, default=list)
+    field_conflicts: Mapped[dict] = mapped_column(JSON, default=dict)
+    deduplication_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     source_references: Mapped[list["JobSourceReference"]] = relationship(
         back_populates="job", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -404,7 +490,11 @@ class JobSourceReference(Base):
     source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     raw_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # soft link to raw_source_records
     source_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    source_priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_primary_source: Mapped[bool] = mapped_column(default=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
 
     job: Mapped["JobRecord"] = relationship(back_populates="source_references")
 
@@ -613,4 +703,162 @@ class OpportunityCandidate(Base):
         SAEnum(OpportunityStatus, native_enum=False, length=16), default=OpportunityStatus.CANDIDATE, index=True
     )
     lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class MatchConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    NO_MATCH = "NO_MATCH"
+
+
+class MatchDecision(str, Enum):
+    AUTO_MERGE = "AUTO_MERGE"
+    REVIEW = "REVIEW"
+    NO_MATCH = "NO_MATCH"
+
+
+class DuplicateStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class JobDuplicateCandidate(Base):
+    """A MEDIUM-confidence potential duplicate held for human review — never
+    auto-merged. Keeps the explanation (matched fields + differences)."""
+
+    __tablename__ = "job_duplicate_candidates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    canonical_job_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    record_a: Mapped[dict] = mapped_column(JSON, default=dict)   # {source_id, external_id, title, ...}
+    record_b: Mapped[dict] = mapped_column(JSON, default=dict)
+    match_score: Mapped[int] = mapped_column(Integer, default=0)
+    match_confidence: Mapped[MatchConfidence] = mapped_column(
+        SAEnum(MatchConfidence, native_enum=False, length=16), default=MatchConfidence.LOW
+    )
+    matched_fields: Mapped[list[str]] = mapped_column(JSON, default=list)
+    differences: Mapped[list[str]] = mapped_column(JSON, default=list)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    status: Mapped[DuplicateStatus] = mapped_column(
+        SAEnum(DuplicateStatus, native_enum=False, length=16), default=DuplicateStatus.PENDING, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class EvidenceRecord(Base):
+    """First-class evidence supporting a job / signal / lead / company.
+
+    References existing RawSourceRecord data (no large raw payloads duplicated).
+    Carries FOUR distinct scores kept separate: source_reliability, authority,
+    freshness, and evidence_confidence. Verification is versioned + re-runnable.
+    """
+
+    __tablename__ = "evidence_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    raw_source_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    canonical_job_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    business_signal_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    company_normalized_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
+    evidence_type: Mapped[EvidenceType] = mapped_column(
+        SAEnum(EvidenceType, native_enum=False, length=24), default=EvidenceType.OTHER, index=True
+    )
+    source_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_tier: Mapped[SourceTier] = mapped_column(
+        SAEnum(SourceTier, native_enum=False, length=16), default=SourceTier.TIER_4, index=True
+    )
+
+    observed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    evidence_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    evidence_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extracted_claims: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    # FOUR distinct scores — never collapsed into one.
+    source_reliability_score: Mapped[int] = mapped_column(Integer, default=0)
+    authority_score: Mapped[int] = mapped_column(Integer, default=0)
+    freshness_score: Mapped[int] = mapped_column(Integer, default=0)
+    consistency_score: Mapped[int] = mapped_column(Integer, default=0)
+    corroboration_score: Mapped[int] = mapped_column(Integer, default=0)
+    evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Syndicated copies of the same underlying evidence share this group id, so
+    # 10 URLs of one job are NOT 10 independent confirmations.
+    independence_group_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        SAEnum(VerificationStatus, native_enum=False, length=24), default=VerificationStatus.UNVERIFIED, index=True
+    )
+    verification_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    verification_version: Mapped[str] = mapped_column(String(16), default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class EvidenceConflict(Base):
+    """A detected conflict between two pieces of evidence. Never silently
+    discarded — the stronger/authoritative evidence is preferred explicitly."""
+
+    __tablename__ = "evidence_conflicts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subject_type: Mapped[str] = mapped_column(String(32), default="LEAD")   # LEAD | SIGNAL | COMPANY | JOB
+    subject_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    evidence_id_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    evidence_id_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    conflict_type: Mapped[ConflictType] = mapped_column(
+        SAEnum(ConflictType, native_enum=False, length=32), default=ConflictType.OTHER
+    )
+    severity: Mapped[ConflictSeverity] = mapped_column(
+        SAEnum(ConflictSeverity, native_enum=False, length=16), default=ConflictSeverity.LOW
+    )
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution_status: Mapped[EvidenceResolutionStatus] = mapped_column(
+        SAEnum(EvidenceResolutionStatus, native_enum=False, length=16), default=EvidenceResolutionStatus.UNRESOLVED
+    )
+    preferred_evidence_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class EvidenceClaim(Base):
+    """A specific claim (e.g. 'ABC is hiring Java developers') with the evidence
+    supporting or contradicting it. Claims are never created without evidence."""
+
+    __tablename__ = "evidence_claims"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subject_type: Mapped[str] = mapped_column(String(32), default="LEAD")
+    subject_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    claim_type: Mapped[str] = mapped_column(String(48), default="OTHER")
+    claim_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    claim_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        SAEnum(VerificationStatus, native_enum=False, length=24), default=VerificationStatus.UNVERIFIED
+    )
+    supporting_sources: Mapped[list[str]] = mapped_column(JSON, default=list)
+    contradictory_sources: Mapped[list[str]] = mapped_column(JSON, default=list)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)

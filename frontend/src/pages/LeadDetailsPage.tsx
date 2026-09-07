@@ -12,6 +12,7 @@ import { OpportunityPanel } from '@/components/leads/detail/OpportunityPanel';
 import { TechnologyList } from '@/components/leads/detail/TechnologyList';
 import { POCPanel } from '@/components/leads/detail/POCPanel';
 import { EvidencePanel } from '@/components/leads/detail/EvidencePanel';
+import { VerificationPanel } from '@/components/leads/detail/VerificationPanel';
 import { OutreachPanel } from '@/components/leads/detail/OutreachPanel';
 import { RecommendationCard } from '@/components/leads/detail/RecommendationCard';
 import { useDeleteLead, useLead } from '@/hooks/useLeads';
@@ -118,6 +119,7 @@ export function LeadDetailsPage() {
             <TechnologyList lead={lead} />
             <CompanySummaryCard lead={lead} />
             <EvidencePanel lead={lead} />
+            <VerificationPanel leadId={lead.id} />
             <OutreachPanel lead={lead} />
           </div>
 

@@ -138,9 +138,23 @@ export function useDashboard(range: DateRange) {
     return { hasReal, hasSynthetic, demoOnly: hasSynthetic && !hasReal };
   }, [query.data]);
 
+  // Data-trust distribution: verified vs unverified intelligence (not lead score).
+  const trust = useMemo(() => {
+    const items = query.data?.items ?? [];
+    const counts = { VERIFIED: 0, PARTIALLY_VERIFIED: 0, UNVERIFIED: 0, STALE: 0, CONTRADICTED: 0 };
+    let ready = 0;
+    for (const l of items) {
+      const s = l.verification_status;
+      if (s && s in counts) counts[s as keyof typeof counts] += 1;
+      if (l.lead_readiness === 'READY') ready += 1;
+    }
+    return { counts, ready, total: items.length };
+  }, [query.data]);
+
   return {
     data,
     provenance,
+    trust,
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,

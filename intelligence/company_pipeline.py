@@ -120,6 +120,63 @@ def _primary_source_url(agg: CompanyAggregate) -> Optional[str]:
     return None
 
 
+def _verify_company(agg: CompanyAggregate, now) -> dict:
+    """Compute evidence-based verification fields for a company lead (pure).
+
+    Kept STRICTLY separate from lead_score: a HOT lead can be PARTIALLY_VERIFIED."""
+    import hashlib
+
+    from config.evidence import VERIFICATION_VERSION
+    from processors.normalization.text import normalize_for_compare
+    from verification.lead_readiness import classify_readiness
+    from verification.signal_verification import EvidenceInput, verify_evidence_set
+
+    def _dt(v):
+        if v is None:
+            return None
+        try:
+            d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+            return d.astimezone(timezone.utc).replace(tzinfo=None) if d.tzinfo else d
+        except (ValueError, TypeError):
+            return v if isinstance(v, datetime) else None
+
+    inputs = [
+        EvidenceInput(
+            source_id=e.get("source_id") or e.get("source") or "unknown",
+            content_hash=hashlib.sha256(
+                f"{normalize_for_compare(e.get('job_title'))}|{agg.normalized_name}".encode()
+            ).hexdigest()[:32],
+            source_url=e.get("source_url"),
+            published_at=_dt(e.get("published_at")),
+            normalized_company_name=agg.normalized_name,
+            normalized_title=e.get("job_title"),
+        )
+        for e in agg.evidence
+    ]
+    signal_type = agg.company_signals[0] if agg.company_signals else "HIRING"
+    result = verify_evidence_set(inputs, signal_type=signal_type, now=now)
+    readiness = classify_readiness(
+        verification_status=result.verification_status,
+        evidence_confidence=result.evidence_confidence,
+        freshness_score=result.freshness_score,
+        has_meaningful_signal=agg.it_job_count > 0 or bool(agg.company_signals),
+    )
+    return {
+        "signal_confidence": result.signal_confidence,
+        "fields": {
+            "source_reliability": result.source_reliability,
+            "evidence_confidence": result.evidence_confidence,
+            "freshness_score": result.freshness_score,
+            "independent_support_count": result.independent_support_count,
+            "verification_status": result.verification_status,
+            "lead_readiness": readiness,
+            "verification_reason": " ".join(result.reasons)[:2000],
+            "verification_version": VERIFICATION_VERSION,
+            "verified_at": now,
+        },
+    }
+
+
 def build_lead_fields(
     agg: CompanyAggregate,
     *,
@@ -131,6 +188,7 @@ def build_lead_fields(
     priority = priority_for(score, config)
     opportunity = opportunity_type(agg)
     summary = _summary_text(agg, opportunity)
+    verification = _verify_company(agg, now)
     intensity_label = _INTENSITY_LABEL[agg.hiring_intensity]
     sources = sorted(agg.sources)
     pitch = (
@@ -163,7 +221,8 @@ def build_lead_fields(
         "technologies": agg.top_technologies[:12],
         "hiring_roles": agg.top_roles[:6],
         "estimated_hiring": agg.it_job_count,
-        "signal_confidence": float(score),
+        # signal_confidence is EVIDENCE-based (distinct from the commercial score).
+        "signal_confidence": float(verification["signal_confidence"]),
         "lead_score": float(score),
         "lead_priority": priority,
         "opportunity_summary": summary,
@@ -173,6 +232,8 @@ def build_lead_fields(
         "data_provenance": agg.provenance,
         "status": LeadStatus.NEW,
         "last_verified_at": now,
+        # Verification intelligence — kept separate from lead_score/lead_priority.
+        **verification["fields"],
     }
 
 
@@ -223,9 +284,13 @@ def rebuild_company_leads(
         jobs = [JobInput.from_raw_record(r) for r in session.scalars(stmt)]
     summary = CompanyRunSummary(provenance=provenance.value, jobs=len(jobs))
 
+    from verification.service import EvidenceVerificationService
+
+    verifier = EvidenceVerificationService(session)
     for agg in aggregate_companies(jobs, config=config, now=now):
         try:
-            _lead, created = upsert_company_lead(session, agg, config=config, now=now)
+            lead, created = upsert_company_lead(session, agg, config=config, now=now)
+            verifier.verify_lead(lead, now=now)   # persist evidence records + conflicts (idempotent)
         except Exception as exc:  # noqa: BLE001 - record, keep going
             summary.errors.append(f"{agg.display_name}: {exc}")
             continue

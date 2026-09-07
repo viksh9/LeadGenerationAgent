@@ -28,8 +28,11 @@ from database.models import (
     DataProvenance,
     HiringIntensity,
     LeadPriority,
+    LeadReadiness,
     LeadStatus,
     SignalType,
+    SourceTier,
+    VerificationStatus,
 )
 
 # ---------------------------------------------------------------------------
@@ -216,10 +219,75 @@ class LeadResponse(BaseModel):
     evidence: list[dict] = Field(default_factory=list)
     last_signal_date: Optional[datetime] = None
 
+    # Verification intelligence — kept separate from lead_score/lead_priority.
+    source_reliability: int = 0
+    evidence_confidence: int = 0
+    freshness_score: int = 0
+    independent_support_count: int = 0
+    verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
+    lead_readiness: LeadReadiness = LeadReadiness.REVIEW_REQUIRED
+    verification_reason: Optional[str] = None
+    verified_at: Optional[datetime] = None
+
     status: LeadStatus = LeadStatus.NEW
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_verified_at: Optional[datetime] = None
+
+
+class EvidenceResponse(BaseModel):
+    """One evidence record supporting a lead/signal."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    evidence_type: str
+    source_name: Optional[str] = None
+    source_url: Optional[str] = None
+    source_domain: Optional[str] = None
+    source_tier: SourceTier = SourceTier.TIER_4
+    evidence_title: Optional[str] = None
+    published_at: Optional[datetime] = None
+    observed_at: Optional[datetime] = None
+    source_reliability_score: int = 0
+    freshness_score: int = 0
+    evidence_confidence: int = 0
+    independence_group_id: Optional[str] = None
+    verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
+    data_provenance: DataProvenance = DataProvenance.REAL
+
+
+class ConflictResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    conflict_type: str
+    severity: str
+    description: Optional[str] = None
+    resolution_status: str
+
+
+class VerificationResponse(BaseModel):
+    """The four distinct scores + verification status for a lead."""
+
+    lead_id: int
+    company_name: str
+    # Kept SEPARATE — never collapsed into one number.
+    lead_score: float
+    lead_priority: LeadPriority
+    source_reliability: int
+    evidence_confidence: int
+    signal_confidence: Optional[float] = None
+    freshness_score: int
+    verification_status: VerificationStatus
+    lead_readiness: LeadReadiness
+    independent_support_count: int
+    source_count: int
+    verification_reason: Optional[str] = None
+    verified_at: Optional[datetime] = None
+    supporting_sources: list[EvidenceResponse] = Field(default_factory=list)
+    conflicts: list[ConflictResponse] = Field(default_factory=list)
+    data_provenance: DataProvenance = DataProvenance.REAL
 
 
 class TechnologyDemandItem(BaseModel):
