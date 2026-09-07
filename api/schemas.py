@@ -23,7 +23,14 @@ from pydantic import (
     field_validator,
 )
 
-from database.models import LeadPriority, LeadStatus, SignalType
+from database.models import (
+    CompanyType,
+    DataProvenance,
+    HiringIntensity,
+    LeadPriority,
+    LeadStatus,
+    SignalType,
+)
 
 # ---------------------------------------------------------------------------
 # Reusable validators / annotated types
@@ -161,8 +168,18 @@ class LeadResponse(BaseModel):
 
     id: int
     company_name: str
+    normalized_company_name: Optional[str] = None
+    company_domain: Optional[str] = None
+    company_type: Optional[CompanyType] = None
     industry: Optional[str] = None
     location: Optional[str] = None
+
+    # Company-level hiring aggregation.
+    it_job_count: int = 0
+    recent_job_count: int = 0
+    hiring_intensity: Optional[HiringIntensity] = None
+    primary_target_role: Optional[str] = None
+    company_signals: list[str] = Field(default_factory=list)
 
     signal_type: Optional[SignalType] = None
     signal_title: Optional[str] = None
@@ -193,10 +210,31 @@ class LeadResponse(BaseModel):
     recommended_action: Optional[str] = None
     recommended_pitch: Optional[str] = None
 
+    # Evidence / provenance.
+    data_provenance: DataProvenance = DataProvenance.REAL
+    source_count: int = 0
+    evidence: list[dict] = Field(default_factory=list)
+    last_signal_date: Optional[datetime] = None
+
     status: LeadStatus = LeadStatus.NEW
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_verified_at: Optional[datetime] = None
+
+
+class TechnologyDemandItem(BaseModel):
+    """Aggregated demand for one technology across collected IT jobs."""
+
+    technology: str
+    openings: int
+    companies: int
+
+
+class TechnologyDemandResponse(BaseModel):
+    """Technology demand computed from real (or synthetic) collected job records."""
+
+    provenance: DataProvenance | None = None
+    items: list[TechnologyDemandItem] = Field(default_factory=list)
 
 
 class LeadListResponse(BaseModel):

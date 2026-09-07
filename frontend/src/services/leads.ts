@@ -7,6 +7,7 @@ import type {
   LeadListParams,
   LeadListResponse,
   LeadUpdate,
+  TechnologyDemandResponse,
 } from '@/types/lead';
 
 /**
@@ -24,6 +25,17 @@ export async function getLeads(
 
 export async function getLead(id: number, signal?: AbortSignal): Promise<Lead> {
   const { data } = await api.get<Lead>(`/leads/${id}`, { signal });
+  return data;
+}
+
+export async function getTechnologyDemand(
+  params: { provenance?: 'real' | 'synthetic' | 'all'; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<TechnologyDemandResponse> {
+  const { data } = await api.get<TechnologyDemandResponse>('/leads/technology-demand', {
+    params,
+    signal,
+  });
   return data;
 }
 

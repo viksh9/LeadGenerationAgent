@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Flame, Target, ThermometerSun, Trophy } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { EmptyState, ErrorState } from '@/components/ui/States';
+import { DataProvenanceBanner } from '@/components/common/DataProvenanceBanner';
 import { DashboardKpiCard } from '@/components/dashboard/DashboardKpiCard';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
 import { PriorityDistributionChart } from '@/components/dashboard/PriorityDistributionChart';
@@ -44,9 +45,9 @@ function RangeFilter({ value, onChange }: { value: DateRange; onChange: (v: Date
 
 export function DashboardPage() {
   const [range, setRange] = useState<DateRange>('all');
-  const { data, isLoading, isError, refetch, isEmpty } = useDashboard(range);
+  const { data, provenance, isLoading, isError, refetch, isEmpty } = useDashboard(range);
 
-  const subtitle = 'Identify and prioritize the most valuable business opportunities.';
+  const subtitle = 'Company-level Indian IT hiring opportunities from real collected signals.';
 
   let body;
   if (isLoading) {
@@ -56,11 +57,11 @@ export function DashboardPage() {
   } else if (isEmpty || !data) {
     body = (
       <EmptyState
-        title="No leads available yet."
-        description="Analyze your first lead to start building your lead intelligence."
+        title="No verified Indian IT signals available yet."
+        description="No real data source is connected. Connect a collector and aggregate company-level opportunities, or explore demo data in development."
         action={
           <Link to="/leads/analyze" className="btn-primary">
-            Analyze New Lead
+            Analyze a Company
           </Link>
         }
       />
@@ -72,6 +73,7 @@ export function DashboardPage() {
       : undefined;
     body = (
       <>
+        {provenance.demoOnly && <DataProvenanceBanner />}
         <section
           aria-label="Key metrics"
           className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"

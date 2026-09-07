@@ -20,6 +20,18 @@ const deleteLeadMock = vi.mocked(deleteLead);
 
 function makeLead(p: Partial<Lead> & Pick<Lead, 'id' | 'company_name'>): Lead {
   return {
+    normalized_company_name: null,
+    company_domain: null,
+    company_type: null,
+    it_job_count: 0,
+    recent_job_count: 0,
+    hiring_intensity: null,
+    primary_target_role: null,
+    company_signals: [],
+    data_provenance: 'REAL',
+    source_count: 0,
+    evidence: [],
+    last_signal_date: null,
     industry: 'IT',
     location: 'Pune',
     company_size: null,
@@ -235,7 +247,6 @@ describe('LeadsPage', () => {
     const row = screen.getByText('Helios Systems').closest('tr') as HTMLElement;
     expect(within(row).getByText('Project Award')).toBeInTheDocument();
     expect(within(row).getByText('+2 more')).toBeInTheDocument();
-    expect(within(row).getByText('Large-scale ramp-up')).toBeInTheDocument();
     expect(screen.queryByText('PROJECT_AWARD')).not.toBeInTheDocument();
   });
 

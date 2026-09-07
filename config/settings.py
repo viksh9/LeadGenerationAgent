@@ -44,10 +44,25 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
     default_sample_path: Path = DATA_DIR / "sample_lead.json"
+    # Whether synthetic/demo leads are shown by default. Explicitly disabled in
+    # production so the dashboard never presents demo data as real. Callers can
+    # still override per-request via the `provenance` query param.
+    show_synthetic_leads: bool | None = Field(
+        default=None,
+        description="Default provenance visibility. None => derive from environment.",
+        validation_alias=AliasChoices("SHOW_SYNTHETIC_LEADS", "DEMO_MODE"),
+    )
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def synthetic_leads_visible(self) -> bool:
+        """Show synthetic leads by default only outside production."""
+        if self.show_synthetic_leads is not None:
+            return self.show_synthetic_leads
+        return self.environment.lower() not in {"production", "prod"}
 
 
 @lru_cache

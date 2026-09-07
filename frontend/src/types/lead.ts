@@ -26,14 +26,53 @@ export type SignalType =
   | 'CONTRACT'
   | 'OTHER';
 
+export type DataProvenance = 'REAL' | 'SYNTHETIC';
+
+export type HiringIntensity = 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+
+export type CompanyType =
+  | 'IT_SERVICES'
+  | 'SOFTWARE_PRODUCT'
+  | 'SAAS'
+  | 'CLOUD'
+  | 'AI_ML'
+  | 'CYBERSECURITY'
+  | 'FINTECH_TECH'
+  | 'HEALTHTECH'
+  | 'ECOMMERCE_TECH'
+  | 'ENTERPRISE_SOFTWARE'
+  | 'IT_CONSULTING'
+  | 'DIGITAL_TRANSFORMATION'
+  | 'OTHER_TECHNOLOGY';
+
+/** One job posting supporting a company opportunity (evidence trail). */
+export interface LeadEvidence {
+  source?: string | null;
+  source_id?: string | null;
+  source_url?: string | null;
+  job_title?: string | null;
+  published_at?: string | null;
+  external_id?: string | null;
+  duplicate_of_prior_source?: boolean;
+}
+
 /** A stored lead (GET /leads/{id}, list items, POST /leads). */
 export interface Lead {
   id: number;
   company_name: string;
+  normalized_company_name: string | null;
+  company_domain: string | null;
+  company_type: CompanyType | null;
   industry: string | null;
   location: string | null;
   company_size: string | null;
   company_website: string | null;
+  // Company-level hiring aggregation (one lead == one company opportunity).
+  it_job_count: number;
+  recent_job_count: number;
+  hiring_intensity: HiringIntensity | null;
+  primary_target_role: string | null;
+  company_signals: string[];
   signal_type: SignalType | null;
   signal_title: string | null;
   signal_description: string | null;
@@ -55,10 +94,27 @@ export interface Lead {
   opportunity_summary: string | null;
   recommended_action: string | null;
   recommended_pitch: string | null;
+  // Evidence / provenance.
+  data_provenance: DataProvenance;
+  source_count: number;
+  evidence: LeadEvidence[];
+  last_signal_date: string | null;
   status: LeadStatus;
   created_at: string | null;
   updated_at: string | null;
   last_verified_at: string | null;
+}
+
+/** GET /leads/technology-demand item. */
+export interface TechnologyDemandItem {
+  technology: string;
+  openings: number;
+  companies: number;
+}
+
+export interface TechnologyDemandResponse {
+  provenance: DataProvenance | null;
+  items: TechnologyDemandItem[];
 }
 
 /** Payload for POST /leads (direct create). Calculated fields are not allowed. */
@@ -220,6 +276,7 @@ export interface LeadListParams {
   min_score?: number;
   max_score?: number;
   technology?: string;
+  provenance?: 'real' | 'synthetic' | 'all';
   sort_by?: 'lead_score' | 'created_at' | 'updated_at' | 'signal_date' | 'company_name';
   sort_order?: 'asc' | 'desc';
 }

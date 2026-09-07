@@ -37,10 +37,18 @@ __all__ = [
 _WRITABLE_FIELDS: frozenset[str] = frozenset(
     {
         "company_name",
+        "normalized_company_name",
+        "company_domain",
+        "company_type",
         "industry",
         "location",
         "company_size",
         "company_website",
+        "it_job_count",
+        "recent_job_count",
+        "hiring_intensity",
+        "primary_target_role",
+        "company_signals",
         "signal_type",
         "signal_title",
         "signal_description",
@@ -62,6 +70,10 @@ _WRITABLE_FIELDS: frozenset[str] = frozenset(
         "opportunity_summary",
         "recommended_action",
         "recommended_pitch",
+        "data_provenance",
+        "source_count",
+        "evidence",
+        "last_signal_date",
         "status",
         "last_verified_at",
     }
@@ -146,6 +158,7 @@ def query_leads(
     min_score: float | None = None,
     max_score: float | None = None,
     technology: str | None = None,
+    provenance: Any = None,
     sort_by: str = "lead_score",
     sort_order: str = "desc",
     page: int = 1,
@@ -178,6 +191,8 @@ def query_leads(
         conditions.append(Lead.lead_priority == lead_priority)
     if status is not None:
         conditions.append(Lead.status == status)
+    if provenance is not None:
+        conditions.append(Lead.data_provenance == provenance)
     if min_score is not None:
         conditions.append(Lead.lead_score >= min_score)
     if max_score is not None:
@@ -219,6 +234,28 @@ def find_duplicate_lead(
     if source_url is not None:
         stmt = stmt.where(Lead.source_url == source_url)
     stmt = stmt.order_by(Lead.id.desc())
+    return session.scalars(stmt).first()
+
+
+def find_company_lead(
+    session: Session,
+    *,
+    normalized_company_name: str,
+    provenance: Any,
+) -> Lead | None:
+    """Find the company-level lead for a normalized company + provenance.
+
+    Company-level aggregation keeps ONE lead per (normalized company, provenance),
+    so re-aggregation refreshes that row rather than creating duplicates.
+    """
+    if not normalized_company_name:
+        return None
+    stmt = (
+        select(Lead)
+        .where(Lead.normalized_company_name == normalized_company_name)
+        .where(Lead.data_provenance == provenance)
+        .order_by(Lead.id.asc())
+    )
     return session.scalars(stmt).first()
 
 

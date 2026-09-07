@@ -66,6 +66,44 @@ class LeadStatus(str, Enum):
     NURTURE = "NURTURE"
 
 
+class DataProvenance(str, Enum):
+    """Whether a lead was built from real collected data or synthetic/demo data.
+
+    The production dashboard shows REAL only; SYNTHETIC is for development/demo
+    and must always be visibly labelled.
+    """
+
+    REAL = "REAL"
+    SYNTHETIC = "SYNTHETIC"
+
+
+class HiringIntensity(str, Enum):
+    """Company-level hiring intensity derived from aggregated IT job activity."""
+
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    VERY_HIGH = "VERY_HIGH"
+
+
+class CompanyType(str, Enum):
+    """Best-effort classification of a technology company (evidence-based)."""
+
+    IT_SERVICES = "IT_SERVICES"
+    SOFTWARE_PRODUCT = "SOFTWARE_PRODUCT"
+    SAAS = "SAAS"
+    CLOUD = "CLOUD"
+    AI_ML = "AI_ML"
+    CYBERSECURITY = "CYBERSECURITY"
+    FINTECH_TECH = "FINTECH_TECH"
+    HEALTHTECH = "HEALTHTECH"
+    ECOMMERCE_TECH = "ECOMMERCE_TECH"
+    ENTERPRISE_SOFTWARE = "ENTERPRISE_SOFTWARE"
+    IT_CONSULTING = "IT_CONSULTING"
+    DIGITAL_TRANSFORMATION = "DIGITAL_TRANSFORMATION"
+    OTHER_TECHNOLOGY = "OTHER_TECHNOLOGY"
+
+
 class Lead(Base):
     """Denormalized prospect row used across scoring, enrichment, and outreach."""
 
@@ -97,10 +135,24 @@ class Lead(Base):
 
     # Company
     company_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    normalized_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    company_type: Mapped[CompanyType | None] = mapped_column(
+        SAEnum(CompanyType, native_enum=False, length=32), nullable=True
+    )
     industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_size: Mapped[str | None] = mapped_column(String(64), nullable=True)
     company_website: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Company-level hiring aggregation (one lead == one company opportunity).
+    it_job_count: Mapped[int] = mapped_column(Integer, default=0)
+    recent_job_count: Mapped[int] = mapped_column(Integer, default=0)
+    hiring_intensity: Mapped[HiringIntensity | None] = mapped_column(
+        SAEnum(HiringIntensity, native_enum=False, length=16), nullable=True, index=True
+    )
+    primary_target_role: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    company_signals: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     # Signal
     signal_type: Mapped[SignalType | None] = mapped_column(
@@ -138,6 +190,18 @@ class Lead(Base):
     opportunity_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommended_action: Mapped[str | None] = mapped_column(String(255), nullable=True)
     recommended_pitch: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Evidence / provenance (every lead must be explainable).
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16),
+        default=DataProvenance.REAL,
+        index=True,
+    )
+    source_count: Mapped[int] = mapped_column(Integer, default=0)
+    # evidence: list of {source, source_id, source_url, job_title, published_at,
+    # external_id} — the job postings that support this company opportunity.
+    evidence: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    last_signal_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Lifecycle
     status: Mapped[LeadStatus] = mapped_column(

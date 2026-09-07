@@ -20,9 +20,19 @@ from api.schemas import (
     LeadListResponse,
     LeadResponse,
     LeadUpdate,
+    TechnologyDemandItem,
+    TechnologyDemandResponse,
 )
 from config.exceptions import NotFoundError
-from database.models import LeadPriority, LeadStatus, SignalType
+from config.settings import get_settings
+from database.models import (
+    DataProvenance,
+    LeadPriority,
+    LeadStatus,
+    RawSourceRecord,
+    RecordType,
+    SignalType,
+)
 from database.repository import (
     create_lead,
     delete_lead,
@@ -30,7 +40,9 @@ from database.repository import (
     query_leads,
     update_lead,
 )
+from intelligence.company_aggregator import JobInput, technology_demand
 from intelligence.lead_pipeline import LeadAnalysisPipeline, LeadAnalysisResult
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -51,6 +63,23 @@ class SortField(str, Enum):
 class SortOrder(str, Enum):
     asc = "asc"
     desc = "desc"
+
+
+class ProvenanceFilter(str, Enum):
+    real = "real"
+    synthetic = "synthetic"
+    all = "all"
+
+
+def _resolve_provenance(provenance: ProvenanceFilter | None) -> DataProvenance | None:
+    """Map the query param to a DB filter. Default hides synthetic in production."""
+    if provenance is ProvenanceFilter.real:
+        return DataProvenance.REAL
+    if provenance is ProvenanceFilter.synthetic:
+        return DataProvenance.SYNTHETIC
+    if provenance is ProvenanceFilter.all:
+        return None
+    return None if get_settings().synthetic_leads_visible else DataProvenance.REAL
 
 
 @router.post(
@@ -109,6 +138,9 @@ def list_leads_endpoint(
     min_score: float | None = Query(None, ge=0, le=100),
     max_score: float | None = Query(None, ge=0, le=100),
     technology: str | None = Query(None),
+    provenance: ProvenanceFilter | None = Query(
+        None, description="real (default in production), synthetic, or all"
+    ),
     sort_by: SortField = Query(SortField.lead_score),
     sort_order: SortOrder = Query(SortOrder.desc),
 ) -> LeadListResponse:
@@ -123,6 +155,7 @@ def list_leads_endpoint(
         min_score=min_score,
         max_score=max_score,
         technology=technology,
+        provenance=_resolve_provenance(provenance),
         sort_by=sort_by.value,
         sort_order=sort_order.value,
         page=page,
@@ -135,6 +168,31 @@ def list_leads_endpoint(
         page=page,
         page_size=page_size,
         total_pages=total_pages,
+    )
+
+
+@router.get(
+    "/technology-demand",
+    response_model=TechnologyDemandResponse,
+    summary="Technology demand",
+    description="Aggregated technology demand (openings + companies) from collected IT job records.",
+)
+def technology_demand_endpoint(
+    session: Session = Depends(get_session),
+    provenance: ProvenanceFilter | None = Query(None),
+    limit: int = Query(25, ge=1, le=200),
+) -> TechnologyDemandResponse:
+    prov = _resolve_provenance(provenance)
+    stmt = select(RawSourceRecord).where(RawSourceRecord.record_type == RecordType.JOB_POSTING)
+    if prov is DataProvenance.REAL:
+        stmt = stmt.where(RawSourceRecord.is_synthetic.is_(False))
+    elif prov is DataProvenance.SYNTHETIC:
+        stmt = stmt.where(RawSourceRecord.is_synthetic.is_(True))
+    jobs = [JobInput.from_raw_record(r) for r in session.scalars(stmt)]
+    items = technology_demand(jobs)[:limit]
+    return TechnologyDemandResponse(
+        provenance=prov,
+        items=[TechnologyDemandItem(**item) for item in items],
     )
 
 
