@@ -109,6 +109,9 @@ holds placeholders only.
 | `ADZUNA_MAX_REQUESTS_PER_RUN` | Hard cap on API requests per collection run | `30` |
 | `JOOBLE_API_KEY` | Jooble jobs API key (optional; per-country key) | — |
 | `JOOBLE_API_HOST` | Jooble host — use `in.jooble.org` for India | `jooble.org` |
+| `JOOBLE_LIFETIME_REQUEST_BUDGET` | Hard **lifetime** request cap per Jooble key (free plan is 500 total, not per period) | `500` |
+| `GREENHOUSE_BOARDS` | Comma-separated Greenhouse board tokens to collect (no key; public Job Board API) | — |
+| `LEVER_SITES` | Comma-separated Lever site handles to collect (no key; public Postings API) | — |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | Reserved for a later outreach phase | — |
 
 See `.env.example` for the full list (Adzuna, Jooble, and career-page collector
@@ -203,7 +206,9 @@ collector class is *not* the same as an active, verified real-data connection.
 | Source | Collector | Status | Notes |
 | --- | --- | --- | --- |
 | Adzuna Jobs API | implemented | `NOT_CONFIGURED` | Set `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`; verify live before use. Commercial use `REQUIRES_APPROVAL` |
-| Jooble Jobs API | implemented | `NOT_CONFIGURED` | Set `JOOBLE_API_KEY` (+ `JOOBLE_API_HOST=in.jooble.org` for India); verify live before use |
+| Jooble Jobs API | implemented | `NOT_CONFIGURED` | Set `JOOBLE_API_KEY` (+ `JOOBLE_API_HOST=in.jooble.org` for India); verify live before use. Free plan = 500-request **lifetime** cap per key |
+| Greenhouse Job Board API | implemented | `DISCOVERY_REQUIRED` | Official public board API, no auth. Set `GREENHOUSE_BOARDS` (board tokens) or pass `--board`; `TIER_1` evidence. Commercial reuse `REQUIRES_REVIEW` |
+| Lever Postings API | implemented | `DISCOVERY_REQUIRED` | Official public postings API, no auth. Set `LEVER_SITES` (site handles) or pass `--board`; `TIER_1` evidence. Commercial reuse `REQUIRES_REVIEW` |
 | Company career pages | implemented | `REQUIRES_REVIEW` | Robots/ToS review per site before enabling |
 | Company newsroom (RSS) | implemented | `REQUIRES_REVIEW` | Per-feed review before enabling |
 | RSS business/tech news | implemented | `NOT_CONFIGURED` | No reviewed feeds configured |
@@ -229,6 +234,8 @@ persist only REAL records:
 python scripts/collect.py --list                         # runnable sources
 python scripts/collect.py --source adzuna                # real collection
 python scripts/collect.py --source jooble --query "python developer" --location Bengaluru
+python scripts/collect.py --source greenhouse --board <board_token>   # official ATS (public, no key)
+python scripts/collect.py --source lever --board <site_handle>        # official ATS (public, no key)
 python scripts/collect.py --source adzuna --max-pages 2 --dry-run   # persist nothing
 python scripts/source_check.py --source adzuna           # real connectivity check → source_health
 python scripts/source_check.py --all
@@ -286,6 +293,65 @@ Adzuna is the primary hiring-signal source for Indian IT. Official API reference
 - **Licensing:** Adzuna commercial use **`REQUIRES_APPROVAL`** per their terms.
   Being technically connectable is **not** the same as approved for commercial use —
   do not treat production commercial use as approved.
+
+### Official ATS sources (Greenhouse, Lever)
+
+Alongside the aggregators, the platform collects directly from two **official,
+public ATS APIs**. These are first-party company job boards (no auth, no key), so
+their postings are treated as **`TIER_1`** evidence — higher-confidence direct
+evidence than an aggregator's syndicated copy. Both reuse the standard pipeline
+(raw → normalize → canonical dedup → company resolution → evidence verification →
+signal → opportunity → lead).
+
+- **Greenhouse — Job Board API** (`collectors/ats/greenhouse.py`). Official docs:
+  <https://docs.greenhouse.io/job-board.html>.
+  - **Endpoint**: `GET https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true`.
+    Public, **no authentication**. Response: `{jobs:[{id, title, updated_at,
+    location:{name}, absolute_url, content, company_name, departments, offices}],
+    meta:{total}}`.
+  - **Config**: `GREENHOUSE_BOARDS` — comma-separated company **board tokens**; no
+    key. Board tokens are format-validated; boards are **not** enumerated blindly.
+- **Lever — Postings API** (`collectors/ats/lever.py`). Official docs:
+  <https://github.com/lever/postings-api> (developer docs at
+  <https://hire.lever.co/developer>).
+  - **Endpoint**: `GET https://api.lever.co/v0/postings/{site}?mode=json[&limit=N&skip=M]`.
+    Public, **no authentication**; only **published** postings are returned.
+    Response: a list of `{id, text, categories:{location, team, commitment,
+    department}, hostedUrl, applyUrl, createdAt (epoch ms), descriptionPlain,
+    workplaceType}`.
+  - **Config**: `LEVER_SITES` — comma-separated company **site handles**; no key.
+- **CLI**:
+
+  ```bash
+  python scripts/collect.py --source greenhouse --board <board_token>
+  python scripts/collect.py --source lever --board <site_handle>
+  # or configure default boards via GREENHOUSE_BOARDS / LEVER_SITES
+  python scripts/collect.py --source greenhouse --board <board_token> --dry-run  # real request, persists nothing
+  python scripts/source_check.py --source greenhouse    # connectivity check
+  python scripts/source_check.py --source lever
+  ```
+
+- **Syndication is one evidence group.** One canonical job may carry **multiple**
+  source references across Adzuna / Jooble / ATS. Syndicated copies of the same
+  posting are a single evidence group — **not** independent confirmations. Discovered
+  boards are recorded in the `company_career_sources` table (`CompanyCareerSource`)
+  with status `DISCOVERY_REQUIRED` / `CONFIGURED` / `CONNECTED`.
+- **Status**: `DISCOVERY_REQUIRED` — the collector is implemented and works, but no
+  board token / site handle is known yet. A source becomes `CONNECTED` only after a
+  real public request has actually succeeded.
+- **Licensing:** commercial / ongoing reuse is **`REQUIRES_REVIEW`** — review the
+  Greenhouse and Lever terms before enabling ongoing commercial use. Being publicly
+  reachable is **not** the same as approved for commercial reuse.
+
+### Jooble request budget
+
+Jooble's free REST plan is a **hard 500-request lifetime cap per key** (absolute,
+**not** per period). The app persists request usage
+(`source_health.requests_used` / `request_budget`); `scripts/collect.py` **caps a
+run to the remaining budget**, warns at 80% consumption, and stops cleanly with
+`BUDGET_EXHAUSTED` once the budget is used up. Configure the ceiling with
+`JOOBLE_LIFETIME_REQUEST_BUDGET` (default `500`). Keys are per-country domain — for
+India, use an `in.jooble.org` key with `JOOBLE_API_HOST=in.jooble.org`.
 
 **Source status API** (GET endpoints make no network calls and never return
 credentials):

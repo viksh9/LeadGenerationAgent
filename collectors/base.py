@@ -92,6 +92,8 @@ class FetchRequest(BaseModel):
     after_external_id: Optional[str] = None
     page: Optional[int] = Field(default=None, ge=1)
     limit: Optional[int] = Field(default=None, ge=1)
+    # ATS board/site identifier (Greenhouse board_token, Lever site handle).
+    board: Optional[str] = None
 
 
 class CollectorResult(BaseModel):

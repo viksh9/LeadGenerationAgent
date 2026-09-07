@@ -9,6 +9,7 @@ export type SourceStatus =
   | 'CONNECTED'
   | 'CONFIGURED'
   | 'NOT_CONFIGURED'
+  | 'DISCOVERY_REQUIRED'
   | 'AUTHENTICATION_REQUIRED'
   | 'AUTHENTICATION_FAILED'
   | 'RATE_LIMITED'
@@ -81,6 +82,10 @@ const STATUS_DISPLAY: Record<SourceStatus, SourceStatusDisplay> = {
     label: 'Not configured',
     className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
   },
+  DISCOVERY_REQUIRED: {
+    label: 'Discovery required',
+    className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  },
   AUTHENTICATION_REQUIRED: {
     label: 'Authentication required',
     className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
@@ -134,6 +139,7 @@ const CONNECTION_STATUS_DISPLAY: Record<string, SourceStatusDisplay> = {
   CONNECTED: { label: 'Connected', className: EMERALD },
   CONFIGURED: { label: 'Configured', className: BLUE },
   NOT_CONFIGURED: { label: 'Not configured', className: AMBER },
+  DISCOVERY_REQUIRED: { label: 'Discovery required', className: AMBER },
   AUTHENTICATION_REQUIRED: { label: 'Authentication required', className: AMBER },
   AUTHENTICATION_FAILED: { label: 'Authentication failed', className: ROSE },
   RATE_LIMITED: { label: 'Rate limited', className: AMBER },

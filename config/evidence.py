@@ -16,6 +16,8 @@ VERIFIER_RULES_VERSION = "1.0.0"
 SOURCE_TIER_BY_ID: dict[str, SourceTier] = {
     "company_career_pages": SourceTier.TIER_1,
     "company_career": SourceTier.TIER_1,
+    "greenhouse": SourceTier.TIER_1,      # official company ATS board
+    "lever": SourceTier.TIER_1,           # official company ATS postings
     "company_newsroom": SourceTier.TIER_1,
     "government_open_data": SourceTier.TIER_1,
     "government_procurement": SourceTier.TIER_1,

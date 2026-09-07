@@ -111,6 +111,95 @@ sources:
       (collectors/jobs/jooble.py); status stays NOT_CONFIGURED until JOOBLE_API_KEY
       is set and only CONNECTED after a verified live request.
 
+  - source_id: greenhouse
+    name: Greenhouse Job Boards (official ATS)
+    category: COMPANY
+    source_type: PUBLIC_WEB
+    provider: Greenhouse
+    base_url: https://boards-api.greenhouse.io/v1/boards
+    documentation_url: https://docs.greenhouse.io/job-board.html
+    terms_url: https://www.greenhouse.io/terms-of-service
+    status: NOT_CONFIGURED
+    enabled: false
+    requires_api_key: false
+    authentication_type: NONE
+    credential_env_vars: [GREENHOUSE_BOARDS]
+    capabilities: [jobs, companies, job_dates, job_locations, source_urls, source_ids]
+    supports_india: true
+    reliability_tier: TIER_1
+    robots_required: false
+    priority: 1
+    rate_limit: { requests_per_minute: 30, requests_per_day: 1000 }
+    rate_limit_notes: >-
+      Public Job Board API (no key). Collect only known company boards; do not
+      enumerate boards blindly. A board is identified per company (GREENHOUSE_BOARDS).
+    licensing_notes: >-
+      Public job-board data. Review Greenhouse's terms for ongoing/commercial reuse
+      before production; keep source_url attribution.
+    supports_search: false
+    supports_pagination: false
+    supports_incremental_fetch: false
+    supports_date_filter: false
+    supports_location: true
+    supports_job_id: true
+    data_quality: HIGH
+    commercial_use_status: REQUIRES_REVIEW
+    compliance:
+      terms_status: REQUIRES_REVIEW
+      robots_status: ALLOWED
+      api_terms_reviewed: false
+      commercial_use_status: REQUIRES_REVIEW
+      data_retention_notes: Official company board; highest identity confidence. Review terms before commercial reuse.
+    notes: >-
+      Official company ATS boards (direct, higher-confidence evidence than
+      aggregators). GET /v1/boards/{board_token}/jobs?content=true — public, no auth.
+      Status is DISCOVERY_REQUIRED until a legitimate company board_token is known;
+      CONNECTED only after a real public request succeeds. Never fabricate a board.
+
+  - source_id: lever
+    name: Lever Postings (official ATS)
+    category: COMPANY
+    source_type: PUBLIC_WEB
+    provider: Lever
+    base_url: https://api.lever.co/v0/postings
+    documentation_url: https://github.com/lever/postings-api
+    terms_url: https://www.lever.co/legal/
+    status: NOT_CONFIGURED
+    enabled: false
+    requires_api_key: false
+    authentication_type: NONE
+    credential_env_vars: [LEVER_SITES]
+    capabilities: [jobs, companies, job_dates, job_locations, source_urls, source_ids]
+    supports_india: true
+    reliability_tier: TIER_1
+    robots_required: false
+    priority: 1
+    rate_limit: { requests_per_minute: 30, requests_per_day: 1000 }
+    rate_limit_notes: >-
+      Public Postings API (no key). Only published postings are returned. Collect
+      only known company sites (LEVER_SITES); do not enumerate sites blindly.
+    licensing_notes: >-
+      Public postings data. Review Lever's terms for ongoing/commercial reuse before
+      production; keep source_url attribution.
+    supports_search: false
+    supports_pagination: true
+    supports_incremental_fetch: false
+    supports_date_filter: false
+    supports_location: true
+    supports_job_id: true
+    data_quality: HIGH
+    commercial_use_status: REQUIRES_REVIEW
+    compliance:
+      terms_status: REQUIRES_REVIEW
+      robots_status: ALLOWED
+      api_terms_reviewed: false
+      commercial_use_status: REQUIRES_REVIEW
+      data_retention_notes: Official company board; highest identity confidence. Review terms before commercial reuse.
+    notes: >-
+      Official company ATS postings (direct evidence). GET /v0/postings/{site}?mode=json
+      — public, no auth. Status is DISCOVERY_REQUIRED until a legitimate company site
+      handle is known; CONNECTED only after a real public request succeeds.
+
   - source_id: company_career_pages
     name: Company Career Pages
     category: COMPANY

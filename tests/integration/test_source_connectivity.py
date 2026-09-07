@@ -27,8 +27,9 @@ from database.models import SourceConnectionStatus
 # Registry
 # --------------------------------------------------------------------------- #
 def test_registry_lists_runnable_sources():
-    assert runnable_source_ids() == frozenset({"adzuna", "jooble"})
+    assert runnable_source_ids() == frozenset({"adzuna", "jooble", "greenhouse", "lever"})
     assert is_runnable("adzuna") and is_runnable("jooble")
+    assert is_runnable("greenhouse") and is_runnable("lever")
     assert not is_runnable("government_open_data")
 
 

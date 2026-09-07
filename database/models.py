@@ -21,6 +21,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -459,6 +460,29 @@ class SourceConnectionStatus(str, Enum):
     ERROR = "ERROR"
 
 
+class AtsProvider(str, Enum):
+    """Applicant Tracking System / official career-source provider."""
+
+    GREENHOUSE = "GREENHOUSE"
+    LEVER = "LEVER"
+    CAREER_PAGE = "CAREER_PAGE"     # generic official career page (non-ATS)
+    OTHER = "OTHER"
+
+
+class CareerSourceStatus(str, Enum):
+    """State of a discovered company career/ATS source.
+
+    DISCOVERY_REQUIRED means we know the company but not (yet) a legitimate board
+    identifier / endpoint to collect from — never a fabricated board.
+    """
+
+    DISCOVERY_REQUIRED = "DISCOVERY_REQUIRED"
+    CONFIGURED = "CONFIGURED"       # board identifier known, not yet verified
+    CONNECTED = "CONNECTED"         # a real public request succeeded
+    DISABLED = "DISABLED"
+    ERROR = "ERROR"
+
+
 class JobRecord(Base):
     """A canonical (deduplicated) job posting.
 
@@ -609,6 +633,51 @@ class SourceHealth(Base):
     last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
     checks_total: Mapped[int] = mapped_column(Integer, default=0)
     checks_ok: Mapped[int] = mapped_column(Integer, default=0)
+    # Persistent request-budget tracking (e.g. Jooble's 500-request LIFETIME free
+    # cap). request_budget is None when the source has no fixed lifetime budget.
+    requests_used: Mapped[int] = mapped_column(Integer, default=0)
+    request_budget: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class CompanyCareerSource(Base):
+    """A discovered official company career / ATS source (Greenhouse, Lever, …).
+
+    Persists a legitimately-identified board so a company-specific collector can be
+    activated. Never holds a fabricated board — until a real board identifier is
+    known the status is DISCOVERY_REQUIRED. Mirrors the CompanySourceReference
+    pattern; company_id is optional (the company may not be resolved yet).
+    """
+
+    __tablename__ = "company_career_sources"
+    __table_args__ = (
+        UniqueConstraint("ats_provider", "board_identifier", name="uq_career_source_provider_board"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    ats_provider: Mapped[AtsProvider] = mapped_column(
+        SAEnum(AtsProvider, native_enum=False, length=16), index=True
+    )
+    board_identifier: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    careers_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    discovery_method: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[CareerSourceStatus] = mapped_column(
+        SAEnum(CareerSourceStatus, native_enum=False, length=24),
+        default=CareerSourceStatus.DISCOVERY_REQUIRED,
+        index=True,
+    )
+    enabled: Mapped[bool] = mapped_column(default=False, index=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

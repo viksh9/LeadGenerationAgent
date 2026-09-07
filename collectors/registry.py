@@ -35,10 +35,26 @@ def _build_jooble(source: SourceDefinition) -> BaseCollector:
     return JoobleJobCollector(source)
 
 
-# source_id -> factory(SourceDefinition) -> BaseCollector
+def _build_greenhouse(source: SourceDefinition) -> BaseCollector:
+    from collectors.ats.greenhouse import GreenhouseCollector
+
+    return GreenhouseCollector(source)
+
+
+def _build_lever(source: SourceDefinition) -> BaseCollector:
+    from collectors.ats.lever import LeverCollector
+
+    return LeverCollector(source)
+
+
+# source_id -> factory(SourceDefinition) -> BaseCollector. Board/site identifiers
+# for the ATS collectors come from the environment (GREENHOUSE_BOARDS/LEVER_SITES)
+# or an explicit --board, so they still fit the source_id-runnable contract.
 COLLECTOR_FACTORIES: dict[str, Callable[[SourceDefinition], BaseCollector]] = {
     "adzuna": _build_adzuna,
     "jooble": _build_jooble,
+    "greenhouse": _build_greenhouse,
+    "lever": _build_lever,
 }
 
 

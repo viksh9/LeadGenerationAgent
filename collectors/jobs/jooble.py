@@ -75,6 +75,9 @@ class JoobleConfig(BaseModel):
     radius: Optional[int] = None
     requests_per_minute: int = 10
     daily_request_limit: int = 100
+    # Hard LIFETIME request budget per key (free plan = 500, absolute). Enforced
+    # persistently via collectors.source_budget so the quota can't be burned.
+    lifetime_request_budget: int = 500
     timeout_seconds: float = 15.0
 
     @property
@@ -117,6 +120,7 @@ def load_jooble_config() -> JoobleConfig:
         radius=int(radius) if radius and radius.isdigit() else None,
         requests_per_minute=_env_int("JOOBLE_REQUESTS_PER_MINUTE", 10),
         daily_request_limit=_env_int("JOOBLE_DAILY_REQUEST_LIMIT", 100),
+        lifetime_request_budget=_env_int("JOOBLE_LIFETIME_REQUEST_BUDGET", 500),
         timeout_seconds=float(os.environ.get("JOOBLE_TIMEOUT_SECONDS", 15)),
     )
 
@@ -208,7 +212,8 @@ _TAG_RE = re.compile(r"<[^>]+>")
 def _clean(text: Optional[str]) -> Optional[str]:
     if not text:
         return None
-    stripped = html.unescape(_TAG_RE.sub(" ", text))
+    # Unescape entities first, then strip tags (handles escaped or raw HTML).
+    stripped = _TAG_RE.sub(" ", html.unescape(text))
     stripped = re.sub(r"\s+", " ", stripped).strip()
     return stripped or None
 
