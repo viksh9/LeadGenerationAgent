@@ -15,23 +15,29 @@ sources:
     status: AVAILABLE
     enabled: false
     requires_api_key: true
-    rate_limit: { requests_per_minute: 25, requests_per_day: 1000 }
+    rate_limit: { requests_per_minute: 20, requests_per_day: 200 }
     supports_search: true
     supports_pagination: true
-    supports_incremental_fetch: false
+    supports_incremental_fetch: true
     supports_date_filter: true
     data_quality: MEDIUM
     commercial_use_status: REQUIRES_APPROVAL
     compliance:
-      terms_status: REQUIRES_APPROVAL
+      terms_status: REQUIRES_REVIEW
       robots_status: UNKNOWN
-      api_terms_reviewed: false
+      api_terms_reviewed: true
       commercial_use_status: REQUIRES_APPROVAL
-      data_retention_notes: Review API terms for retention/attribution before enabling.
+      data_retention_notes: >-
+        Adzuna's current terms require review/approval for ongoing commercial use.
+        Store only what the API returns; keep source_url attribution. See
+        docs/sources/adzuna.md before enabling in production.
     notes: >-
-      Public jobs aggregator API. Collector implemented (collectors/adzuna.py) and
-      unit-tested offline; AVAILABLE once SOURCE_ADZUNA_APP_ID / SOURCE_ADZUNA_API_KEY
-      are set. Not marked CONNECTED until verified against the live API.
+      Public jobs aggregator API. Collector implemented (collectors/jobs/adzuna.py)
+      and unit-tested offline (no network by default). Country defaults to `in`
+      (India) but is configurable via ADZUNA_COUNTRY. Credentials come from
+      ADZUNA_APP_ID / ADZUNA_APP_KEY; status is NOT_CONFIGURED until both are set
+      and only CONNECTED once verified against the live API. Incremental fetch is a
+      recency window (max_days_old) + dedup, not a true cursor.
 
   - source_id: company_career_pages
     name: Company Career Pages

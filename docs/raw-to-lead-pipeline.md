@@ -61,7 +61,7 @@ FK) so raw provenance survives lead deletion.
 ## Run it
 
 ```bash
-python scripts/collect_jobs.py --query "cloud engineer"   # collect -> raw
+python -m collectors.jobs.adzuna --query "cloud engineer"  # collect -> raw
 python scripts/process_raw.py                              # raw -> leads
 python scripts/process_raw.py --real-only                 # skip synthetic raw
 ```

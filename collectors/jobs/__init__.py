@@ -1,0 +1,1 @@
+"""Job-source collectors (Adzuna, …)."""
