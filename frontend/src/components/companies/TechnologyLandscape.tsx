@@ -7,17 +7,17 @@ export function TechnologyLandscape({ company }: { company: CompanyIntelligence 
   return (
     <DetailCard title="Technology landscape">
       {items.length === 0 ? (
-        <p className="text-sm text-slate-400">No technologies detected across this account.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">No technologies detected across this account.</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {items.map((tech) => (
             <li
               key={tech.name}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-300"
             >
               {tech.name}
               <span
-                className="rounded-full bg-white px-1.5 tabular-nums text-slate-500"
+                className="rounded-full bg-white dark:bg-slate-900 px-1.5 tabular-nums text-slate-500 dark:text-slate-400"
                 aria-label={`${tech.leadCount} related leads`}
               >
                 {tech.leadCount}

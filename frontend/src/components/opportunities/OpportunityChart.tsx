@@ -20,7 +20,7 @@ export function OpportunityChart({ data }: { data: OpportunityTypeDatum[] }) {
         <div className="mt-4 h-72" role="img" aria-label={`Opportunity type distribution. ${summary}.`}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, bottom: 60, left: -12 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(100,116,139,0.18)" />
               <XAxis
                 dataKey="label"
                 angle={-35}
@@ -30,7 +30,7 @@ export function OpportunityChart({ data }: { data: OpportunityTypeDatum[] }) {
                 height={70}
               />
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid rgba(100,116,139,0.35)' }} />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {data.map((d, i) => (
                   <Cell key={d.type} fill={BAR_COLORS[i % BAR_COLORS.length]} />

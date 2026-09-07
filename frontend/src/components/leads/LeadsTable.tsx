@@ -32,17 +32,17 @@ function SortHeader({
   return (
     <th
       scope="col"
-      className="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+      className="border-b border-slate-200 dark:border-slate-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
     >
       <button
         type="button"
         onClick={() => onSort(column)}
-        className="inline-flex items-center gap-1 hover:text-slate-800"
+        className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-200"
         aria-label={`Sort by ${label}`}
       >
         {label}
         <Icon
-          className={active ? 'h-3.5 w-3.5 text-slate-700' : 'h-3.5 w-3.5 text-slate-300'}
+          className={active ? 'h-3.5 w-3.5 text-slate-700 dark:text-slate-300' : 'h-3.5 w-3.5 text-slate-300 dark:text-slate-600'}
           aria-hidden="true"
         />
       </button>
@@ -54,7 +54,7 @@ function Th({ children }: { children: React.ReactNode }) {
   return (
     <th
       scope="col"
-      className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+      className="whitespace-nowrap border-b border-slate-200 dark:border-slate-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
     >
       {children}
     </th>
@@ -63,7 +63,7 @@ function Th({ children }: { children: React.ReactNode }) {
 
 /** Up to two technology chips, then "+N more" (full list on hover). */
 function TechList({ technologies }: { technologies: string[] }) {
-  if (!technologies || technologies.length === 0) return <span className="text-slate-400">—</span>;
+  if (!technologies || technologies.length === 0) return <span className="text-slate-400 dark:text-slate-500">—</span>;
   const shown = technologies.slice(0, 2);
   const extra = technologies.length - shown.length;
   return (
@@ -72,7 +72,7 @@ function TechList({ technologies }: { technologies: string[] }) {
         <Badge key={t}>{t}</Badge>
       ))}
       {extra > 0 && (
-        <span className="text-xs text-slate-500" title={technologies.join(', ')}>
+        <span className="text-xs text-slate-500 dark:text-slate-400" title={technologies.join(', ')}>
           {`+${extra} more`}
         </span>
       )}
@@ -106,12 +106,12 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
         {leads.map((lead) => (
           <tr
             key={lead.id}
-            className="cursor-pointer hover:bg-slate-50"
+            className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
             onClick={() => openLead(lead.id)}
           >
             <Td>
-              <span className="font-medium text-slate-900">{lead.company_name}</span>
-              {lead.location && <span className="block text-xs text-slate-400">{lead.location}</span>}
+              <span className="font-medium text-slate-900 dark:text-slate-100">{lead.company_name}</span>
+              {lead.location && <span className="block text-xs text-slate-400 dark:text-slate-500">{lead.location}</span>}
             </Td>
             <Td>{lead.industry ?? '—'}</Td>
             <Td>
@@ -125,11 +125,11 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
             </Td>
             <Td>
               {lead.opportunity_summary ? (
-                <span className="block max-w-[16rem] truncate text-slate-700" title={lead.opportunity_summary}>
+                <span className="block max-w-[16rem] truncate text-slate-700 dark:text-slate-300" title={lead.opportunity_summary}>
                   {lead.opportunity_summary}
                 </span>
               ) : (
-                <span className="text-slate-400">—</span>
+                <span className="text-slate-400 dark:text-slate-500">—</span>
               )}
             </Td>
             <Td>
@@ -162,7 +162,7 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
                 </button>
                 <button
                   type="button"
-                  className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                  className="rounded-md p-1.5 text-slate-400 dark:text-slate-500 hover:bg-rose-50 hover:text-rose-600"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDelete(lead);

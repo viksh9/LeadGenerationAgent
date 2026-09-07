@@ -25,7 +25,7 @@ export function SourcePerformance({ sources }: { sources: SourceStatistics[] }) 
             {sources.map((row) => (
               <tr key={row.source}>
                 <Td>
-                  <span className="font-medium text-slate-900">{row.source}</span>
+                  <span className="font-medium text-slate-900 dark:text-slate-100">{row.source}</span>
                 </Td>
                 <Td>
                   <span className="tabular-nums">{row.leads}</span>

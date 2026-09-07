@@ -3,8 +3,8 @@ import type { OpportunitySummary as Summary } from '@/types/opportunity';
 function Kpi({ label, value }: { label: string; value: number }) {
   return (
     <div className="card card-pad">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{value}</p>
     </div>
   );
 }

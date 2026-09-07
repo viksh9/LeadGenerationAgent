@@ -29,14 +29,14 @@ export function OutreachTable({ items, onOpen }: Props) {
       </thead>
       <tbody>
         {items.map((o) => (
-          <tr key={o.leadId} className="cursor-pointer hover:bg-slate-50" onClick={() => onOpen(o)}>
+          <tr key={o.leadId} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => onOpen(o)}>
             <Td>
-              <span className="font-medium text-slate-900">{o.company}</span>
-              {o.industry && <span className="block text-xs text-slate-400">{o.industry}</span>}
+              <span className="font-medium text-slate-900 dark:text-slate-100">{o.company}</span>
+              {o.industry && <span className="block text-xs text-slate-400 dark:text-slate-500">{o.industry}</span>}
             </Td>
             <Td>{o.role ?? '—'}</Td>
             <Td>
-              <span className="whitespace-nowrap text-slate-700">
+              <span className="whitespace-nowrap text-slate-700 dark:text-slate-300">
                 {OPPORTUNITY_TYPE_LABELS[o.opportunityType]}
               </span>
             </Td>
@@ -50,7 +50,7 @@ export function OutreachTable({ items, onOpen }: Props) {
               <OutreachStatusBadge status={o.status} />
             </Td>
             <Td>
-              <span className="whitespace-nowrap text-xs text-slate-500">{formatDate(o.updatedAt)}</span>
+              <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">{formatDate(o.updatedAt)}</span>
             </Td>
             <Td>
               <button

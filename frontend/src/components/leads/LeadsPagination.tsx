@@ -22,15 +22,15 @@ export function LeadsPagination({
   const to = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row">
-      <p className="text-sm text-slate-500">
-        Showing <span className="font-medium text-slate-700">{from}</span>–
-        <span className="font-medium text-slate-700">{to}</span> of{' '}
-        <span className="font-medium text-slate-700">{total.toLocaleString()}</span>
+    <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800 px-4 py-3 sm:flex-row">
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        Showing <span className="font-medium text-slate-700 dark:text-slate-300">{from}</span>–
+        <span className="font-medium text-slate-700 dark:text-slate-300">{to}</span> of{' '}
+        <span className="font-medium text-slate-700 dark:text-slate-300">{total.toLocaleString()}</span>
       </p>
 
       <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-slate-500">
+        <label className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <span className="hidden sm:inline">Per page</span>
           <select
             className="select w-auto py-1"
@@ -56,7 +56,7 @@ export function LeadsPagination({
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="px-2 text-sm text-slate-600" aria-live="polite">
+          <span className="px-2 text-sm text-slate-600 dark:text-slate-300" aria-live="polite">
             Page {page} of {Math.max(totalPages, 1)}
           </span>
           <button

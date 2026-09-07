@@ -13,16 +13,16 @@ export function DecisionMakerRecommendations({ company }: { company: CompanyInte
   return (
     <DetailCard title="Recommended decision-makers">
       {roles.length === 0 ? (
-        <p className="text-sm text-slate-400">No decision-maker roles recommended yet.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">No decision-maker roles recommended yet.</p>
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {roles.map((dm) => (
             <li key={dm.role} className="flex items-center justify-between gap-3 py-2.5">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900">{dm.role}</p>
-                {dm.name && <p className="text-xs text-slate-500">{dm.name}</p>}
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{dm.role}</p>
+                {dm.name && <p className="text-xs text-slate-500 dark:text-slate-400">{dm.name}</p>}
               </div>
-              <div className="flex items-center gap-3 text-xs text-slate-400">
+              <div className="flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
                 <span aria-label={`${dm.leadCount} related leads`}>
                   {dm.leadCount} lead{dm.leadCount === 1 ? '' : 's'}
                 </span>

@@ -15,11 +15,11 @@ import {
 import type { DistributionDatum, LeadTrendPoint } from '@/types/analytics';
 
 const AXIS_TICK = { fontSize: 11, fill: '#64748b' };
-const TOOLTIP_STYLE = { fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' };
+const TOOLTIP_STYLE = { fontSize: 12, borderRadius: 8, border: '1px solid rgba(100,116,139,0.35)' };
 const PALETTE = ['#2563eb', '#0891b2', '#7c3aed', '#d97706', '#059669', '#db2777', '#64748b', '#94a3b8', '#0ea5e9'];
 
 function NotEnough() {
-  return <p className="py-8 text-center text-sm text-slate-400">Not enough data yet</p>;
+  return <p className="py-8 text-center text-sm text-slate-400 dark:text-slate-500">Not enough data yet</p>;
 }
 
 /** Donut chart for a small distribution (e.g. priority), with a colour map. */
@@ -59,7 +59,7 @@ export function BarDistribution({ data, ariaLabel }: { data: DistributionDatum[]
     <div style={{ height }} role="img" aria-label={`${ariaLabel}. ${summary}.`}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(100,116,139,0.18)" />
           <XAxis type="number" allowDecimals={false} tick={AXIS_TICK} />
           <YAxis type="category" dataKey="label" width={140} tick={AXIS_TICK} />
           <Tooltip contentStyle={TOOLTIP_STYLE} />
@@ -90,7 +90,7 @@ export function LineTrend({
     <div className="h-56" role="img" aria-label={`${ariaLabel}. ${summary}.`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ left: -12, right: 12, top: 4, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(100,116,139,0.18)" />
           <XAxis dataKey="label" tick={AXIS_TICK} />
           <YAxis allowDecimals={false} tick={AXIS_TICK} />
           <Tooltip contentStyle={TOOLTIP_STYLE} />

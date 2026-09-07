@@ -5,14 +5,16 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Select } from '@/components/ui/Select';
 import { SettingRow, SettingsSection } from '@/components/settings/SettingsSection';
 import { usePreferences } from '@/hooks/usePreferences';
+import { useThemeContext } from '@/contexts/ThemeContext';
 import { useHealth } from '@/hooks/useHealth';
+import type { ThemePreference } from '@/types/settings';
 import { API_BASE_URL } from '@/services/api';
 import { PAGE_SIZE_OPTIONS } from '@/constants/leads';
 
 function ConnectionDot({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'idle' }) {
-  const color = tone === 'ok' ? 'bg-emerald-500' : tone === 'bad' ? 'bg-rose-500' : 'bg-slate-300';
+  const color = tone === 'ok' ? 'bg-emerald-500' : tone === 'bad' ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600';
   return (
-    <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+    <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
       <span className={`h-2.5 w-2.5 rounded-full ${color}`} aria-hidden="true" />
       {label}
     </span>
@@ -21,6 +23,7 @@ function ConnectionDot({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'i
 
 export function SettingsPage() {
   const { prefs, update, reset } = usePreferences();
+  const { theme, setTheme } = useThemeContext();
   const health = useHealth();
   const queryClient = useQueryClient();
   const [cacheCleared, setCacheCleared] = useState(false);
@@ -45,6 +48,22 @@ export function SettingsPage() {
           title="Preferences"
           description="Saved in this browser only — there is no account yet."
         >
+          <SettingRow
+            label="Theme"
+            hint="System follows your device appearance."
+            control={
+              <Select
+                aria-label="Theme"
+                className="w-32"
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as ThemePreference)}
+              >
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </Select>
+            }
+          />
           <SettingRow
             label="Leads per page"
             hint="Applied as the default page size on the Leads list."
@@ -124,28 +143,28 @@ export function SettingsPage() {
           <SettingRow
             label="API base URL"
             control={
-              <code className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">{API_BASE_URL}</code>
+              <code className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-1 text-xs text-slate-700 dark:text-slate-300">{API_BASE_URL}</code>
             }
           />
           <SettingRow
             label="Environment"
-            control={<span className="text-sm text-slate-700">{health.data?.environment ?? 'Not available'}</span>}
+            control={<span className="text-sm text-slate-700 dark:text-slate-300">{health.data?.environment ?? 'Not available'}</span>}
           />
         </SettingsSection>
 
         <SettingsSection title="About" description="Application information.">
           <SettingRow
             label="Application"
-            control={<span className="text-sm text-slate-700">{health.data?.app ?? 'LeadGenerationAgent'}</span>}
+            control={<span className="text-sm text-slate-700 dark:text-slate-300">{health.data?.app ?? 'LeadGenerationAgent'}</span>}
           />
           <SettingRow
             label="Version"
-            control={<span className="text-sm text-slate-700">{health.data?.version ?? 'Not available'}</span>}
+            control={<span className="text-sm text-slate-700 dark:text-slate-300">{health.data?.version ?? 'Not available'}</span>}
           />
           <SettingRow
             label="Accounts"
             hint="Authentication and multi-user accounts are not part of this phase."
-            control={<span className="text-sm text-slate-500">Local, single user</span>}
+            control={<span className="text-sm text-slate-500 dark:text-slate-400">Local, single user</span>}
           />
         </SettingsSection>
       </div>

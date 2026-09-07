@@ -6,8 +6,8 @@ import type { OutreachItem } from '@/types/outreach';
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-xs uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="text-right text-sm text-slate-700">{children}</dd>
+      <dt className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</dt>
+      <dd className="text-right text-sm text-slate-700 dark:text-slate-300">{children}</dd>
     </div>
   );
 }
@@ -15,8 +15,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 /** Evidence behind the outreach — the single persisted source (no multi-source claim). */
 export function EvidenceSummary({ item }: { item: OutreachItem }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Evidence</p>
+    <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Evidence</p>
       <dl className="mt-2 space-y-2">
         <Row label="Signal">{item.signalType ? humanizeSignal(item.signalType) : 'Not available'}</Row>
         <Row label="Source">{item.sourceName ?? 'Not available'}</Row>

@@ -53,7 +53,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby={description ? 'confirm-desc' : undefined}
-        className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl"
+        className="w-full max-w-sm rounded-lg bg-white dark:bg-slate-900 p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
@@ -61,11 +61,11 @@ export function ConfirmDialog({
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-500" aria-hidden="true" />
           )}
           <div>
-            <h2 id="confirm-title" className="text-base font-semibold text-slate-900">
+            <h2 id="confirm-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">
               {title}
             </h2>
             {description && (
-              <p id="confirm-desc" className="mt-1 text-sm text-slate-500">
+              <p id="confirm-desc" className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {description}
               </p>
             )}

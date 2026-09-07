@@ -27,7 +27,7 @@ export function POCPanel({ lead }: { lead: Lead }) {
           </div>
         </dl>
       ) : (
-        <p className="text-sm text-slate-400">No contact identified yet.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">No contact identified yet.</p>
       )}
     </DetailCard>
   );

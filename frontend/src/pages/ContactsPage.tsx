@@ -49,13 +49,13 @@ function Skeleton() {
     <div className="space-y-4" aria-hidden="true" data-testid="contacts-skeleton">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
         ))}
       </div>
-      <div className="h-20 animate-pulse rounded-xl bg-slate-100" />
+      <div className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="h-96 animate-pulse rounded-xl bg-slate-100 lg:col-span-2" />
-        <div className="h-96 animate-pulse rounded-xl bg-slate-100" />
+        <div className="h-96 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800 lg:col-span-2" />
+        <div className="h-96 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       </div>
     </div>
   );
@@ -170,7 +170,7 @@ export function ContactsPage() {
   return header(
     <div className="space-y-4">
       <ContactSummaryCards summary={summary} />
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-400 dark:text-slate-500">
         Phase 1 shows recommended decision-maker <strong>roles</strong>, not verified people.
         Relevance reflects the related lead's opportunity score.
       </p>
@@ -184,7 +184,7 @@ export function ContactsPage() {
       />
 
       {datasetLimited && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 dark:text-slate-500">
           Derived from the top {fetchedCount} of {serverTotal?.toLocaleString()} leads.
         </p>
       )}
@@ -192,7 +192,7 @@ export function ContactsPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex rounded-md border border-slate-200 p-0.5" role="tablist" aria-label="View">
+            <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-800 p-0.5" role="tablist" aria-label="View">
               {(['table', 'company'] as View[]).map((v) => (
                 <button
                   key={v}
@@ -202,7 +202,7 @@ export function ContactsPage() {
                   onClick={() => updateParams({ view: v })}
                   className={cn(
                     'rounded px-3 py-1 text-sm',
-                    view === v ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50',
+                    view === v ? 'bg-brand-50 text-brand-700' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800',
                   )}
                 >
                   {v === 'table' ? 'Table' : 'By company'}
@@ -210,7 +210,7 @@ export function ContactsPage() {
               ))}
             </div>
             <div className="flex items-center gap-3">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 {visible.length} recommendation{visible.length === 1 ? '' : 's'}
               </p>
               <Select

@@ -27,7 +27,7 @@ export function PitchBlock({ pitch }: { pitch: string }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 p-4 font-sans text-sm leading-relaxed text-slate-700">
+      <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 dark:bg-slate-800 p-4 font-sans text-sm leading-relaxed text-slate-700 dark:text-slate-300">
         {pitch}
       </pre>
     </div>

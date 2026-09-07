@@ -73,7 +73,7 @@ export function ActiveFilters({ params, onRemove, onClear }: ActiveFiltersProps)
           {label}
           <button
             type="button"
-            className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+            className="rounded-full p-0.5 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
             onClick={() => onRemove(key)}
             aria-label={`Remove filter ${label}`}
           >

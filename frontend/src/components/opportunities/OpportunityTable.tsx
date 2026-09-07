@@ -32,12 +32,12 @@ export function OpportunityTable({ opportunities, onOpen }: OpportunityTableProp
         {opportunities.map((o) => (
           <tr
             key={o.leadId}
-            className="cursor-pointer hover:bg-slate-50"
+            className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
             onClick={() => onOpen(o)}
           >
             <Td>
-              <span className="font-medium text-slate-900">{o.company}</span>
-              {o.industry && <span className="block text-xs text-slate-400">{o.industry}</span>}
+              <span className="font-medium text-slate-900 dark:text-slate-100">{o.company}</span>
+              {o.industry && <span className="block text-xs text-slate-400 dark:text-slate-500">{o.industry}</span>}
             </Td>
             <Td>
               <OpportunityTypeBadge type={o.opportunityType} />
@@ -46,7 +46,7 @@ export function OpportunityTable({ opportunities, onOpen }: OpportunityTableProp
               <StaffingNeedBadge need={o.staffingNeed} />
             </Td>
             <Td>
-              <span className="whitespace-nowrap tabular-nums text-slate-700">
+              <span className="whitespace-nowrap tabular-nums text-slate-700 dark:text-slate-300">
                 {o.estimatedHiring != null ? `${o.estimatedHiring} eng` : 'Not available'}
               </span>
             </Td>
@@ -63,7 +63,7 @@ export function OpportunityTable({ opportunities, onOpen }: OpportunityTableProp
               <PriorityBadge priority={o.priority} />
             </Td>
             <Td>
-              <span className="text-xs font-medium text-slate-600">{o.status}</span>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{o.status}</span>
             </Td>
             <Td>
               <button

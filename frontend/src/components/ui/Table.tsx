@@ -13,7 +13,7 @@ export function Th({ children }: { children: ReactNode }) {
   return (
     <th
       scope="col"
-      className="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+      className="border-b border-slate-200 dark:border-slate-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
     >
       {children}
     </th>
@@ -21,5 +21,5 @@ export function Th({ children }: { children: ReactNode }) {
 }
 
 export function Td({ children }: { children: ReactNode }) {
-  return <td className="border-b border-slate-100 px-4 py-3 text-slate-700">{children}</td>;
+  return <td className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 text-slate-700 dark:text-slate-300">{children}</td>;
 }

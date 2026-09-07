@@ -2,10 +2,10 @@ import { Card, CardTitle } from '@/components/ui/Card';
 import type { OutreachReadiness as Readiness } from '@/types/analytics';
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: 'good' | 'warn' }) {
-  const color = tone === 'good' ? 'text-emerald-700' : tone === 'warn' ? 'text-amber-700' : 'text-slate-900';
+  const color = tone === 'good' ? 'text-emerald-700' : tone === 'warn' ? 'text-amber-700' : 'text-slate-900 dark:text-slate-100';
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-      <span className="text-sm text-slate-600">{label}</span>
+    <div className="flex items-center justify-between rounded-lg border border-slate-100 dark:border-slate-800 px-3 py-2">
+      <span className="text-sm text-slate-600 dark:text-slate-300">{label}</span>
       <span className={`text-sm font-semibold tabular-nums ${color}`}>{value}</span>
     </div>
   );

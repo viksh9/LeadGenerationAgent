@@ -17,8 +17,8 @@ import type { MessageChannel, OutreachItem } from '@/types/outreach';
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-800">{children}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</dt>
+      <dd className="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{children}</dd>
     </div>
   );
 }
@@ -59,13 +59,13 @@ export function OutreachDetailDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={`Outreach for ${item.company}`}
-        className="h-full w-full max-w-lg overflow-y-auto bg-white shadow-xl"
+        className="h-full w-full max-w-lg overflow-y-auto bg-white dark:bg-slate-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-slate-100 p-4">
+        <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 p-4">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-slate-900">{item.company}</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">{item.company}</h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
               {item.role ?? 'Target role not identified'}
               {item.industry ? ` · ${item.industry}` : ''}
             </p>
@@ -73,7 +73,7 @@ export function OutreachDetailDrawer({
           <button
             ref={closeRef}
             type="button"
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-md p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300"
             onClick={onClose}
             aria-label="Close outreach details"
           >
@@ -113,14 +113,14 @@ export function OutreachDetailDrawer({
           </Row>
 
           {item.recommendedAction && (
-            <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+            <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-3">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                   Recommended action
                 </p>
                 <CopyButton text={item.recommendedAction} label="Copy recommended action" />
               </div>
-              <p className="mt-1 text-sm text-slate-700">{item.recommendedAction}</p>
+              <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{item.recommendedAction}</p>
             </div>
           )}
 
@@ -128,7 +128,7 @@ export function OutreachDetailDrawer({
 
           {/* Message channels */}
           <div>
-            <div className="flex gap-1 border-b border-slate-200" role="tablist" aria-label="Message channels">
+            <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800" role="tablist" aria-label="Message channels">
               {TABS.map((t) => (
                 <button
                   key={t.key}
@@ -140,7 +140,7 @@ export function OutreachDetailDrawer({
                     '-mb-px border-b-2 px-3 py-2 text-sm font-medium',
                     channel === t.key
                       ? 'border-brand-600 text-brand-700'
-                      : 'border-transparent text-slate-500 hover:text-slate-800',
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
                   )}
                 >
                   {t.label}

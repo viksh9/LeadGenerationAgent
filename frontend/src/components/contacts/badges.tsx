@@ -4,7 +4,7 @@ import type { DecisionMakerType } from '@/types/contact';
 
 /** Neutral badge naming a recommended role. */
 export function RoleBadge({ role }: { role: string }) {
-  return <span className="badge bg-slate-100 text-slate-700">{role}</span>;
+  return <span className="badge bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">{role}</span>;
 }
 
 const TYPE_CLASS: Record<DecisionMakerType, string> = {

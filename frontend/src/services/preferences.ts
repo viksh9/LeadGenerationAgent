@@ -1,5 +1,5 @@
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/constants/leads';
-import type { Preferences } from '@/types/settings';
+import type { Preferences, ThemePreference } from '@/types/settings';
 
 /**
  * Local preferences store (localStorage). There is no backend settings/user
@@ -8,7 +8,9 @@ import type { Preferences } from '@/types/settings';
  */
 const KEY = 'leadgen.preferences';
 
-export const DEFAULT_PREFERENCES: Preferences = { leadsPageSize: DEFAULT_PAGE_SIZE };
+export const DEFAULT_PREFERENCES: Preferences = { leadsPageSize: DEFAULT_PAGE_SIZE, theme: 'system' };
+
+const THEMES: ThemePreference[] = ['light', 'dark', 'system'];
 
 export function getPreferences(): Preferences {
   try {
@@ -18,6 +20,9 @@ export function getPreferences(): Preferences {
     const size = Number(parsed.leadsPageSize);
     return {
       leadsPageSize: PAGE_SIZE_OPTIONS.includes(size) ? size : DEFAULT_PREFERENCES.leadsPageSize,
+      theme: THEMES.includes(parsed.theme as ThemePreference)
+        ? (parsed.theme as ThemePreference)
+        : DEFAULT_PREFERENCES.theme,
     };
   } catch {
     return { ...DEFAULT_PREFERENCES };

@@ -12,22 +12,22 @@ export function HiringIntelligence({ company }: { company: CompanyIntelligence }
     <DetailCard title="Hiring intelligence">
       <div className="space-y-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">
+          <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
             Estimated technology hiring
           </p>
           {estimatedHiring > 0 ? (
             <>
-              <p className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-900">
+              <p className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                 {estimatedHiring}
               </p>
-              <p className="text-xs text-slate-400">Estimate based on available lead data.</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Estimate based on available lead data.</p>
             </>
           ) : (
-            <p className="mt-0.5 text-sm text-slate-400">Not enough information</p>
+            <p className="mt-0.5 text-sm text-slate-400 dark:text-slate-500">Not enough information</p>
           )}
         </div>
         <div>
-          <p className="mb-1.5 text-xs uppercase tracking-wide text-slate-400">Top roles</p>
+          <p className="mb-1.5 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Top roles</p>
           <Chips items={roles} />
         </div>
       </div>

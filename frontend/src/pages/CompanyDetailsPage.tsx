@@ -20,16 +20,16 @@ import { useCompany } from '@/hooks/useCompanies';
 function DetailSkeleton() {
   return (
     <div className="space-y-4" aria-hidden="true" data-testid="company-skeleton">
-      <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
+      <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-100" />
+            <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
           ))}
         </div>
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-100" />
+            <div key={i} className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
           ))}
         </div>
       </div>
@@ -120,7 +120,7 @@ export function CompanyDetailsPage() {
 
         {noSignals && (
           <Card>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               No meaningful business signals available yet. Additional project or hiring signals are
               needed before this account can be qualified.
             </p>

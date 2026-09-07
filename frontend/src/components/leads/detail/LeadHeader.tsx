@@ -31,19 +31,19 @@ export function LeadHeader({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <PriorityBadge priority={lead.lead_priority} />
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
               {lead.status}
             </span>
           </div>
-          <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
           <div className="text-right">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Lead score</p>
-            <p className="text-2xl font-semibold tabular-nums text-slate-900">
+            <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Lead score</p>
+            <p className="text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">
               {formatScore(lead.lead_score)}
-              <span className="text-sm font-normal text-slate-400"> / 100</span>
+              <span className="text-sm font-normal text-slate-400 dark:text-slate-500"> / 100</span>
             </p>
           </div>
           <ScoreIndicator score={lead.lead_score} />

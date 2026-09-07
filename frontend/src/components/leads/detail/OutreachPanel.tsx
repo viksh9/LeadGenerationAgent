@@ -13,7 +13,7 @@ export function OutreachPanel({ lead }: { lead: Lead }) {
       {lead.recommended_pitch ? (
         <PitchBlock pitch={lead.recommended_pitch} />
       ) : (
-        <p className="text-sm text-slate-400">No pitch generated for this lead.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">No pitch generated for this lead.</p>
       )}
     </DetailCard>
   );

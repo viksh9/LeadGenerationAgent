@@ -18,10 +18,10 @@ export function AnalysisResult({ result, onReset }: { result: LeadAnalysis; onRe
           <div className="flex items-center gap-3">
             <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-500" aria-hidden="true" />
             <div>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 {result.already_existed ? 'Re-analyzed existing lead' : 'Analysis complete'}
               </p>
-              <p className="text-lg font-semibold text-slate-900">{result.company_name}</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{result.company_name}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
@@ -62,7 +62,7 @@ export function AnalysisResult({ result, onReset }: { result: LeadAnalysis; onRe
           <dl className="space-y-3">
             <Field label="Primary role">
               {poc_recommendation.primary_role ? (
-                <span className="font-medium text-slate-900">{poc_recommendation.primary_role.role}</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{poc_recommendation.primary_role.role}</span>
               ) : undefined}
             </Field>
             <Field label="Secondary roles">
@@ -82,7 +82,7 @@ export function AnalysisResult({ result, onReset }: { result: LeadAnalysis; onRe
       </div>
 
       <DetailCard title="Recommended Pitch">
-        <p className="mb-2 text-sm font-medium text-slate-700">{pitch_result.email_subject}</p>
+        <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{pitch_result.email_subject}</p>
         <PitchBlock pitch={pitch_result.recommended_pitch} />
       </DetailCard>
     </div>

@@ -46,13 +46,13 @@ function Skeleton() {
     <div className="space-y-4" aria-hidden="true" data-testid="opportunities-skeleton">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
         ))}
       </div>
-      <div className="h-20 animate-pulse rounded-xl bg-slate-100" />
+      <div className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="h-96 animate-pulse rounded-xl bg-slate-100 lg:col-span-2" />
-        <div className="h-96 animate-pulse rounded-xl bg-slate-100" />
+        <div className="h-96 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800 lg:col-span-2" />
+        <div className="h-96 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       </div>
     </div>
   );
@@ -184,7 +184,7 @@ export function OpportunitiesPage() {
       />
 
       {datasetLimited && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 dark:text-slate-500">
           Derived from the top {fetchedCount} of {serverTotal?.toLocaleString()} leads.
         </p>
       )}
@@ -192,7 +192,7 @@ export function OpportunitiesPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {visible.length} opportunit{visible.length === 1 ? 'y' : 'ies'}
             </p>
             <Select

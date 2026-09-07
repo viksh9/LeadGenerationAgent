@@ -18,27 +18,27 @@ export function TopOpportunities({
   return (
     <Card>
       <CardTitle>Top opportunities</CardTitle>
-      <ul className="mt-3 divide-y divide-slate-100">
+      <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
         {top.map((o) => (
           <li key={o.leadId}>
             <button
               type="button"
               onClick={() => onOpen(o)}
-              className="flex w-full items-center gap-3 py-2.5 text-left hover:bg-slate-50"
+              className="flex w-full items-center gap-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
               aria-label={`View top opportunity for ${o.company}`}
             >
               <Flame className="h-4 w-4 shrink-0 text-rose-500" aria-hidden="true" />
-              <span className="w-8 shrink-0 text-lg font-semibold tabular-nums text-slate-900">
+              <span className="w-8 shrink-0 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                 {Math.round(o.score)}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-slate-800">{o.company}</span>
+                <span className="block truncate font-medium text-slate-800 dark:text-slate-200">{o.company}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-1.5">
                   <OpportunityTypeBadge type={o.opportunityType} />
                   <StaffingNeedBadge need={o.staffingNeed} />
                 </span>
                 {o.recommendedAction && (
-                  <span className="mt-1 block truncate text-xs text-slate-500">{o.recommendedAction}</span>
+                  <span className="mt-1 block truncate text-xs text-slate-500 dark:text-slate-400">{o.recommendedAction}</span>
                 )}
               </span>
               <PriorityBadge priority={o.priority} />

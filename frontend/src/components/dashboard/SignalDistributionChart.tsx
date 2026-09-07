@@ -23,7 +23,7 @@ export function SignalDistributionChart({ data }: { data: SignalDistributionDatu
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
-              <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+              <CartesianGrid horizontal={false} stroke="rgba(100,116,139,0.18)" />
               <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} />
               <YAxis
                 type="category"
@@ -33,7 +33,7 @@ export function SignalDistributionChart({ data }: { data: SignalDistributionDatu
               />
               <Tooltip
                 cursor={{ fill: '#f8fafc' }}
-                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid rgba(100,116,139,0.35)' }}
               />
               <Bar dataKey="count" name="Leads" fill="#2563eb" radius={[0, 4, 4, 0]} />
             </BarChart>

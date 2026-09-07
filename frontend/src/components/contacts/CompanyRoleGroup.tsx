@@ -14,14 +14,14 @@ function RoleRow({
     <button
       type="button"
       onClick={() => onOpen(contact)}
-      className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left hover:bg-slate-50"
+      className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
       aria-label={`View ${contact.role} recommendation for ${contact.company}`}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-sm font-medium text-slate-800">{contact.role}</span>
+        <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{contact.role}</span>
         <DecisionMakerTypeBadge type={contact.decisionMakerType} />
       </span>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">
+      <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700 dark:text-slate-300">
         {Math.round(contact.relevance)}
       </span>
     </button>
@@ -43,22 +43,22 @@ export function CompanyRoleGroup({
         <div className="flex items-center justify-between gap-3">
           <Link
             to={`/companies/${encodeURIComponent(group.company)}`}
-            className="font-semibold text-slate-900 hover:text-brand-700"
+            className="font-semibold text-slate-900 dark:text-slate-100 hover:text-brand-700"
             onClick={(e) => e.stopPropagation()}
           >
             {group.company}
           </Link>
-          {group.industry && <span className="text-xs text-slate-400">{group.industry}</span>}
+          {group.industry && <span className="text-xs text-slate-400 dark:text-slate-500">{group.industry}</span>}
         </div>
 
         <div className="mt-3">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Primary</p>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Primary</p>
           <RoleRow contact={primary} onOpen={onOpen} />
         </div>
 
         {secondary.length > 0 && (
           <div className="mt-3">
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Secondary</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Secondary</p>
             <div className="space-y-1">
               {secondary.map((c) => (
                 <RoleRow key={c.id} contact={c} onOpen={onOpen} />

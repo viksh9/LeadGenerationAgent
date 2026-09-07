@@ -15,26 +15,26 @@ export function CompanyOpportunities({ company }: { company: CompanyIntelligence
   return (
     <DetailCard title="Potential opportunities">
       {opportunities.length === 0 ? (
-        <p className="text-sm text-slate-400">No opportunities identified from current signals.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">No opportunities identified from current signals.</p>
       ) : (
         <ul className="space-y-3">
           {opportunities.map((opp) => (
-            <li key={opp.leadId} className="rounded-lg border border-slate-100 p-3">
+            <li key={opp.leadId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
               <div className="flex items-start justify-between gap-3">
-                <p className="text-sm text-slate-800">{opp.summary ?? 'Opportunity'}</p>
+                <p className="text-sm text-slate-800 dark:text-slate-200">{opp.summary ?? 'Opportunity'}</p>
                 <PriorityBadge priority={opp.priority} />
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
                 <span>
                   Est. staffing:{' '}
-                  <span className="font-medium text-slate-600">
+                  <span className="font-medium text-slate-600 dark:text-slate-300">
                     {opp.estimatedHiring ? `${opp.estimatedHiring} engineers` : 'Not available'}
                   </span>
                 </span>
                 <span>
-                  Score: <span className="font-medium tabular-nums text-slate-600">{Math.round(opp.score)}</span>
+                  Score: <span className="font-medium tabular-nums text-slate-600 dark:text-slate-300">{Math.round(opp.score)}</span>
                 </span>
-                <span>Status: <span className="font-medium text-slate-600">{opp.status}</span></span>
+                <span>Status: <span className="font-medium text-slate-600 dark:text-slate-300">{opp.status}</span></span>
                 <button
                   type="button"
                   className="ml-auto text-brand-600 hover:underline"

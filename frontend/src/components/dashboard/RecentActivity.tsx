@@ -20,20 +20,20 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
       {items.length === 0 ? (
         <EmptyState title="No activity yet" />
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {items.map((item) => {
             const { label, icon: Icon } = KIND_META[item.kind];
             return (
               <li key={`${item.id}-${item.kind}`} className="flex items-center gap-3 px-5 py-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   <Icon className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-slate-700">
-                    <span className="font-medium text-slate-900">{label}</span> — {item.company}
+                  <p className="text-sm text-slate-700 dark:text-slate-300">
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{label}</span> — {item.company}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs text-slate-400">{timeAgo(item.at)}</span>
+                <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">{timeAgo(item.at)}</span>
               </li>
             );
           })}

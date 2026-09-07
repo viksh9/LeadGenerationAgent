@@ -13,22 +13,22 @@ export function ProjectIntelligence({ company }: { company: CompanyIntelligence 
   return (
     <DetailCard title="Project intelligence">
       {projects.length === 0 ? (
-        <p className="text-sm text-slate-400">No projects referenced in this account's signals.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">No projects referenced in this account's signals.</p>
       ) : (
         <ul className="space-y-3">
           {projects.map((project) => (
-            <li key={`${project.leadId}-${project.name}`} className="rounded-lg border border-slate-100 p-3">
+            <li key={`${project.leadId}-${project.name}`} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium text-slate-900">{project.name}</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">{project.name}</p>
                 {project.signalType && <Badge>{humanizeSignal(project.signalType)}</Badge>}
               </div>
               {project.opportunitySummary && (
-                <p className="mt-1 text-sm text-slate-500">{project.opportunitySummary}</p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{project.opportunitySummary}</p>
               )}
-              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
                 <span>Date: {formatDate(project.date)}</span>
                 {project.value != null && (
-                  <span>Value: <span className="font-medium text-slate-600">{formatCurrency(project.value)}</span></span>
+                  <span>Value: <span className="font-medium text-slate-600 dark:text-slate-300">{formatCurrency(project.value)}</span></span>
                 )}
                 <button
                   type="button"

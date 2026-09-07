@@ -91,11 +91,11 @@ export function QuickFilterTabs({
               'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
               active
                 ? 'border-brand-300 bg-brand-50 text-brand-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800',
             )}
           >
             {tab.label}
-            <span className="rounded-full bg-slate-100 px-1.5 text-xs tabular-nums text-slate-500">
+            <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">
               {count}
             </span>
           </button>

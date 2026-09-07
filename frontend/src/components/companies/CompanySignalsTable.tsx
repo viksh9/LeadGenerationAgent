@@ -26,7 +26,7 @@ export function CompanySignalsTable({ leads }: { leads: Lead[] }) {
         {leads.map((lead) => (
           <tr
             key={lead.id}
-            className="cursor-pointer hover:bg-slate-50"
+            className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
             onClick={() => navigate(`/leads/${lead.id}`)}
           >
             <Td>
@@ -34,22 +34,22 @@ export function CompanySignalsTable({ leads }: { leads: Lead[] }) {
                 <div>
                   <Badge className="whitespace-nowrap">{humanizeSignal(lead.signal_type)}</Badge>
                   {lead.signal_title && (
-                    <span className="mt-1 block max-w-[16rem] truncate text-xs text-slate-500" title={lead.signal_title}>
+                    <span className="mt-1 block max-w-[16rem] truncate text-xs text-slate-500 dark:text-slate-400" title={lead.signal_title}>
                       {lead.signal_title}
                     </span>
                   )}
                 </div>
               ) : (
-                <span className="text-slate-400">—</span>
+                <span className="text-slate-400 dark:text-slate-500">—</span>
               )}
             </Td>
             <Td>
               {lead.opportunity_summary ? (
-                <span className="block max-w-[18rem] truncate text-slate-700" title={lead.opportunity_summary}>
+                <span className="block max-w-[18rem] truncate text-slate-700 dark:text-slate-300" title={lead.opportunity_summary}>
                   {lead.opportunity_summary}
                 </span>
               ) : (
-                <span className="text-slate-400">—</span>
+                <span className="text-slate-400 dark:text-slate-500">—</span>
               )}
             </Td>
             <Td>
@@ -59,7 +59,7 @@ export function CompanySignalsTable({ leads }: { leads: Lead[] }) {
               <PriorityBadge priority={lead.lead_priority} />
             </Td>
             <Td>
-              <span className="text-xs font-medium text-slate-600">{lead.status}</span>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{lead.status}</span>
             </Td>
             <Td>
               <span className="whitespace-nowrap">{formatDate(lead.signal_date)}</span>

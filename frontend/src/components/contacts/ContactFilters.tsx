@@ -57,7 +57,7 @@ export function ContactFilters({ filters, searchText, onSearchText, onChange, on
             </label>
             <div className="relative">
               <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
                 aria-hidden="true"
               />
               <input
@@ -156,7 +156,7 @@ export function ContactFilters({ filters, searchText, onSearchText, onChange, on
               {label}
               <button
                 type="button"
-                className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                className="rounded-full p-0.5 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
                 onClick={() => onChange({ [key]: '' } as Patch)}
                 aria-label={`Remove filter ${label}`}
               >

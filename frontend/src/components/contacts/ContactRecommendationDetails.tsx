@@ -13,8 +13,8 @@ import type { ContactRecommendation } from '@/types/contact';
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-800">{children}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</dt>
+      <dd className="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{children}</dd>
     </div>
   );
 }
@@ -47,13 +47,13 @@ export function ContactRecommendationDetails({
         role="dialog"
         aria-modal="true"
         aria-label={`${c.role} recommendation for ${c.company}`}
-        className="h-full w-full max-w-md overflow-y-auto bg-white shadow-xl"
+        className="h-full w-full max-w-md overflow-y-auto bg-white dark:bg-slate-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-slate-100 p-4">
+        <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 p-4">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-slate-900">{c.role}</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">{c.role}</h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
               {c.company}
               {c.industry ? ` · ${c.industry}` : ''}
             </p>
@@ -61,7 +61,7 @@ export function ContactRecommendationDetails({
           <button
             ref={closeRef}
             type="button"
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-md p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300"
             onClick={onClose}
             aria-label="Close recommendation details"
           >
@@ -87,7 +87,7 @@ export function ContactRecommendationDetails({
             {c.personName ? (
               <span>{c.personName}</span>
             ) : (
-              <span className="text-slate-500">Person not identified yet</span>
+              <span className="text-slate-500 dark:text-slate-400">Person not identified yet</span>
             )}
           </Row>
 
@@ -96,9 +96,9 @@ export function ContactRecommendationDetails({
           <Row label="Opportunity">
             <span>{opportunityLabel(c)}</span>
             {c.opportunitySummary && (
-              <span className="mt-0.5 block text-slate-600">{c.opportunitySummary}</span>
+              <span className="mt-0.5 block text-slate-600 dark:text-slate-300">{c.opportunitySummary}</span>
             )}
-            <span className="mt-0.5 block text-xs text-slate-400">
+            <span className="mt-0.5 block text-xs text-slate-400 dark:text-slate-500">
               Lead score: {Math.round(c.leadScore)} ·{' '}
               {c.estimatedHiring != null ? `${c.estimatedHiring} engineers` : 'Team size not available'}
             </span>

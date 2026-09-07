@@ -8,13 +8,13 @@ export function TechnologyList({ lead }: { lead: Lead }) {
     <DetailCard title="Technology & roles">
       <div className="space-y-4">
         <div>
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
             Technology requirements
           </p>
           <Chips items={lead.technologies} />
         </div>
         <div>
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
             Likely roles
           </p>
           <Chips items={lead.hiring_roles} />

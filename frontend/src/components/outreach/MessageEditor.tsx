@@ -36,7 +36,7 @@ export function MessageEditor({
     <div>
       <div className="mb-1 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
           {edited && (
             <span className="text-xs font-medium text-amber-600" role="status">
               Unsaved changes

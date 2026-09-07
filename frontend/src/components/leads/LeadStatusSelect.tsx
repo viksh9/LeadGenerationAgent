@@ -34,7 +34,7 @@ export function LeadStatusSelect({
         ))}
       </select>
       {mutation.isPending && (
-        <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" aria-hidden="true" />
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400 dark:text-slate-500" aria-hidden="true" />
       )}
     </span>
   );

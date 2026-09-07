@@ -34,12 +34,12 @@ export function PriorityDistributionChart({ data }: { data: PriorityDistribution
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid rgba(100,116,139,0.35)' }}
               />
               <Legend
                 verticalAlign="bottom"
                 height={24}
-                formatter={(value) => <span className="text-xs text-slate-600">{value}</span>}
+                formatter={(value) => <span className="text-xs text-slate-600 dark:text-slate-300">{value}</span>}
               />
             </PieChart>
           </ResponsiveContainer>

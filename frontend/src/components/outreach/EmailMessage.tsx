@@ -8,7 +8,7 @@ import type { OutreachItem } from '@/types/outreach';
  */
 export function EmailMessage({ item }: { item: OutreachItem }) {
   if (!item.message.pitch) {
-    return <p className="text-sm text-slate-400">No email pitch has been generated for this lead.</p>;
+    return <p className="text-sm text-slate-400 dark:text-slate-500">No email pitch has been generated for this lead.</p>;
   }
   return (
     <div className="space-y-4">

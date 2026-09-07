@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/Card';
 
 function Shimmer({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
+  return <div className={`animate-pulse rounded bg-slate-200 dark:bg-slate-700 ${className}`} />;
 }
 
 /** Skeleton mirroring the dashboard layout (cards, table rows, charts). */

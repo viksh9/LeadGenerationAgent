@@ -18,10 +18,10 @@ export function OpportunityPanel({ lead }: { lead: Lead }) {
       <dl className="space-y-3">
         <Field label="Summary">{lead.opportunity_summary}</Field>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
             Estimated staffing
           </dt>
-          <dd className="mt-0.5 text-lg font-semibold text-slate-900">
+          <dd className="mt-0.5 text-lg font-semibold text-slate-900 dark:text-slate-100">
             {staffingText(lead.estimated_hiring)}
           </dd>
         </div>

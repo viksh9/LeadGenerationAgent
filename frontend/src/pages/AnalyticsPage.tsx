@@ -45,13 +45,13 @@ function Skeleton() {
     <div className="space-y-4" aria-hidden="true" data-testid="analytics-skeleton">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
         ))}
       </div>
-      <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
+      <div className="h-16 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-64 animate-pulse rounded-xl bg-slate-100" />
+          <div key={i} className="h-64 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
         ))}
       </div>
     </div>
@@ -168,7 +168,7 @@ export function AnalyticsPage() {
         onClear={() => setSearchParams(new URLSearchParams(), { replace: true })}
       />
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-400 dark:text-slate-500">
         Based on available lead data{datasetLimited ? ` — top ${fetchedCount} of ${serverTotal?.toLocaleString()} leads` : ''}.
         Status counts are the current distribution, not historical conversion.
       </p>

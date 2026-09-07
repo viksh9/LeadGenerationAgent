@@ -15,5 +15,5 @@ export function Card({ children, className, padded = true, ...props }: CardProps
 }
 
 export function CardTitle({ children }: { children: ReactNode }) {
-  return <h3 className="text-sm font-semibold text-slate-900">{children}</h3>;
+  return <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{children}</h3>;
 }

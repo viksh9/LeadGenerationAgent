@@ -13,7 +13,7 @@ export function TopOpportunitiesTable({ leads }: { leads: Lead[] }) {
     <Card padded={false}>
       <div className="flex items-center justify-between px-5 py-4">
         <CardTitle>Top Opportunities</CardTitle>
-        <span className="text-xs text-slate-400">Sorted by score</span>
+        <span className="text-xs text-slate-400 dark:text-slate-500">Sorted by score</span>
       </div>
       {leads.length === 0 ? (
         <EmptyState title="No opportunities yet" description="Analyzed leads will appear here." />
@@ -34,11 +34,11 @@ export function TopOpportunitiesTable({ leads }: { leads: Lead[] }) {
             {leads.map((lead) => (
               <tr
                 key={lead.id}
-                className="cursor-pointer hover:bg-slate-50"
+                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
                 onClick={() => navigate(`/leads/${lead.id}`)}
               >
                 <Td>
-                  <span className="font-medium text-slate-900">{lead.company_name}</span>
+                  <span className="font-medium text-slate-900 dark:text-slate-100">{lead.company_name}</span>
                 </Td>
                 <Td>{lead.industry ?? '—'}</Td>
                 <Td>{lead.signal_type ? <Badge>{lead.signal_type}</Badge> : '—'}</Td>
@@ -49,7 +49,7 @@ export function TopOpportunitiesTable({ leads }: { leads: Lead[] }) {
                   <PriorityBadge priority={lead.lead_priority} />
                 </Td>
                 <Td>
-                  <span className="line-clamp-1 max-w-xs text-slate-600">
+                  <span className="line-clamp-1 max-w-xs text-slate-600 dark:text-slate-300">
                     {lead.opportunity_summary ?? lead.signal_title ?? '—'}
                   </span>
                 </Td>

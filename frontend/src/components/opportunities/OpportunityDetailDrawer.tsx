@@ -11,8 +11,8 @@ import type { Opportunity } from '@/types/opportunity';
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-800">{children}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</dt>
+      <dd className="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{children}</dd>
     </div>
   );
 }
@@ -45,18 +45,18 @@ export function OpportunityDetailDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={`Opportunity for ${o.company}`}
-        className="h-full w-full max-w-md overflow-y-auto bg-white shadow-xl"
+        className="h-full w-full max-w-md overflow-y-auto bg-white dark:bg-slate-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-slate-100 p-4">
+        <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 p-4">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-slate-900">{o.company}</h2>
-            <p className="text-xs text-slate-400">{o.industry ?? '—'}</p>
+            <h2 className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">{o.company}</h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500">{o.industry ?? '—'}</p>
           </div>
           <button
             ref={closeRef}
             type="button"
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-md p-1 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300"
             onClick={onClose}
             aria-label="Close opportunity details"
           >
@@ -100,13 +100,13 @@ export function OpportunityDetailDrawer({
             ) : (
               'Not available'
             )}
-            <p className="mt-0.5 text-xs text-slate-400">Secondary roles: not available</p>
+            <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Secondary roles: not available</p>
           </Row>
 
           <Row label="Recommended action">{o.recommendedAction ?? 'Not available'}</Row>
 
-          <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Evidence</p>
+          <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Evidence</p>
             <dl className="mt-2 space-y-2">
               <Row label="Signal">
                 {o.signalType ? humanizeSignal(o.signalType) : 'Not available'}

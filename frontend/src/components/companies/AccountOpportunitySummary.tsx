@@ -11,9 +11,9 @@ function staffingNeed(estimatedHiring: number): 'HIGH' | 'MEDIUM' | 'LOW' | 'UNK
 
 function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
-      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-      <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+    <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-3">
+      <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
+      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{value}</div>
     </div>
   );
 }

@@ -12,20 +12,20 @@ export function CompanyEvidence({ company }: { company: CompanyIntelligence }) {
   return (
     <DetailCard title="Sources & evidence">
       {evidence.length === 0 ? (
-        <p className="text-sm text-slate-400">No sources recorded for this account.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">No sources recorded for this account.</p>
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {evidence.map((item) => (
             <li key={item.leadId} className="py-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-medium text-slate-800">
+                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">
                   {item.sourceName ?? 'Source'}
                 </span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-400 dark:text-slate-500">
                   {item.confidence != null ? `${Math.round(item.confidence)}% confidence` : '—'}
                 </span>
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+              <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
                 <span>Signal: {formatDate(item.signalDate)}</span>
                 <span>Verified: {formatDateTime(item.lastVerified)}</span>
                 {item.sourceUrl && <ExternalLinkValue href={item.sourceUrl} label="Open source" />}

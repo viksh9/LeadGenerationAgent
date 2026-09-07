@@ -5,7 +5,7 @@ export const priorityBadgeClass: Record<LeadPriority, string> = {
   HOT: 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
   WARM: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
   NURTURE: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
-  LOW: 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200',
+  LOW: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-1 ring-inset ring-slate-200 dark:ring-slate-700',
 };
 
 export function formatDate(value: string | null | undefined): string {

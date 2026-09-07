@@ -10,7 +10,7 @@ export function IndustryAnalysis({ industries }: { industries: IndustryStatistic
         <CardTitle>Industry &amp; opportunity insight</CardTitle>
       </div>
       {industries.length === 0 ? (
-        <p className="p-5 text-sm text-slate-400">Not enough data yet</p>
+        <p className="p-5 text-sm text-slate-400 dark:text-slate-500">Not enough data yet</p>
       ) : (
         <div className="mt-3">
           <Table>
@@ -28,7 +28,7 @@ export function IndustryAnalysis({ industries }: { industries: IndustryStatistic
               {industries.map((row) => (
                 <tr key={row.industry}>
                   <Td>
-                    <span className="font-medium text-slate-900">{row.industry}</span>
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{row.industry}</span>
                   </Td>
                   <Td>
                     <span className="tabular-nums">{row.leads}</span>
@@ -43,7 +43,7 @@ export function IndustryAnalysis({ industries }: { industries: IndustryStatistic
                     <span className="tabular-nums">{row.highStaffing}</span>
                   </Td>
                   <Td>
-                    <span className="whitespace-nowrap text-slate-700">
+                    <span className="whitespace-nowrap text-slate-700 dark:text-slate-300">
                       {row.topOpportunityLabel ?? '—'}
                     </span>
                   </Td>

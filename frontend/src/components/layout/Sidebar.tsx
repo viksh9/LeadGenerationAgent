@@ -33,7 +33,7 @@ function Brand() {
       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
         <Radar className="h-5 w-5" aria-hidden="true" />
       </span>
-      <span className="text-sm font-semibold text-slate-900">LeadGenerationAgent</span>
+      <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">LeadGenerationAgent</span>
     </div>
   );
 }
@@ -42,10 +42,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop / tablet: persistent sidebar */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 lg:flex">
         <Brand />
         <NavItems />
-        <p className="px-5 py-4 text-xs text-slate-400">Phase 1 · v0.1.0</p>
+        <p className="px-5 py-4 text-xs text-slate-400 dark:text-slate-500">Phase 1 · v0.1.0</p>
       </aside>
 
       {/* Mobile: drawer */}
@@ -57,7 +57,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             aria-hidden="true"
           />
           <aside
-            className="absolute inset-y-0 left-0 flex w-64 flex-col bg-white shadow-xl"
+            className="absolute inset-y-0 left-0 flex w-64 flex-col bg-white dark:bg-slate-900 shadow-xl"
             role="dialog"
             aria-modal="true"
             aria-label="Navigation"

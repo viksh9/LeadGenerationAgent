@@ -6,7 +6,7 @@ export function LoadingState({ message = 'Loading…' }: { message?: string }) {
     <div
       role="status"
       aria-live="polite"
-      className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500"
+      className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500 dark:text-slate-400"
     >
       <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
       <p className="text-sm">{message}</p>
@@ -24,7 +24,7 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="flex flex-col items-center justify-center gap-3 py-16 text-center text-slate-600"
+      className="flex flex-col items-center justify-center gap-3 py-16 text-center text-slate-600 dark:text-slate-300"
     >
       <AlertCircle className="h-6 w-6 text-rose-500" aria-hidden="true" />
       <p className="text-sm">{message}</p>
@@ -48,9 +48,9 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-      <Inbox className="h-7 w-7 text-slate-300" aria-hidden="true" />
-      <p className="text-sm font-medium text-slate-700">{title}</p>
-      {description && <p className="max-w-sm text-sm text-slate-500">{description}</p>}
+      <Inbox className="h-7 w-7 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{title}</p>
+      {description && <p className="max-w-sm text-sm text-slate-500 dark:text-slate-400">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );

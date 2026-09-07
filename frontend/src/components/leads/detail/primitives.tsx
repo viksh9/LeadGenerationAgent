@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 
 /** A row of badge chips, or an em dash when empty. */
 export function Chips({ items }: { items: string[] }) {
-  if (!items || items.length === 0) return <span className="text-slate-400">—</span>;
+  if (!items || items.length === 0) return <span className="text-slate-400 dark:text-slate-500">—</span>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((item) => (
@@ -24,7 +24,7 @@ export function ExternalLinkValue({
   label?: string;
   stripScheme?: boolean;
 }) {
-  if (!href) return <span className="text-slate-400">—</span>;
+  if (!href) return <span className="text-slate-400 dark:text-slate-500">—</span>;
   const text = label ?? (stripScheme ? href.replace(/^https?:\/\//, '') : href);
   return (
     <a

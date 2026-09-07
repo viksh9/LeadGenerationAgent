@@ -9,7 +9,7 @@ export function StatusControl({ leadId, status }: { leadId: number; status: Lead
 
   return (
     <div className="flex items-center gap-2">
-      <label htmlFor="lead-status" className="text-sm text-slate-500">
+      <label htmlFor="lead-status" className="text-sm text-slate-500 dark:text-slate-400">
         Status
       </label>
       <select
@@ -25,7 +25,7 @@ export function StatusControl({ leadId, status }: { leadId: number; status: Lead
           </option>
         ))}
       </select>
-      {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-slate-400" aria-hidden="true" />}
+      {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-slate-400 dark:text-slate-500" aria-hidden="true" />}
       {mutation.isSuccess && !mutation.isPending && (
         <Check className="h-4 w-4 text-emerald-500" aria-label="Saved" />
       )}

@@ -9,7 +9,7 @@ describe('preferences store', () => {
   });
 
   it('round-trips a saved preference', () => {
-    savePreferences({ leadsPageSize: 50 });
+    savePreferences({ leadsPageSize: 50, theme: 'system' });
     expect(getPreferences().leadsPageSize).toBe(50);
   });
 
@@ -19,7 +19,7 @@ describe('preferences store', () => {
   });
 
   it('resets to defaults', () => {
-    savePreferences({ leadsPageSize: 100 });
+    savePreferences({ leadsPageSize: 100, theme: 'system' });
     resetPreferences();
     expect(getPreferences()).toEqual(DEFAULT_PREFERENCES);
   });

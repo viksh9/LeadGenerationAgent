@@ -22,12 +22,12 @@ export function DashboardKpiCard({
     <Card>
       <div className="flex items-start justify-between">
         <div className="min-w-0">
-          <p className="text-sm text-slate-500">{title}</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
+          <p className="text-sm text-slate-500 dark:text-slate-400">{title}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">
             {typeof value === 'number' ? value.toLocaleString() : value}
           </p>
-          <p className="mt-1 text-xs text-slate-500">{description}</p>
-          {note && <p className="mt-1 text-xs text-slate-400">{note}</p>}
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{description}</p>
+          {note && <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{note}</p>}
         </div>
         <Icon className={`h-8 w-8 shrink-0 ${accent}`} aria-hidden="true" />
       </div>

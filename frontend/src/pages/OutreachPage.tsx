@@ -39,13 +39,13 @@ function Skeleton() {
     <div className="space-y-4" aria-hidden="true" data-testid="outreach-skeleton">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+          <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
         ))}
       </div>
-      <div className="h-20 animate-pulse rounded-xl bg-slate-100" />
+      <div className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="h-96 animate-pulse rounded-xl bg-slate-100 lg:col-span-2" />
-        <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+        <div className="h-96 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800 lg:col-span-2" />
+        <div className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
       </div>
     </div>
   );
@@ -64,12 +64,12 @@ function QueueSection({
 }) {
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold text-slate-900">
+      <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
         {title} ({items.length})
       </h3>
       {items.length === 0 ? (
         <Card>
-          <p className="p-5 text-sm text-slate-400">{emptyText}</p>
+          <p className="p-5 text-sm text-slate-400 dark:text-slate-500">{emptyText}</p>
         </Card>
       ) : (
         <>
@@ -202,7 +202,7 @@ export function OutreachPage() {
   return header(
     <div className="space-y-4">
       <OutreachSummaryCards summary={summary} />
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-400 dark:text-slate-500">
         Prepare and copy messaging for human-reviewed outreach — nothing is sent from here.
       </p>
 
@@ -215,7 +215,7 @@ export function OutreachPage() {
       />
 
       {datasetLimited && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 dark:text-slate-500">
           Derived from the top {fetchedCount} of {serverTotal?.toLocaleString()} leads.
         </p>
       )}
@@ -254,7 +254,7 @@ export function OutreachPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             {ready.length === 0 && needsReview.length > 0 && (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 Some opportunities need additional research before outreach.
               </p>
             )}

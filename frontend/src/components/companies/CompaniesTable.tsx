@@ -37,13 +37,13 @@ export function CompaniesTable({ companies }: { companies: CompanySummary[] }) {
         {companies.map((company) => (
           <tr
             key={company.name}
-            className="cursor-pointer hover:bg-slate-50"
+            className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
             onClick={() => navigate(companyDetailPath(company.name))}
           >
             <Td>
-              <span className="font-medium text-slate-900">{company.name}</span>
+              <span className="font-medium text-slate-900 dark:text-slate-100">{company.name}</span>
               {company.companySize && (
-                <span className="block text-xs text-slate-400">{company.companySize}</span>
+                <span className="block text-xs text-slate-400 dark:text-slate-500">{company.companySize}</span>
               )}
             </Td>
             <Td>{company.industry ?? '—'}</Td>
@@ -60,10 +60,10 @@ export function CompaniesTable({ companies }: { companies: CompanySummary[] }) {
             <Td>
               {company.latestSignalType ? (
                 <div>
-                  <span className="whitespace-nowrap text-slate-700">
+                  <span className="whitespace-nowrap text-slate-700 dark:text-slate-300">
                     {humanizeSignal(company.latestSignalType)}
                   </span>
-                  <span className="block text-xs text-slate-400">{formatDate(company.latestSignal)}</span>
+                  <span className="block text-xs text-slate-400 dark:text-slate-500">{formatDate(company.latestSignal)}</span>
                 </div>
               ) : (
                 '—'

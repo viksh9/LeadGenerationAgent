@@ -56,7 +56,7 @@ function SkeletonRows() {
   return (
     <div className="space-y-2 p-4" aria-hidden="true" data-testid="leads-skeleton">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="h-10 w-full animate-pulse rounded bg-slate-100" />
+        <div key={i} className="h-10 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
       ))}
     </div>
   );
@@ -210,7 +210,7 @@ export function LeadsPage() {
         <ActiveFilters params={params} onRemove={handleRemoveFilter} onClear={handleClear} />
 
         {data && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             {data.total.toLocaleString()} lead{data.total === 1 ? '' : 's'}
           </p>
         )}

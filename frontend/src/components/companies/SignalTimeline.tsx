@@ -14,9 +14,9 @@ export function SignalTimeline({ company }: { company: CompanyIntelligence }) {
   return (
     <DetailCard title="Signal timeline">
       {signals.length === 0 ? (
-        <p className="text-sm text-slate-400">No business signals recorded yet.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">No business signals recorded yet.</p>
       ) : (
-        <ol className="relative space-y-4 border-l border-slate-200 pl-5">
+        <ol className="relative space-y-4 border-l border-slate-200 dark:border-slate-800 pl-5">
           {signals.map((signal) => (
             <li key={signal.leadId} className="relative">
               <span
@@ -25,25 +25,25 @@ export function SignalTimeline({ company }: { company: CompanyIntelligence }) {
               />
               <button
                 type="button"
-                className="w-full rounded-lg p-2 text-left hover:bg-slate-50"
+                className="w-full rounded-lg p-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                 onClick={() => navigate(`/leads/${signal.leadId}`)}
                 aria-label={`View lead ${signal.leadId} for signal ${humanizeSignal(signal.signalType)}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     {signal.signalType && <Badge>{humanizeSignal(signal.signalType)}</Badge>}
-                    <span className="text-xs text-slate-400">{formatDate(signal.date)}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{formatDate(signal.date)}</span>
                   </div>
                   <SignalStrength confidence={signal.confidence} />
                 </div>
                 {signal.title && (
-                  <p className="mt-1 text-sm font-medium text-slate-800">{signal.title}</p>
+                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">{signal.title}</p>
                 )}
                 {signal.description && (
-                  <p className="mt-0.5 line-clamp-2 text-sm text-slate-500">{signal.description}</p>
+                  <p className="mt-0.5 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{signal.description}</p>
                 )}
-                <p className="mt-1 text-xs text-slate-400">
-                  Related lead score: <span className="font-medium tabular-nums text-slate-600">{Math.round(signal.score)}</span>
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                  Related lead score: <span className="font-medium tabular-nums text-slate-600 dark:text-slate-300">{Math.round(signal.score)}</span>
                 </p>
               </button>
             </li>

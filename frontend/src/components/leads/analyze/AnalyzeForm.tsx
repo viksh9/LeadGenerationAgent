@@ -52,7 +52,7 @@ function buildPayload(form: HTMLFormElement): LeadAnalyzeRequest {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <fieldset className="card card-pad">
-      <legend className="px-1 text-sm font-semibold text-slate-900">{title}</legend>
+      <legend className="px-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</legend>
       <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>
     </fieldset>
   );
@@ -87,7 +87,7 @@ export function AnalyzeForm({ onAnalyze, isSubmitting }: AnalyzeFormProps) {
             className="input"
             placeholder="e.g. Won a modernization project and is hiring 30 Java engineers and 10 AWS engineers…"
           />
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
             The description drives signal detection — include roles, technologies, and hiring numbers.
           </p>
         </div>

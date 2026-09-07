@@ -22,7 +22,7 @@ const RANGE_OPTIONS: { value: DateRange; label: string }[] = [
 
 function RangeFilter({ value, onChange }: { value: DateRange; onChange: (v: DateRange) => void }) {
   return (
-    <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5" role="group" aria-label="Date range">
+    <div className="inline-flex rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5" role="group" aria-label="Date range">
       {RANGE_OPTIONS.map((option) => (
         <button
           key={option.value}
@@ -32,7 +32,7 @@ function RangeFilter({ value, onChange }: { value: DateRange; onChange: (v: Date
           className={
             value === option.value
               ? 'rounded px-3 py-1.5 text-sm font-medium bg-brand-600 text-white'
-              : 'rounded px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100'
+              : 'rounded px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
           }
         >
           {option.label}

@@ -11,7 +11,7 @@ export function TechnologyDemand({ technologies }: { technologies: TechnologySta
         <CardTitle>Technology demand</CardTitle>
       </div>
       {technologies.length === 0 ? (
-        <p className="p-5 text-sm text-slate-400">Not enough data yet</p>
+        <p className="p-5 text-sm text-slate-400 dark:text-slate-500">Not enough data yet</p>
       ) : (
         <div className="mt-3">
           <Table>
@@ -27,9 +27,9 @@ export function TechnologyDemand({ technologies }: { technologies: TechnologySta
               {technologies.map((row) => (
                 <tr key={row.technology}>
                   <Td>
-                    <span className="font-medium text-slate-900">{row.technology}</span>
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{row.technology}</span>
                     <span
-                      className="mt-1 block h-1.5 max-w-[10rem] overflow-hidden rounded-full bg-slate-100"
+                      className="mt-1 block h-1.5 max-w-[10rem] overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
                       aria-hidden="true"
                     >
                       <span
