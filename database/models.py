@@ -17,12 +17,13 @@ from sqlalchemy import (
     DateTime,
     Enum as SAEnum,
     Float,
+    ForeignKey,
     Integer,
     String,
     Text,
     func,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow() -> datetime:
@@ -296,3 +297,137 @@ class RawSourceRecord(Base):
     # Set once a raw record has been normalized into a Lead (soft link, no FK
     # constraint so raw records survive lead deletion for provenance).
     lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+
+class RemoteType(str, Enum):
+    ONSITE = "ONSITE"
+    REMOTE = "REMOTE"
+    HYBRID = "HYBRID"
+    UNKNOWN = "UNKNOWN"
+
+
+class JobStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    EXPIRED = "EXPIRED"
+    UNKNOWN = "UNKNOWN"
+
+
+class CollectionRunStatus(str, Enum):
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class JobRecord(Base):
+    """A canonical (deduplicated) job posting.
+
+    Many raw records / source references can map to one JobRecord — the same
+    opening seen on multiple sources is ONE job here, with every source retained
+    as evidence (see JobSourceReference). This is the layer the company
+    aggregator counts, so a job is never double-counted across sources.
+    """
+
+    __tablename__ = "job_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Identity.
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    canonical_key: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
+
+    # Company.
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    normalized_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
+    # Title — the ORIGINAL source title is preserved; normalized_role is derived.
+    original_job_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    normalized_role: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Location.
+    original_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    remote_type: Mapped[RemoteType] = mapped_column(
+        SAEnum(RemoteType, native_enum=False, length=16), default=RemoteType.UNKNOWN
+    )
+
+    # Details.
+    employment_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    experience_level: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    salary_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    salary_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    department: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    job_category: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    technologies: Mapped[list[str]] = mapped_column(JSON, default=list)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+    # Dates / status.
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    source_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    job_status: Mapped[JobStatus] = mapped_column(
+        SAEnum(JobStatus, native_enum=False, length=16), default=JobStatus.UNKNOWN
+    )
+
+    # Provenance / quality / evidence.
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    data_quality_score: Mapped[int] = mapped_column(Integer, default=0)
+    primary_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_count: Mapped[int] = mapped_column(Integer, default=0)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    collected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+    source_references: Mapped[list["JobSourceReference"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class JobSourceReference(Base):
+    """One source that observed a canonical JobRecord.
+
+    Retaining every source lets the evidence layer say "found on 3 sources"
+    truthfully — but a reference is NOT counted as an independent opening.
+    """
+
+    __tablename__ = "job_source_references"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_record_id: Mapped[int] = mapped_column(ForeignKey("job_records.id", ondelete="CASCADE"), index=True)
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    raw_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # soft link to raw_source_records
+    source_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    observed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    job: Mapped["JobRecord"] = relationship(back_populates="source_references")
+
+
+class CollectionRun(Base):
+    """Audit record for one collection run (per source/query)."""
+
+    __tablename__ = "collection_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    query: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pages: Mapped[int] = mapped_column(Integer, default=0)
+    records_fetched: Mapped[int] = mapped_column(Integer, default=0)
+    records_created: Mapped[int] = mapped_column(Integer, default=0)
+    records_updated: Mapped[int] = mapped_column(Integer, default=0)
+    duplicates: Mapped[int] = mapped_column(Integer, default=0)
+    errors: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[CollectionRunStatus] = mapped_column(
+        SAEnum(CollectionRunStatus, native_enum=False, length=16), default=CollectionRunStatus.RUNNING, index=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)

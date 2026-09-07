@@ -66,3 +66,26 @@ def extract_estimated_hiring(text: str) -> Optional[int]:
     """Largest explicit hiring count mentioned in `text` (or None)."""
     counts = [int(g) for match in _HIRING_RE.findall(text or "") for g in match if g]
     return max(counts) if counts else None
+
+
+# Seniority / qualifier tokens stripped when deriving a normalized role.
+_SENIORITY_PREFIX = re.compile(
+    r"^\s*(senior|sr\.?|junior|jr\.?|lead|principal|staff|associate|trainee|intern)\b[\s.-]*",
+    re.IGNORECASE,
+)
+
+
+def normalize_role(title: Optional[str]) -> Optional[str]:
+    """Derive a canonical role from an ORIGINAL job title (title is never mutated).
+
+    Prefers a canonical match from ROLE_ALIASES; otherwise strips a leading
+    seniority word and any trailing qualifier after a dash/paren/comma.
+    "Senior Java Backend Engineer - Payments" -> "Backend Engineer" (canonical)."""
+    if not title or not title.strip():
+        return None
+    canonical = extract_roles(title)
+    if canonical:
+        return canonical[0]
+    cut = re.split(r"[-–(,/|]", title, maxsplit=1)[0]
+    cleaned = _SENIORITY_PREFIX.sub("", cut).strip()
+    return cleaned or None

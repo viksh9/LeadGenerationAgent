@@ -44,6 +44,8 @@ class SourceType(str, Enum):
 class SourceStatus(str, Enum):
     PLANNED = "PLANNED"
     AVAILABLE = "AVAILABLE"
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+    REQUIRES_REVIEW = "REQUIRES_REVIEW"
     CONNECTED = "CONNECTED"
     DISABLED = "DISABLED"
     ERROR = "ERROR"
@@ -92,6 +94,13 @@ class SourceDefinition(BaseModel):
     supports_pagination: bool = False
     supports_incremental_fetch: bool = False
     supports_date_filter: bool = False
+    supports_location: bool = False
+    supports_salary: bool = False
+    supports_company_id: bool = False
+    supports_job_id: bool = False
+    # Canonical-source preference (lower = higher priority). Official company
+    # career pages should outrank third-party aggregators.
+    priority: int = 5
     data_quality: str = "UNKNOWN"
     commercial_use_status: ComplianceStatus = ComplianceStatus.UNKNOWN
     compliance: SourceCompliance = Field(default_factory=SourceCompliance)

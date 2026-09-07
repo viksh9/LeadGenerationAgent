@@ -19,6 +19,7 @@ from config.aggregation import DEFAULT_AGGREGATION_CONFIG, AggregationConfig
 from database.models import (
     DataProvenance,
     HiringIntensity,
+    JobRecord,
     Lead,
     LeadPriority,
     LeadStatus,
@@ -201,20 +202,25 @@ def rebuild_company_leads(
     provenance: DataProvenance = DataProvenance.REAL,
     config: AggregationConfig = DEFAULT_AGGREGATION_CONFIG,
     now: Optional[datetime] = None,
+    source: str = "raw",
 ) -> CompanyRunSummary:
-    """Aggregate all stored raw job records of a provenance into company leads.
+    """Aggregate stored jobs of a provenance into company-level leads.
 
-    Real vs synthetic are kept strictly separate (a real company lead is never
-    built from synthetic jobs, and vice versa)."""
+    `source="canonical"` reads deduplicated JobRecords (the real pipeline path);
+    `source="raw"` reads raw_source_records directly (legacy/simple path). Real
+    vs synthetic are kept strictly separate."""
     now = now or datetime.now(timezone.utc).replace(tzinfo=None)
     is_synth = provenance is DataProvenance.SYNTHETIC
-    stmt = (
-        select(RawSourceRecord)
-        .where(RawSourceRecord.record_type == RecordType.JOB_POSTING)
-        .where(RawSourceRecord.is_synthetic.is_(is_synth))
-    )
-    records = list(session.scalars(stmt))
-    jobs = [JobInput.from_raw_record(r) for r in records]
+    if source == "canonical":
+        stmt = select(JobRecord).where(JobRecord.data_provenance == provenance)
+        jobs = [JobInput.from_job_record(jr) for jr in session.scalars(stmt)]
+    else:
+        stmt = (
+            select(RawSourceRecord)
+            .where(RawSourceRecord.record_type == RecordType.JOB_POSTING)
+            .where(RawSourceRecord.is_synthetic.is_(is_synth))
+        )
+        jobs = [JobInput.from_raw_record(r) for r in session.scalars(stmt)]
     summary = CompanyRunSummary(provenance=provenance.value, jobs=len(jobs))
 
     for agg in aggregate_companies(jobs, config=config, now=now):
