@@ -431,3 +431,186 @@ class CollectionRun(Base):
         SAEnum(CollectionRunStatus, native_enum=False, length=16), default=CollectionRunStatus.RUNNING, index=True
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class BusinessSignalType(str, Enum):
+    """Business/market signals (distinct from Lead.signal_type so extending this
+    never destabilises the existing lead signal enum / dashboard chart)."""
+
+    PROJECT_AWARD = "PROJECT_AWARD"
+    PROJECT_EXECUTION = "PROJECT_EXECUTION"
+    CONTRACT = "CONTRACT"
+    TENDER = "TENDER"
+    DIGITAL_TRANSFORMATION = "DIGITAL_TRANSFORMATION"
+    CLOUD_MIGRATION = "CLOUD_MIGRATION"
+    TECHNOLOGY_MODERNIZATION = "TECHNOLOGY_MODERNIZATION"
+    AI_INITIATIVE = "AI_INITIATIVE"
+    PARTNERSHIP = "PARTNERSHIP"
+    EXPANSION = "EXPANSION"
+    DELIVERY_CENTER_EXPANSION = "DELIVERY_CENTER_EXPANSION"
+    ENGINEERING_EXPANSION = "ENGINEERING_EXPANSION"
+    VENDOR_REQUIREMENT = "VENDOR_REQUIREMENT"
+    OUTSOURCING = "OUTSOURCING"
+    ACQUISITION = "ACQUISITION"
+    OTHER = "OTHER"
+
+
+class SignalStrength(str, Enum):
+    STRONG = "STRONG"
+    MEDIUM = "MEDIUM"
+    WEAK = "WEAK"
+
+
+class SourceRole(str, Enum):
+    PRIMARY = "PRIMARY"
+    SUPPORTING = "SUPPORTING"
+
+
+class ResolutionStatus(str, Enum):
+    RESOLVED = "RESOLVED"
+    REVIEW = "REVIEW"
+    UNRESOLVED = "UNRESOLVED"
+
+
+class OpportunityStatus(str, Enum):
+    CANDIDATE = "CANDIDATE"
+    REVIEW = "REVIEW"
+    PROMOTED = "PROMOTED"      # promoted into a Lead
+    REJECTED = "REJECTED"
+
+
+class BusinessSignal(Base):
+    """A canonical business/market signal (project, contract, tender, expansion,
+    partnership, transformation, …) extracted from a real source record.
+
+    One real-world event = ONE BusinessSignal, with every corroborating source
+    kept as a SignalSourceReference. Never auto-promoted to a Lead."""
+
+    __tablename__ = "business_signals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    event_group_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+    # Company (original preserved; normalized derived; resolution may need review).
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    normalized_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resolution_status: Mapped[ResolutionStatus] = mapped_column(
+        SAEnum(ResolutionStatus, native_enum=False, length=16), default=ResolutionStatus.UNRESOLVED
+    )
+
+    signal_type: Mapped[BusinessSignalType] = mapped_column(
+        SAEnum(BusinessSignalType, native_enum=False, length=32), default=BusinessSignalType.OTHER, index=True
+    )
+    signal_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    signal_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signal_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    collected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+    signal_age_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Project / contract detail (only what the source explicitly states).
+    project_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    project_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    project_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    project_value_text: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    contract_party: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    partner_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    technology_terms: Mapped[list[str]] = mapped_column(JSON, default=list)
+    industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    signal_strength: Mapped[SignalStrength] = mapped_column(
+        SAEnum(SignalStrength, native_enum=False, length=16), default=SignalStrength.WEAK, index=True
+    )
+    source_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    data_quality_score: Mapped[int] = mapped_column(Integer, default=0)
+
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    raw_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_count: Mapped[int] = mapped_column(Integer, default=1)
+
+    source_references: Mapped[list["SignalSourceReference"]] = relationship(
+        back_populates="signal", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class SignalSourceReference(Base):
+    """One source that reported a BusinessSignal (PRIMARY or SUPPORTING)."""
+
+    __tablename__ = "signal_source_references"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    business_signal_id: Mapped[int] = mapped_column(ForeignKey("business_signals.id", ondelete="CASCADE"), index=True)
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    source_role: Mapped[SourceRole] = mapped_column(
+        SAEnum(SourceRole, native_enum=False, length=16), default=SourceRole.PRIMARY
+    )
+    source_confidence: Mapped[int] = mapped_column(Integer, default=0)
+
+    signal: Mapped["BusinessSignal"] = relationship(back_populates="source_references")
+
+
+class OpportunityCandidate(Base):
+    """A conservative, company-level opportunity candidate combining job
+    intelligence and business signals. NOT a Lead — an intermediate stage that
+    carries the inputs the Lead Scoring Engine consumes."""
+
+    __tablename__ = "opportunity_candidates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    normalized_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+
+    it_company_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # true|false|unknown
+    it_company_confidence: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Job intelligence.
+    it_job_count: Mapped[int] = mapped_column(Integer, default=0)
+    recent_it_jobs: Mapped[int] = mapped_column(Integer, default=0)
+    hiring_intensity: Mapped[HiringIntensity | None] = mapped_column(
+        SAEnum(HiringIntensity, native_enum=False, length=16), nullable=True
+    )
+    top_technologies: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+    # Business intelligence.
+    total_business_signals: Mapped[int] = mapped_column(Integer, default=0)
+    recent_business_signals: Mapped[int] = mapped_column(Integer, default=0)
+    strong_signals: Mapped[int] = mapped_column(Integer, default=0)
+    project_signals: Mapped[int] = mapped_column(Integer, default=0)
+    contract_signals: Mapped[int] = mapped_column(Integer, default=0)
+    transformation_signals: Mapped[int] = mapped_column(Integer, default=0)
+    expansion_signals: Mapped[int] = mapped_column(Integer, default=0)
+
+    opportunity_types: Mapped[list[str]] = mapped_column(JSON, default=list)
+    signal_types: Mapped[list[str]] = mapped_column(JSON, default=list)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_count: Mapped[int] = mapped_column(Integer, default=0)
+    evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    confidence: Mapped[int] = mapped_column(Integer, default=0)
+    last_signal_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[OpportunityStatus] = mapped_column(
+        SAEnum(OpportunityStatus, native_enum=False, length=16), default=OpportunityStatus.CANDIDATE, index=True
+    )
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
