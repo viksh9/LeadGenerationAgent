@@ -690,18 +690,48 @@ class BusinessSignalType(str, Enum):
     PROJECT_EXECUTION = "PROJECT_EXECUTION"
     CONTRACT = "CONTRACT"
     TENDER = "TENDER"
+    GOVERNMENT_TENDER = "GOVERNMENT_TENDER"
+    RFP = "RFP"
+    IT_CONTRACT = "IT_CONTRACT"
     DIGITAL_TRANSFORMATION = "DIGITAL_TRANSFORMATION"
     CLOUD_MIGRATION = "CLOUD_MIGRATION"
     TECHNOLOGY_MODERNIZATION = "TECHNOLOGY_MODERNIZATION"
+    TECHNOLOGY_INITIATIVE = "TECHNOLOGY_INITIATIVE"
     AI_INITIATIVE = "AI_INITIATIVE"
+    CYBERSECURITY_INITIATIVE = "CYBERSECURITY_INITIATIVE"
+    SYSTEM_IMPLEMENTATION = "SYSTEM_IMPLEMENTATION"
     PARTNERSHIP = "PARTNERSHIP"
     EXPANSION = "EXPANSION"
+    TECH_CENTER_EXPANSION = "TECH_CENTER_EXPANSION"
+    OFFICE_EXPANSION = "OFFICE_EXPANSION"
     DELIVERY_CENTER_EXPANSION = "DELIVERY_CENTER_EXPANSION"
     ENGINEERING_EXPANSION = "ENGINEERING_EXPANSION"
     VENDOR_REQUIREMENT = "VENDOR_REQUIREMENT"
     OUTSOURCING = "OUTSOURCING"
     ACQUISITION = "ACQUISITION"
     OTHER = "OTHER"
+
+
+class TenderStatus(str, Enum):
+    """Lifecycle status of a government/procurement tender (from source data only)."""
+
+    OPEN = "OPEN"
+    CLOSING_SOON = "CLOSING_SOON"
+    CLOSED = "CLOSED"
+    CANCELLED = "CANCELLED"
+    AWARDED = "AWARDED"
+    UNKNOWN = "UNKNOWN"
+
+
+class CommercialIntent(str, Enum):
+    """Deterministic commercial-intent classification (kept separate from evidence
+    confidence and lead score)."""
+
+    VERY_HIGH = "VERY_HIGH"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    UNKNOWN = "UNKNOWN"
 
 
 class SignalStrength(str, Enum):
@@ -789,6 +819,14 @@ class BusinessSignal(Base):
     )
     raw_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_count: Mapped[int] = mapped_column(Integer, default=1)
+    # Resolved canonical company (nullable; resolution may be pending/review).
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Deterministic commercial-intent (separate from evidence/source confidence).
+    commercial_intent: Mapped[CommercialIntent] = mapped_column(
+        SAEnum(CommercialIntent, native_enum=False, length=16), default=CommercialIntent.UNKNOWN
+    )
 
     source_references: Mapped[list["SignalSourceReference"]] = relationship(
         back_populates="signal", cascade="all, delete-orphan", lazy="selectin"
@@ -863,6 +901,75 @@ class OpportunityCandidate(Base):
     )
     lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), default=utcnow)
+
+
+class TenderRecord(Base):
+    """A government/procurement tender or RFP from a permitted real source.
+
+    Only what the source explicitly states is stored; absent values stay NULL (never
+    fabricated). The issuing organization (signal_origin_organization) is kept
+    separate from any named awarded vendor/target company (§15). One canonical
+    tender per (source_id, source_record_id); history is preserved (not deleted)."""
+
+    __tablename__ = "tender_records"
+    __table_args__ = (
+        UniqueConstraint("source_id", "source_record_id", name="uq_tender_source_record"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    source_record_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Issuing organization (the buyer) — NOT necessarily the commercial target.
+    organization_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    department: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    organization_type: Mapped[str | None] = mapped_column(String(64), nullable=True)  # GOVERNMENT/PSU/PRIVATE/UNKNOWN
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    issue_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    publication_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    closing_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    award_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    estimated_value: Mapped[float | None] = mapped_column(Float, nullable=True)   # NULL if source omits
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    estimated_value_text: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    category: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    technologies: Mapped[list[str]] = mapped_column(JSON, default=list)
+    scope_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    eligibility_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    tender_status: Mapped[TenderStatus] = mapped_column(
+        SAEnum(TenderStatus, native_enum=False, length=16), default=TenderStatus.UNKNOWN, index=True
+    )
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    raw_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # §15: issuer org vs any named awarded/target vendor company.
+    signal_origin_organization: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    target_company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    business_signal_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+    evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
+    freshness_score: Mapped[int] = mapped_column(Integer, default=0)
+    commercial_intent: Mapped[CommercialIntent] = mapped_column(
+        SAEnum(CommercialIntent, native_enum=False, length=16), default=CommercialIntent.UNKNOWN
+    )
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True
+    )
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 class MatchConfidence(str, Enum):

@@ -31,6 +31,10 @@ _ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
         "requests_used": "INTEGER DEFAULT 0",
         "request_budget": "INTEGER",
     },
+    "business_signals": {
+        "company_id": "INTEGER",
+        "commercial_intent": "VARCHAR(16) DEFAULT 'UNKNOWN'",
+    },
 }
 
 

@@ -18,6 +18,28 @@ vi.mock('@/services/careerSources', async () => {
   return { ...actual, fetchCareerSources: vi.fn().mockResolvedValue({ items: [], total: 0 }) };
 });
 
+vi.mock('@/services/signals', async () => {
+  const actual = await vi.importActual<typeof import('@/services/signals')>('@/services/signals');
+  return {
+    ...actual,
+    fetchSignals: vi
+      .fn()
+      .mockResolvedValue({ items: [], total: 0, page: 1, page_size: 50, total_pages: 0 }),
+    fetchSignal: vi.fn(),
+  };
+});
+
+vi.mock('@/services/tenders', async () => {
+  const actual = await vi.importActual<typeof import('@/services/tenders')>('@/services/tenders');
+  return {
+    ...actual,
+    fetchTenders: vi
+      .fn()
+      .mockResolvedValue({ items: [], total: 0, page: 1, page_size: 50, total_pages: 0 }),
+    fetchTender: vi.fn(),
+  };
+});
+
 function makeLead(p: Partial<Lead> & Pick<Lead, 'id' | 'company_name'>): Lead {
   return {
     normalized_company_name: null,

@@ -235,27 +235,42 @@ sources:
       end-to-end. Status stays PLANNED at the aggregate level.
 
   - source_id: government_open_data
-    name: Government Open Data / Tenders
+    name: Government Open Data (data.gov.in OGD API)
     category: GOVERNMENT
     source_type: OPEN_DATA
-    base_url: null
-    status: PLANNED
+    provider: data.gov.in (OGD Platform India)
+    base_url: https://api.data.gov.in/resource
+    documentation_url: https://data.gov.in/help/how-use-datasets-apis
+    terms_url: https://data.gov.in/government-open-data-license-india
+    status: NOT_CONFIGURED
     enabled: false
-    requires_api_key: false
+    requires_api_key: true
+    authentication_type: API_KEY
+    credential_env_vars: [DATA_GOV_IN_API_KEY, DATA_GOV_IN_TENDER_RESOURCE_ID]
     rate_limit: { requests_per_minute: 15, requests_per_day: 2000 }
     supports_search: true
     supports_pagination: true
     supports_incremental_fetch: true
     supports_date_filter: true
     data_quality: HIGH
-    commercial_use_status: ALLOWED
+    commercial_use_status: REQUIRES_REVIEW
     compliance:
-      terms_status: ALLOWED
+      terms_status: REQUIRES_REVIEW
       robots_status: ALLOWED
       api_terms_reviewed: false
-      commercial_use_status: ALLOWED
-      data_retention_notes: Open data licences typically permit reuse with attribution.
-    notes: Public tender/award portals publishing project and contract signals.
+      commercial_use_status: REQUIRES_REVIEW
+      data_retention_notes: >-
+        Verified 2026: data.gov.in exposes an OGD API
+        (GET https://api.data.gov.in/resource/{resource_id}?api-key=&format=json)
+        under the Government Open Data License – India (GODL). Requires a free API
+        key and a specific dataset resource_id; per-dataset field names vary, so the
+        adapter must be configured per dataset. Confirm the specific dataset's GODL
+        terms before commercial reuse (REQUIRES_REVIEW).
+    notes: >-
+      Legitimate government open-data path (unlike CPPP, which has no public API).
+      Status stays NOT_CONFIGURED until DATA_GOV_IN_API_KEY + a vetted tender
+      DATA_GOV_IN_TENDER_RESOURCE_ID are set and the dataset's field mapping/licence
+      are reviewed. Tenders then flow through the standard tender pipeline.
 
   - source_id: rss_news
     name: RSS / Business & Technology News
@@ -354,10 +369,12 @@ sources:
       are configured per source; PLANNED until a specific feed is reviewed + tested.
 
   - source_id: government_procurement
-    name: Government Procurement / Tenders (open data)
+    name: Government Procurement / Tenders (CPPP / GeM)
     category: TENDER
     source_type: OPEN_DATA
+    provider: NIC / Ministry of Finance (CPPP), GeM
     base_url: null
+    documentation_url: https://eprocure.gov.in/
     status: PLANNED
     enabled: false
     requires_api_key: false
@@ -367,13 +384,19 @@ sources:
     supports_pagination: true
     supports_date_filter: true
     data_quality: HIGH
-    commercial_use_status: ALLOWED
+    commercial_use_status: REQUIRES_REVIEW
     compliance:
       terms_status: REQUIRES_REVIEW
-      robots_status: ALLOWED
+      robots_status: REQUIRES_REVIEW
       api_terms_reviewed: false
-      commercial_use_status: ALLOWED
-      data_retention_notes: Government open data; verify the specific portal's licence and attribution.
+      commercial_use_status: REQUIRES_REVIEW
+      data_retention_notes: >-
+        Verified 2026: the CPPP (eprocure.gov.in) portal publishes NO documented
+        public developer API. The only programmatic access is via third-party
+        scrapers, which this project does NOT use (no unauthorized scraping).
     notes: >-
-      Indian government technology tenders/RFPs (e-procurement open data). A tender
-      is classified first and never treated as a sales opportunity on its own.
+      NOT_IMPLEMENTED / MANUAL_SOURCE_REQUIRED. No permitted public API exists for
+      CPPP/GeM. Tenders from these portals can only be ingested via the manual
+      import path (scripts/import_tender.py) using data an operator obtains under a
+      permitted method. A tender is classified first and never treated as a sales
+      opportunity on its own.

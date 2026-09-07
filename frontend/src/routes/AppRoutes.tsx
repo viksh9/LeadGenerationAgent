@@ -12,6 +12,8 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { OpportunitiesPage } from '@/pages/OpportunitiesPage';
 import { OutreachPage } from '@/pages/OutreachPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { SignalsPage } from '@/pages/SignalsPage';
+import { TendersPage } from '@/pages/TendersPage';
 
 export function AppRoutes() {
   return (
@@ -25,6 +27,8 @@ export function AppRoutes() {
         <Route path="/companies" element={<CompaniesPage />} />
         <Route path="/companies/:name" element={<CompanyDetailsPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
+        <Route path="/signals" element={<SignalsPage />} />
+        <Route path="/tenders" element={<TendersPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/outreach" element={<OutreachPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
