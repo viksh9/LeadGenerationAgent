@@ -43,7 +43,6 @@ class Settings(BaseSettings):
     )
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
-    default_sample_path: Path = DATA_DIR / "sample_lead.json"
     # Whether synthetic/demo leads are shown by default. Explicitly disabled in
     # production so the dashboard never presents demo data as real. Callers can
     # still override per-request via the `provenance` query param.
@@ -51,6 +50,14 @@ class Settings(BaseSettings):
         default=None,
         description="Default provenance visibility. None => derive from environment.",
         validation_alias=AliasChoices("SHOW_SYNTHETIC_LEADS", "DEMO_MODE"),
+    )
+    # Real-data-only enforcement. When on, write guards reject synthetic/demo
+    # business records and REAL records that lack source-backed evidence
+    # (see database.integrity). None => derive from environment.
+    enforce_real_data: bool | None = Field(
+        default=None,
+        description="Reject non-real / source-less business writes. None => derive from environment.",
+        validation_alias=AliasChoices("ENFORCE_REAL_DATA", "REAL_DATA_ONLY"),
     )
 
     @property
@@ -63,6 +70,13 @@ class Settings(BaseSettings):
         if self.show_synthetic_leads is not None:
             return self.show_synthetic_leads
         return self.environment.lower() not in {"production", "prod"}
+
+    @property
+    def real_data_only(self) -> bool:
+        """Enforce real-data-only writes. On by default in production/staging."""
+        if self.enforce_real_data is not None:
+            return self.enforce_real_data
+        return self.environment.lower() in {"production", "prod", "staging", "stage"}
 
 
 @lru_cache

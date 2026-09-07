@@ -1,97 +1,82 @@
-# Development / Sample Data
+# Development & Test Data (real-data-only policy)
 
-**All sample data is SYNTHETIC and for development/testing only.** It contains
-fictional companies and **role-only** points of contact — no real people,
-emails, phone numbers, or private identifiers, and it must never be presented as
-real-world evidence.
+**LeadGenerationAgent is a real-data-only platform.** There is **no** demo, dummy,
+sample, or seeded business data in the application or its runtime paths, and there
+is no production command that can populate the database with synthetic records.
 
-## Purpose
+> **Removed:** the previous `scripts/seed_database.py` and
+> `scripts/seed_demo_companies.py` seed commands and the `data/sample_*.json`
+> business-data files have been removed. Synthetic data now exists **only** inside
+> the test suite. Any older documentation referring to "30/32 synthetic leads",
+> "seed data", or "demo companies" describes that removed setup.
 
-A reliable synthetic dataset + seed mechanism so developers can populate the
-local database, demo the UI, and exercise search/filter/scoring/opportunity/POC/
-outreach/analytics against realistic structures.
+## Where synthetic data lives now (test-only)
 
-## Sample data (`data/sample_leads.json`)
+Synthetic records are confined to the test suite and never reach the application
+database or the UI:
 
-32 synthetic leads across **IT / BFSI / FMCG / Healthcare**, with:
+- `tests/fixtures/sample_leads.json` — synthetic sample-lead records (fictional
+  companies, **role-only** POCs; no real people, emails, or private identifiers).
+- `tests/fixtures/synthetic_leads.py` — reusable synthetic lead builders
+  (`hot_lead`, `warm_lead`, `project_lead`, `missing_data_lead`, …) exposed as
+  pytest fixtures in `tests/integration/conftest.py`.
+- `tests/fixtures/seeding.py` — **test-only** seeding helpers (`load_sample_leads`,
+  `select_records`, `to_analyze_request`, `seed`, `reset_leads`) that run records
+  through the real `LeadAnalysisPipeline` and tag every result
+  `DataProvenance.SYNTHETIC`.
 
-- Varied scenarios: large/small hiring, project award/execution, digital
-  transformation, cloud migration, vendor requirement, staff augmentation,
-  government project, enterprise implementation, expansion, weak/old/recent
-  signals, missing POC/project/source, low/medium/high confidence.
-- Varied tech stacks and role recommendations; several **companies repeated** so
-  Company Intelligence aggregation has something to group.
-- Dates stored as a **relative `signal_age_days`** (not absolute), converted to a
-  `signal_date` against a configurable reference date at seed time — deterministic
-  and never in the future.
+These helpers only ever write to **isolated, throwaway per-test SQLite databases**
+(see `tests/integration/conftest.py`). They are never imported by application or
+runtime code, and the write-guards in `database/integrity.py` reject `SYNTHETIC`
+records in production/staging regardless.
 
-Signal type, opportunity type, score and priority are **computed by the real
-`LeadAnalysisPipeline`**, not hard-coded, so the dataset naturally produces a mix
-of HOT / WARM / NURTURE / LOW.
+## Getting real data into the local database
 
-## Seed commands
-
-```bash
-python scripts/seed_database.py                 # seed all 32 synthetic leads
-python scripts/seed_database.py --count 10      # seed 10 (variety preserved)
-python scripts/seed_database.py --count 50      # seed 50 (generates distinct variants)
-python scripts/seed_database.py --reset --yes   # wipe local dev leads, then seed
-python scripts/seed_database.py --reference-date 2026-09-01   # dates relative to a fixed day
-```
-
-Each run prints created / skipped(duplicates) / failed plus priority, opportunity,
-industry, and signal distributions.
-
-- **`--count N`** — fewer than the sample size picks an even spread across
-  industries/scenarios; more than the sample size appends distinct synthetic
-  variants (company + signal title suffixed) rather than exact duplicates.
-- **Duplicates** — the pipeline updates a matching `(company_name, signal_title,
-  source_url)` in place, so re-running the seed reports `Skipped (dups)` and never
-  creates duplicates.
-
-## Reset safety
-
-`--reset` deletes all leads and is guarded:
-
-- It refuses unless `APP_ENV` is `development`, `test`, or `local`.
-- `production` / `prod` / `staging` / **missing** env → refused.
-- Without `--yes` it prompts for confirmation.
-
-It only ever targets the configured local database — there is no path to a
-production database.
-
-## Fixtures (`tests/fixtures/synthetic_leads.py`)
-
-Reusable synthetic builders — `hot_lead`, `warm_lead`, `nurture_lead`,
-`low_lead`, `project_lead`, `hiring_lead`, `vendor_lead`,
-`digital_transformation_lead`, `missing_data_lead` — exposed as pytest fixtures
-in `tests/integration/conftest.py` and reused across the seed tests.
-
-## Development workflow
+Instead of seeding, collect real data from a configured, permitted source and run
+the pipeline:
 
 ```bash
-# 1. backend
-uvicorn api.main:app --reload            # http://localhost:8000  (docs at /docs)
-# 2. seed synthetic data
-python scripts/seed_database.py
-# 3. frontend
-cd frontend && npm run dev               # http://localhost:5173
+# 1. configure a source (example: Adzuna) in .env — see docs/sources/adzuna.md
+#    ADZUNA_APP_ID=... ADZUNA_APP_KEY=...
+# 2. collect + process real raw records into leads
+python scripts/process_raw.py            # normalize pending raw records → leads
+python scripts/build_company_leads.py    # REAL raw jobs → canonical jobs → company leads
 ```
 
-Then the seeded data appears across `/dashboard`, `/leads`, `/leads/:id`,
-`/companies`, `/companies/:name`, `/opportunities`, `/contacts`, `/outreach`,
-`/analytics`.
+Until a real source is connected the database stays empty and the UI shows honest
+empty states. That is the intended behavior — see [Empty states](#empty-states).
 
-## Limitations
+## Auditing / cleaning the database
 
-- No persisted `is_synthetic` flag on the Lead schema (avoided a schema change).
-  The whole local dev database is synthetic; `source_name` values are prefixed
-  `Synthetic …` as a soft marker. A "Demo data" badge would need a real backend
-  flag and is intentionally not added here.
-- Analytics/derived views aggregate the top ~100 leads (documented elsewhere).
+```bash
+python scripts/db_audit.py                      # real-data-only compliance report
+python scripts/db_audit.py --fail-on-synthetic  # CI gate: non-zero if not clean
+python scripts/db_audit.py --purge-synthetic --yes   # remove synthetic rows (dev/test only)
+```
 
-## Production-data warning
+`purge_synthetic` (in `database/integrity.py`) deletes only `SYNTHETIC`-provenance
+records (and `is_synthetic` raw records) in foreign-key-safe order — it never
+touches real data or schema.
 
-Never point the seed script at, or run `--reset` against, a production database.
-Synthetic records must never be represented as real leads, companies, projects,
-or evidence.
+## Empty states
+
+With no collected data:
+
+- Dashboard → "No verified real data available yet."
+- Companies → "No companies have been discovered from configured real sources."
+- Leads → "No real leads available."
+- Opportunities → "No verified opportunities available."
+
+An API failure shows an error state; the UI never substitutes fabricated data.
+
+## Provenance & guards
+
+Every business record carries `data_provenance` (`REAL` in production). Write
+guards (`database/integrity.py`) enforce:
+
+- No `SYNTHETIC` records in production/staging.
+- A `REAL` lead must have source-backed evidence (`source_url` / `source_name` /
+  `source_count` / `evidence`). Generated AI text is never evidence.
+
+The data-integrity tests (`tests/integration/test_real_data_integrity.py`) verify
+these invariants, and `scripts/db_audit.py --fail-on-synthetic` gates CI.

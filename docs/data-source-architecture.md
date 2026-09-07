@@ -101,10 +101,11 @@ platform restrictions, and does not implement unauthorized scraping.
 
 ## 13. Real-data vs synthetic-data
 
-Synthetic data (`data/sample_leads.json`, `tests/fixtures/`) is for
-development/testing only and is flagged `is_synthetic = true`. Production
-collection sets `is_synthetic = false`. The app is **not** designed around
-synthetic data.
+Synthetic data lives **only** in the test suite (`tests/fixtures/`) and is flagged
+`is_synthetic = true` / `data_provenance = SYNTHETIC`. Production collection sets
+`is_synthetic = false`. The app is real-data-only: synthetic records are rejected
+by the production write-guards (`database/integrity.py`) and never appear in the
+application database or UI. See `docs/development-data.md`.
 
 ## 14. IT industry focus
 
