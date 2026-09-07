@@ -10,6 +10,7 @@ import { useHealth } from '@/hooks/useHealth';
 import type { ThemePreference } from '@/types/settings';
 import { API_BASE_URL } from '@/services/api';
 import { PAGE_SIZE_OPTIONS } from '@/constants/leads';
+import { PLANNED_DATA_SOURCES } from '@/constants/dataSources';
 
 function ConnectionDot({ label, tone }: { label: string; tone: 'ok' | 'bad' | 'idle' }) {
   const color = tone === 'ok' ? 'bg-emerald-500' : tone === 'bad' ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600';
@@ -167,6 +168,27 @@ export function SettingsPage() {
             control={<span className="text-sm text-slate-500 dark:text-slate-400">Local, single user</span>}
           />
         </SettingsSection>
+
+        <div className="lg:col-span-2">
+          <SettingsSection
+            title="Data sources"
+            description="Real-data collection is in progress. Sources are connected only after their collectors are implemented and verified."
+          >
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {PLANNED_DATA_SOURCES.map((source) => (
+                <li key={source.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{source.name}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">{source.category}</p>
+                  </div>
+                  <span className="badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {source.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </SettingsSection>
+        </div>
       </div>
     </PageContainer>
   );

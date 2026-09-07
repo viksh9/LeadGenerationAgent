@@ -1,0 +1,146 @@
+# Candidate data sources for LeadGenerationAgent (real-data phase).
+#
+# EVERY source below is PLANNED. A source is only considered CONNECTED once its
+# collector is implemented, tested, and verified. This file contains metadata
+# ONLY — never API keys or credentials (those come from the environment:
+# SOURCE_<SOURCE_ID>_API_KEY). Compliance fields document posture; the system
+# never bypasses auth, robots, rate limits, or access controls.
+
+sources:
+  - source_id: adzuna
+    name: Adzuna Jobs API
+    category: JOB
+    source_type: THIRD_PARTY_API
+    base_url: https://api.adzuna.com/v1/api
+    status: PLANNED
+    enabled: false
+    requires_api_key: true
+    rate_limit: { requests_per_minute: 25, requests_per_day: 1000 }
+    supports_search: true
+    supports_pagination: true
+    supports_incremental_fetch: false
+    supports_date_filter: true
+    data_quality: MEDIUM
+    commercial_use_status: REQUIRES_APPROVAL
+    compliance:
+      terms_status: REQUIRES_APPROVAL
+      robots_status: UNKNOWN
+      api_terms_reviewed: false
+      commercial_use_status: REQUIRES_APPROVAL
+      data_retention_notes: Review API terms for retention/attribution before enabling.
+    notes: Public jobs aggregator API; candidate for the first real IT job collector.
+
+  - source_id: company_career_pages
+    name: Company Career Pages
+    category: COMPANY
+    source_type: PUBLIC_WEB
+    base_url: null
+    status: PLANNED
+    enabled: false
+    requires_api_key: false
+    rate_limit: { requests_per_minute: 10, requests_per_day: 500 }
+    supports_search: false
+    supports_pagination: true
+    supports_incremental_fetch: false
+    supports_date_filter: false
+    data_quality: HIGH
+    commercial_use_status: RESTRICTED
+    compliance:
+      terms_status: RESTRICTED
+      robots_status: REQUIRES_APPROVAL
+      api_terms_reviewed: false
+      commercial_use_status: RESTRICTED
+      data_retention_notes: Respect each site's robots.txt and terms; only permitted pages.
+    notes: Per-company careers pages; only where robots/terms permit.
+
+  - source_id: government_open_data
+    name: Government Open Data / Tenders
+    category: GOVERNMENT
+    source_type: OPEN_DATA
+    base_url: null
+    status: PLANNED
+    enabled: false
+    requires_api_key: false
+    rate_limit: { requests_per_minute: 15, requests_per_day: 2000 }
+    supports_search: true
+    supports_pagination: true
+    supports_incremental_fetch: true
+    supports_date_filter: true
+    data_quality: HIGH
+    commercial_use_status: ALLOWED
+    compliance:
+      terms_status: ALLOWED
+      robots_status: ALLOWED
+      api_terms_reviewed: false
+      commercial_use_status: ALLOWED
+      data_retention_notes: Open data licences typically permit reuse with attribution.
+    notes: Public tender/award portals publishing project and contract signals.
+
+  - source_id: rss_news
+    name: RSS / Business & Technology News
+    category: NEWS
+    source_type: RSS
+    base_url: null
+    status: PLANNED
+    enabled: false
+    requires_api_key: false
+    rate_limit: { requests_per_minute: 20, requests_per_day: 2000 }
+    supports_search: false
+    supports_pagination: false
+    supports_incremental_fetch: true
+    supports_date_filter: true
+    data_quality: MEDIUM
+    commercial_use_status: RESTRICTED
+    compliance:
+      terms_status: REQUIRES_APPROVAL
+      robots_status: ALLOWED
+      api_terms_reviewed: false
+      commercial_use_status: RESTRICTED
+      data_retention_notes: Store links/summaries; respect publisher terms for full text.
+    notes: Public RSS feeds for project awards, expansions, and transformation news.
+
+  - source_id: project_registry
+    name: Public Project / Contract Registry
+    category: PROJECT
+    source_type: OPEN_DATA
+    base_url: null
+    status: PLANNED
+    enabled: false
+    requires_api_key: false
+    rate_limit: { requests_per_minute: 15, requests_per_day: 1500 }
+    supports_search: true
+    supports_pagination: true
+    supports_incremental_fetch: true
+    supports_date_filter: true
+    data_quality: MEDIUM
+    commercial_use_status: UNKNOWN
+    compliance:
+      terms_status: UNKNOWN
+      robots_status: UNKNOWN
+      api_terms_reviewed: false
+      commercial_use_status: UNKNOWN
+      data_retention_notes: Evaluate licence before enabling.
+    notes: Candidate open registries of awarded projects/contracts.
+
+  - source_id: business_database
+    name: Business / Company Database (third-party)
+    category: BUSINESS_DATABASE
+    source_type: THIRD_PARTY_API
+    base_url: null
+    status: PLANNED
+    enabled: false
+    requires_api_key: true
+    rate_limit: { requests_per_minute: 30, requests_per_day: 1000 }
+    supports_search: true
+    supports_pagination: true
+    supports_incremental_fetch: false
+    supports_date_filter: false
+    data_quality: HIGH
+    commercial_use_status: REQUIRES_APPROVAL
+    compliance:
+      terms_status: REQUIRES_APPROVAL
+      robots_status: UNKNOWN
+      api_terms_reviewed: false
+      commercial_use_status: REQUIRES_APPROVAL
+      data_retention_notes: Commercial licence required; review before enabling.
+    notes: Company-identity/firmographics enrichment candidate (requires approval).

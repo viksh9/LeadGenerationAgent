@@ -152,3 +152,80 @@ class Lead(Base):
         DateTime, server_default=func.now(), default=utcnow, onupdate=utcnow
     )
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class RecordType(str, Enum):
+    """Kind of raw record collected from a source."""
+
+    JOB_POSTING = "JOB_POSTING"
+    COMPANY_PROFILE = "COMPANY_PROFILE"
+    NEWS_ARTICLE = "NEWS_ARTICLE"
+    PROJECT = "PROJECT"
+    TENDER = "TENDER"
+    OTHER = "OTHER"
+
+
+class RawStatus(str, Enum):
+    """Lifecycle of a raw record within the internal ingestion pipeline."""
+
+    NEW = "NEW"
+    NORMALIZED = "NORMALIZED"
+    PROCESSED = "PROCESSED"
+    DUPLICATE = "DUPLICATE"
+    INVALID = "INVALID"
+
+
+class RawSourceRecord(Base):
+    """Immutable-ish raw record collected from an external source.
+
+    This is the INTERNAL ingestion layer — kept logically separate from the
+    derived `Lead`. Normalization/dedup/scoring read from here; they do not run
+    inside this model. `raw_payload` stores the original source JSON as data only.
+    """
+
+    __tablename__ = "raw_source_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Provenance / identity.
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    # Freshness timestamps.
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), default=utcnow, index=True
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Content.
+    record_type: Mapped[RecordType] = mapped_column(
+        SAEnum(RecordType, native_enum=False, length=32), default=RecordType.OTHER
+    )
+    title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Company identity foundation.
+    company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    normalized_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    source_company_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    technologies: Mapped[list[str]] = mapped_column(JSON, default=list)
+    roles: Mapped[list[str]] = mapped_column(JSON, default=list)
+    salary: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    project_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    project_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    contract_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    # Original payload (data only) + flags.
+    raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_synthetic: Mapped[bool] = mapped_column(default=False, index=True)
+    raw_status: Mapped[RawStatus] = mapped_column(
+        SAEnum(RawStatus, native_enum=False, length=16), default=RawStatus.NEW, index=True
+    )
