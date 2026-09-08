@@ -13,9 +13,22 @@ from database.models import Base
 
 
 def get_engine(url: str | None = None) -> Engine:
-    database_url = url or get_settings().database_url
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(database_url, connect_args=connect_args, future=True)
+    settings = get_settings()
+    database_url = url or settings.database_url
+    if database_url.startswith("sqlite"):
+        # SQLite: no server-side pool; keep the cross-thread flag. pool_pre_ping is
+        # cheap and harmless (guards against stale connections after a restart).
+        return create_engine(
+            database_url, connect_args={"check_same_thread": False},
+            future=True, pool_pre_ping=True,
+        )
+    # Server databases (e.g. Postgres): a real connection pool with pre-ping so a
+    # dropped DB connection is detected and replaced rather than erroring (§15).
+    return create_engine(
+        database_url, future=True, pool_pre_ping=True,
+        pool_size=settings.db_pool_size, max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout, pool_recycle=settings.db_pool_recycle,
+    )
 
 
 def create_session_factory(engine: Engine | None = None) -> sessionmaker[Session]:
@@ -51,11 +64,37 @@ def _reconcile_columns(engine: Engine) -> None:
                     conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {ddl}'))
 
 
+# Performance indexes on hot query columns not covered by model index=True (§16).
+# Applied idempotently (CREATE INDEX IF NOT EXISTS) so existing production and
+# fresh test databases both get them. Curated — no redundant/duplicate indexes.
+_ADDITIVE_INDEXES: list[tuple[str, str, str]] = [
+    # (index_name, table, "col" or "col_a, col_b")
+    ("ix_leads_updated_at", "leads", "updated_at"),            # list_leads ORDER BY updated_at
+    ("ix_leads_created_at", "leads", "created_at"),            # query_leads sort by created_at
+    ("ix_leads_prov_score", "leads", "data_provenance, lead_score"),  # common filter+sort
+    ("ix_job_records_first_seen_at", "job_records", "first_seen_at"),  # trend/change ranges
+    ("ix_job_records_last_seen_at", "job_records", "last_seen_at"),
+    ("ix_crm_activities_lead_occurred", "crm_activities", "lead_id, occurred_at"),  # timeline
+    ("ix_audit_logs_entity", "audit_logs", "entity_type, entity_id"),  # audit lookups
+]
+
+
+def _reconcile_indexes(engine: Engine) -> None:
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        for index_name, table, columns in _ADDITIVE_INDEXES:
+            if table not in existing_tables:
+                continue
+            conn.execute(text(f'CREATE INDEX IF NOT EXISTS {index_name} ON {table} ({columns})'))
+
+
 def init_db(engine: Engine | None = None) -> None:
     """Create tables if they do not already exist, then reconcile additive columns."""
     engine = engine or get_engine()
     Base.metadata.create_all(engine)
     _reconcile_columns(engine)
+    _reconcile_indexes(engine)
 
 
 @contextmanager

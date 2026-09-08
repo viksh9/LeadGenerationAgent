@@ -139,9 +139,17 @@ def _analyze_context(session: Session, ctx: LeadIntelligenceContext, *, force: b
     started = time.monotonic()
     error = None
 
+    # Circuit breaker: after repeated provider failures, stop calling it and use
+    # the deterministic baseline until it recovers (§34). Never fabricates output.
+    from resilience import CircuitBreakerOpen, get_breaker
+    breaker = get_breaker("ai_provider", failure_threshold=5, recovery_timeout=120.0)
+    if provider is not None and not breaker.allow():
+        provider = None
+        error = "AI provider temporarily disabled by circuit breaker"
+
     if provider is not None:
         try:
-            output = provider.analyze(ctx)
+            output = breaker.call(provider.analyze, ctx)
             report = validate_output(output, ctx)
             status = AIAnalysisStatus.AI_FLAGGED if report.unsupported_count else AIAnalysisStatus.AI_VALIDATED
             row = _persist(session, ctx, output, status=status, ai_generated=True,

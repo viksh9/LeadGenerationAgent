@@ -879,3 +879,38 @@ docker compose up --build       # API at http://127.0.0.1:8000  (health at /heal
 
 The API serves JSON only; the built SPA (`frontend/dist`) is included in the image
 for you to serve from a reverse proxy / static host / CDN.
+
+## Production hardening
+
+The platform is hardened for real production deployment while preserving the
+real-data-only guarantee. What is **implemented** (code present) and enforced:
+
+- **Fail-safe startup.** In `APP_ENV=production` the app refuses to start on unsafe
+  config — placeholder/missing secrets, wildcard CORS, demo mode on, or a missing
+  `ADMIN_API_KEY`. Errors name only the offending **keys**, never values.
+- **RBAC** (`api/security.py`): open locally (no `ADMIN_API_KEY`), else
+  `X-Admin-Key` ⇒ ADMIN and `X-Role` ⇒ SALES/RESEARCHER/VIEWER, enforced
+  server-side on mutations.
+- **API middleware:** correlation/request IDs (`X-Request-ID`, echoed + in every
+  error body), security headers (nosniff/frame-deny/referrer/CSP; HSTS opt-in for
+  HTTPS), request-body size limit (413), and per-endpoint rate limits on
+  send/webhooks/AI. Stack traces are never returned to clients.
+- **Resilience:** SSRF-guarded outbound fetches, timeouts on every external call,
+  controlled retries with backoff, a circuit breaker for the AI provider (falls
+  back to the deterministic baseline), and per-source failure isolation.
+- **Data layer:** connection pooling with `pool_pre_ping` (server DBs), curated
+  indexes on hot query columns (idempotently reconciled), and uniqueness
+  constraints protecting idempotency (dedup keys, `source+record_id`).
+- **Observability:** structured JSON logs (`LOG_FORMAT=json`) with secret
+  redaction, `GET /health/live` / `GET /health/ready`, and `GET /monitoring/metrics`
+  (operational counts + circuit-breaker state, separate from market intelligence).
+- **Audits:** `python -m app.audit validate-data` (data integrity, actual counts)
+  and `python -m app.audit production-readiness` (fails on synthetic data, missing
+  provenance/evidence, committed secrets, demo mode, wildcard CORS, missing admin
+  key). A GitHub Actions CI (`.github/workflows/ci.yml`) runs tests, build, lint,
+  and both audits against throwaway databases only.
+
+Operational procedures: [docs/operations-runbook.md](docs/operations-runbook.md).
+Backups remain a **manual** documented procedure (not automated), and high
+availability is **not** implemented — see the runbook for what auto-recovers vs
+what needs manual action.

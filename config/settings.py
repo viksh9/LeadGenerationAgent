@@ -118,6 +118,23 @@ class Settings(BaseSettings):
     webhook_tolerance_seconds: int = Field(
         default=300, validation_alias=AliasChoices("WEBHOOK_TOLERANCE_SECONDS"))
 
+    # --- Production hardening (Prompt 40) ---------------------------------- #
+    # Observability: structured JSON logs (opt-in), request/correlation IDs.
+    log_format: str = Field(default="text", validation_alias=AliasChoices("LOG_FORMAT"))  # text | json
+    # API safety limits.
+    max_request_bytes: int = Field(default=1_000_000, validation_alias=AliasChoices("MAX_REQUEST_BYTES"))
+    public_rate_per_minute: int = Field(default=120, validation_alias=AliasChoices("PUBLIC_RATE_PER_MINUTE"))
+    ai_rate_per_minute: int = Field(default=20, validation_alias=AliasChoices("AI_RATE_PER_MINUTE"))
+    # Security headers (HSTS only emitted when the deployment is HTTPS-terminated).
+    security_headers_enabled: bool = Field(
+        default=True, validation_alias=AliasChoices("SECURITY_HEADERS_ENABLED"))
+    hsts_enabled: bool = Field(default=False, validation_alias=AliasChoices("HSTS_ENABLED"))
+    # Database connection pool (used for non-SQLite engines; SQLite ignores these).
+    db_pool_size: int = Field(default=5, validation_alias=AliasChoices("DB_POOL_SIZE"))
+    db_max_overflow: int = Field(default=10, validation_alias=AliasChoices("DB_MAX_OVERFLOW"))
+    db_pool_timeout: int = Field(default=30, validation_alias=AliasChoices("DB_POOL_TIMEOUT"))
+    db_pool_recycle: int = Field(default=1800, validation_alias=AliasChoices("DB_POOL_RECYCLE"))
+
     @field_validator(
         "show_synthetic_leads", "enforce_real_data", "ai_enabled", "scheduler_enabled",
         mode="before",
