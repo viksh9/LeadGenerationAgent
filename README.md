@@ -964,3 +964,32 @@ Status vocabulary is honest by design (`IMPLEMENTED` / `CONFIGURED` /
 `LIVE-VERIFIED` / `NOT_CONFIGURED` / `NOT_IMPLEMENTED` / `REQUIRES_REVIEW`); the
 DB synthetic check is the authoritative fail, and thresholds are never weakened to
 manufacture leads — zero real leads is preferred over fabricated ones.
+
+## Dashboard Excel export
+
+The **Dashboard** has a prominent **"Export All Data"** button (top action area,
+next to the range filter). It generates a professional `.xlsx` workbook of the
+**actual current database contents** — real data only, never demo/sample rows.
+
+- **What "All Data" means:** every stored business entity, one worksheet each —
+  `README` (with actual counts + data policy), `Data Dictionary`, Companies,
+  Canonical Jobs, Job Source Listings, Signals, Evidence, Opportunities, Sales
+  Opportunities, Leads, Contacts, CRM Activities, Outreach, Alerts, AI
+  Intelligence, Sources, Ingestion Runs. Empty tables show their headers and a
+  "No real data available yet." note — never fabricated rows.
+- **Scopes:** `GET /export/excel?scope=all` (default) or `leads` / `companies` /
+  `jobs` / `opportunities` / `contacts`. `GET /export/summary` returns actual
+  counts for the confirmation dialog.
+- **Provenance preserved:** source, source URL (clickable hyperlink), evidence
+  references, verification status, and confidence columns are included; AI FACT vs
+  INFERENCE is retained.
+- **Security:** endpoint is authenticated + role-guarded server-side (any role may
+  export; open locally when no `ADMIN_API_KEY`), rate-limited, and every export is
+  written to the audit log. **No secrets** (API keys/tokens/passwords) are ever
+  exported. Text cells are protected against spreadsheet **formula injection**
+  (leading `= + - @` are neutralised).
+- **Generation:** synchronous, in-memory, streamed as a download (no server-side
+  file is stored — nothing to leak or expire); suitable for the current data
+  volume. Large tables are read in bounded batches. On failure the UI shows
+  *"Unable to generate the Excel export."* — no fake fallback.
+- **File name:** `leadgenerationagent_<scope>_data_<YYYY-MM-DD>.xlsx`.

@@ -5,6 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { EmptyState, ErrorState } from '@/components/ui/States';
 import { DataProvenanceBanner } from '@/components/common/DataProvenanceBanner';
 import { DashboardKpiCard } from '@/components/dashboard/DashboardKpiCard';
+import { ExportAllData } from '@/components/dashboard/ExportAllData';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
 import { PriorityDistributionChart } from '@/components/dashboard/PriorityDistributionChart';
 import { QuickActions } from '@/components/dashboard/QuickActions';
@@ -167,7 +168,12 @@ export function DashboardPage() {
     <PageContainer
       title="Lead Intelligence Dashboard"
       subtitle={subtitle}
-      actions={!isLoading && !isError ? <RangeFilter value={range} onChange={setRange} /> : undefined}
+      actions={
+        <>
+          {!isLoading && !isError ? <RangeFilter value={range} onChange={setRange} /> : null}
+          <ExportAllData />
+        </>
+      }
     >
       {body}
     </PageContainer>
