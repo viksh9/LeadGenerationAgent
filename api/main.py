@@ -28,6 +28,7 @@ from api.routes import (
     companies,
     contacts,
     crm,
+    export,
     health,
     leads,
     observability,
@@ -122,3 +123,4 @@ app.include_router(crm.router)
 app.include_router(outreach.router)
 app.include_router(webhooks.router)
 app.include_router(observability.router)
+app.include_router(export.router)

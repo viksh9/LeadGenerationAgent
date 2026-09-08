@@ -61,7 +61,7 @@ _ALLOWED_CONTEXT = (
 # Runtime code roots to scan (backend packages + frontend src, excluding tests).
 _SCAN_ROOTS = [
     "api", "ai", "app", "collectors", "company", "config", "crm", "database", "enrichment",
-    "ingestion", "intelligence", "monitoring", "notifications", "outreach", "processors",
+    "export", "ingestion", "intelligence", "monitoring", "notifications", "outreach", "processors",
     "resilience", "scheduler", "scripts", "verification", "frontend/src",
 ]
 
