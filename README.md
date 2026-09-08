@@ -42,6 +42,7 @@ been implemented, configured, and verified against the live source. See
 | Monitoring & scheduling | [docs/monitoring-scheduler.md](docs/monitoring-scheduler.md) |
 | CRM & outreach lifecycle | [docs/crm-outreach.md](docs/crm-outreach.md) |
 | Source matrix & integration status | [docs/source-matrix.md](docs/source-matrix.md) |
+| **Real data sources** (all 7 categories, truthful status) | [docs/REAL_DATA_SOURCES.md](docs/REAL_DATA_SOURCES.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
 | Operations (daily checks, incidents, backup) | [OPERATIONS.md](OPERATIONS.md) · [docs/operations-runbook.md](docs/operations-runbook.md) |
 | Production-readiness checklist | [docs/production-readiness-checklist.md](docs/production-readiness-checklist.md) |
@@ -958,6 +959,17 @@ python -m app.audit scorecard              # real-data readiness summary
 python -m app.audit live-sources --source adzuna              # real connectivity check
 python -m app.audit live-ingestion --source adzuna            # dry-run (safe); add --persist
 python -m app.audit trace-lead                                # trace a real lead → evidence → source
+python -m app.audit source-readiness                          # per-source production readiness verdict
+```
+
+Real-source collection (all 7 categories) runs through one failure-isolated
+orchestrator; see [docs/REAL_DATA_SOURCES.md](docs/REAL_DATA_SOURCES.md):
+
+```bash
+python -m app.collectors list                       # sources + runnable + truthful status
+python -m app.collectors run --source adzuna        # real collection (persists)
+python -m app.collectors run --source adzuna --dry-run   # real request, validate, persist nothing
+python -m app.collectors run --all --dry-run        # every runnable source, isolated
 ```
 
 Status vocabulary is honest by design (`IMPLEMENTED` / `CONFIGURED` /

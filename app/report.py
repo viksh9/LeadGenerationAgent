@@ -124,6 +124,45 @@ def go_no_go(session: Session) -> dict:
     }
 
 
+def source_readiness(session: Session) -> dict:
+    """Per-source production readiness (§53). Truthful — never infers CONNECTED.
+    LIVE_VERIFIED only when a real check has recorded a last_success_at."""
+    inventory = source_inventory(session)
+    rows = []
+    for s in inventory:
+        impl = s["implementation"]              # IMPLEMENTED | NOT_IMPLEMENTED
+        conn = s["connection_status"]           # CONNECTED | ... | NOT_CHECKED
+        conf = s["configuration_status"]
+        licensing = s["commercial_use_status"]
+
+        if impl == "NOT_IMPLEMENTED":
+            verdict = "NOT_IMPLEMENTED"
+        elif conn == "CONNECTED" and s.get("last_success_at"):
+            verdict = "LIVE_VERIFIED"
+        elif conn == "CONNECTED":
+            verdict = "CONNECTED"
+        elif conn in ("AUTHENTICATION_FAILED", "ERROR"):
+            verdict = "BLOCKED"
+        elif conf in ("CONFIGURED",):
+            verdict = "CONFIGURED"
+        elif conf in ("NOT_CONFIGURED", "DISCOVERY_REQUIRED", "REQUIRES_REVIEW", "PLANNED",
+                      "AUTHENTICATION_REQUIRED"):
+            verdict = "NOT_CONFIGURED"
+        else:
+            verdict = "REQUIRES_REVIEW"
+
+        # Flag licensing that needs human review (does not by itself block).
+        requires_review = licensing in ("REQUIRES_REVIEW", "REQUIRES_APPROVAL", "RESTRICTED", "UNKNOWN")
+        rows.append({
+            "source_id": s["source_id"], "category": s["category"], "verdict": verdict,
+            "implementation": impl, "configuration": conf, "connection": conn,
+            "licensing": licensing, "requires_license_review": requires_review,
+            "last_success_at": s.get("last_success_at"),
+        })
+    live = sum(1 for r in rows if r["verdict"] == "LIVE_VERIFIED")
+    return {"sources": rows, "total": len(rows), "live_verified": live}
+
+
 def real_data_scorecard(session: Session) -> dict:
     inventory = source_inventory(session)
     connected = sum(1 for s in inventory if s["connection_status"] == "CONNECTED")
