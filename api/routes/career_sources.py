@@ -95,9 +95,28 @@ def discover_career_source_endpoint(
     company = company_repo.get_company(session, company_id)
     if company is None:
         raise NotFoundError(f"Company {company_id} not found.")
+
+    # If the company has no known domain/website, derive the official domain from
+    # real signals (company name + a real lead's source URL) before probing (§4).
+    domain = company.primary_domain
+    if not domain and not company.website:
+        from collectors.company.domain_discovery import CompanyDomainDiscoveryService
+        from database.models import Lead
+        from sqlalchemy import select
+        lead = session.execute(
+            select(Lead).where(Lead.normalized_company_name == company.normalized_name)
+            .order_by(Lead.updated_at.desc()).limit(1)
+        ).scalars().first()
+        dd = CompanyDomainDiscoveryService().discover(
+            company_name=company.canonical_name,
+            source_url=(lead.source_url if lead else None),
+        )
+        if dd.selected_domain and dd.status in ("VERIFIED", "POSSIBLE"):
+            domain = dd.selected_domain
+
     result = discover_career_source(
         company_id=company.id, company_name=company.canonical_name,
-        domain=company.primary_domain, website=company.website,
+        domain=domain, website=company.website,
     )
     row = csr.register_from_discovery(session, result)
     return DiscoverCareerSourceResponse(

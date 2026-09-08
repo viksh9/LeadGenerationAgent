@@ -43,6 +43,7 @@ been implemented, configured, and verified against the live source. See
 | CRM & outreach lifecycle | [docs/crm-outreach.md](docs/crm-outreach.md) |
 | Source matrix & integration status | [docs/source-matrix.md](docs/source-matrix.md) |
 | **Real data sources** (all 7 categories, truthful status) | [docs/REAL_DATA_SOURCES.md](docs/REAL_DATA_SOURCES.md) |
+| **Official company career sources** (domain + ATS discovery) | [docs/OFFICIAL_CAREER_SOURCES.md](docs/OFFICIAL_CAREER_SOURCES.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
 | Operations (daily checks, incidents, backup) | [OPERATIONS.md](OPERATIONS.md) · [docs/operations-runbook.md](docs/operations-runbook.md) |
 | Production-readiness checklist | [docs/production-readiness-checklist.md](docs/production-readiness-checklist.md) |
