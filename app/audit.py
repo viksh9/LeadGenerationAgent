@@ -251,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         ("synthetic-data", "Detect synthetic production records + runtime fabrication paths (§4)."),
         ("quality", "Data-quality scorecard with actual percentages (§11-19)."),
         ("source-inventory", "Per-source implementation/config/connection/licensing (§5)."),
+        ("source-readiness", "Per-source production readiness verdict (§53)."),
         ("full-report", "All sections with PASS/WARN/FAIL/NOT_CONFIGURED (§51)."),
         ("go-no-go", "GO only when all critical requirements pass (§52)."),
         ("scorecard", "Real-data readiness summary (actual counts, §53)."),
@@ -307,6 +308,12 @@ def main(argv: list[str] | None = None) -> int:
             from app.source_inventory import source_inventory
             result = {"sources": source_inventory(session)}
             _print_json_or(args, result, lambda: _print_inventory(result["sources"]))
+            return EXIT_OK
+
+        if args.command == "source-readiness":
+            from app.report import source_readiness
+            result = source_readiness(session)
+            _print_json_or(args, result, lambda: _print_source_readiness(result))
             return EXIT_OK
 
         if args.command == "full-report":
@@ -399,6 +406,14 @@ def _print_inventory(sources) -> None:
     for s in sources:
         print(f"{s['source_id']:16}{s['implementation']:16}{s['configuration_status']:18}"
               f"{s['connection_status']:16}{s['commercial_use_status']}")
+
+
+def _print_source_readiness(result) -> None:
+    print(f"SOURCE READINESS — {result['live_verified']}/{result['total']} live-verified")
+    print(f"  {'SOURCE':26}{'CATEGORY':16}{'VERDICT':18}{'LICENSE REVIEW'}")
+    for r in result["sources"]:
+        flag = "yes" if r["requires_license_review"] else "no"
+        print(f"  {r['source_id']:26}{r['category']:16}{r['verdict']:18}{flag}")
 
 
 def _print_full_report(result) -> None:

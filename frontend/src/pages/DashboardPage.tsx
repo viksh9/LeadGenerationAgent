@@ -12,6 +12,7 @@ import { QuickActions } from '@/components/dashboard/QuickActions';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { RecentSignals } from '@/components/dashboard/RecentSignals';
 import { SignalDistributionChart } from '@/components/dashboard/SignalDistributionChart';
+import { SourceCoverage } from '@/components/dashboard/SourceCoverage';
 import { TopOpportunitiesTable } from '@/components/dashboard/TopOpportunitiesTable';
 import { useDashboard } from '@/hooks/useDashboard';
 import type { DateRange } from '@/types/dashboard';
@@ -159,6 +160,10 @@ export function DashboardPage() {
           <div className="lg:col-span-1">
             <QuickActions />
           </div>
+        </section>
+
+        <section className="mt-6">
+          <SourceCoverage />
         </section>
       </>
     );
