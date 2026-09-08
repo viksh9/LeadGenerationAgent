@@ -13,6 +13,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.middleware import (
+    CorrelationIdMiddleware,
+    RequestSizeLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
+
 from api.dependencies import get_session  # re-exported for tests/overrides
 from api.errors import register_exception_handlers
 from api.routes import (
@@ -24,6 +30,7 @@ from api.routes import (
     crm,
     health,
     leads,
+    observability,
     outreach,
     scheduler,
     signals,
@@ -50,6 +57,13 @@ async def lifespan(_app: FastAPI):
     # real credentials or triggers network-capable code paths. Secrets never logged.
     load_dotenv()
     logger.info("startup app=%s env=%s version=%s", settings.app_name, settings.environment, settings.version)
+
+    # Fail safely on unsafe production configuration (missing/placeholder secrets,
+    # wildcard CORS, demo mode on, missing admin key). Names keys only, never values.
+    from config.validation import assert_startup_config
+    for issue in assert_startup_config(settings):
+        logger.warning("config check [%s] %s: %s", issue.severity, issue.key, issue.message)
+
     init_db()
 
     # Continuous monitoring scheduler — started ONLY when explicitly enabled, so
@@ -86,6 +100,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Production middleware. add_middleware stacks in reverse, so CorrelationId (added
+# last) is outermost and sets the request id before anything else runs.
+if settings.security_headers_enabled:
+    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.hsts_enabled)
+app.add_middleware(RequestSizeLimitMiddleware, max_bytes=settings.max_request_bytes)
+app.add_middleware(CorrelationIdMiddleware)
+
 register_exception_handlers(app)
 app.include_router(health.router)
 app.include_router(leads.router)
@@ -100,3 +121,4 @@ app.include_router(alerts.router)
 app.include_router(crm.router)
 app.include_router(outreach.router)
 app.include_router(webhooks.router)
+app.include_router(observability.router)

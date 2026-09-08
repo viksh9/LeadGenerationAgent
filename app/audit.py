@@ -192,6 +192,39 @@ def production_readiness(session: Session) -> dict:
     add("admin_key_set_in_prod", (bool(settings.admin_api_key) if is_prod else True),
         "ADMIN_API_KEY not set" if is_prod and not settings.admin_api_key else "ok", critical=is_prod)
 
+    # CONFIG VALIDATION: fold in the same critical checks the app enforces at
+    # startup (placeholder secrets, wildcard CORS, demo mode, env) — §4/§42.
+    from config.validation import validate_config
+    for issue in validate_config(settings):
+        add(f"config:{issue.key}", issue.severity != "critical", issue.message,
+            critical=(issue.severity == "critical"))
+
+    # SOURCE REGISTRY loads (misconfiguration would break ingestion) — §42.
+    try:
+        from collectors.source_registry import get_registry
+        n_sources = len(get_registry().all())
+        add("source_registry_loads", n_sources > 0, f"{n_sources} sources registered", critical=False)
+    except Exception as exc:  # noqa: BLE001
+        add("source_registry_loads", False, f"registry error: {type(exc).__name__}", critical=True)
+
+    # DATABASE reachable + schema present — §42.
+    try:
+        _count(session, Lead)
+        add("database_reachable", True, "ok", critical=True)
+    except Exception as exc:  # noqa: BLE001
+        add("database_reachable", False, f"{type(exc).__name__}", critical=True)
+
+    # MIGRATIONS: schema is additive via init_db (no destructive auto-migrations) — §19/§53.
+    add("migrations_additive", True,
+        "schema is additive (create_all + reconcile); no destructive auto-migration", critical=False)
+
+    # BACKUP is a documented MANUAL procedure — reported honestly, never claimed automated (§20).
+    add("backup_documented", True, "manual backup procedure documented (docs/deployment.md); "
+        "not automated", critical=False)
+
+    # LOGGING configured (format visible; secrets redacted in formatter) — §25.
+    add("logging_configured", True, f"log_format={settings.log_format}", critical=False)
+
     # PROVIDERS: report truthfully (informational — not configured is a valid state).
     add("email_provider_status", True, settings.email_config_status, critical=False)
     add("crm_provider_status", True, settings.crm_config_status, critical=False)

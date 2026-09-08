@@ -17,6 +17,7 @@ from ai import service as ai_service
 from ai.provider import config_status
 from api.dependencies import get_session
 from api.schemas import AIIntelligenceResponse, AIStatusResponse
+from api.security import rate_limit
 from company import repository as company_repo
 from config.exceptions import NotFoundError
 from config.settings import get_settings
@@ -24,6 +25,9 @@ from database.repository import get_lead
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["ai"])
+
+# Rate limit forced AI analysis to protect the provider + control cost (§14, §46).
+_ai_limit = rate_limit("ai_analyze", get_settings().ai_rate_per_minute)
 
 
 @router.get("/ai/status", response_model=AIStatusResponse, summary="AI provider status (truthful)")
@@ -52,7 +56,7 @@ def lead_ai_intelligence(lead_id: int, session: Session = Depends(get_session)) 
 
 
 @router.post("/leads/{lead_id}/ai-analyze", response_model=AIIntelligenceResponse,
-             summary="Force a fresh AI analysis for a lead")
+             summary="Force a fresh AI analysis for a lead", dependencies=[Depends(_ai_limit)])
 def lead_ai_analyze(lead_id: int, session: Session = Depends(get_session)) -> AIIntelligenceResponse:
     lead = get_lead(session, lead_id)
     if lead is None:
@@ -72,7 +76,7 @@ def company_ai_intelligence(company_id: int, session: Session = Depends(get_sess
 
 
 @router.post("/companies/{company_id}/ai-analyze", response_model=AIIntelligenceResponse,
-             summary="Force a fresh AI analysis for a company")
+             summary="Force a fresh AI analysis for a company", dependencies=[Depends(_ai_limit)])
 def company_ai_analyze(company_id: int, session: Session = Depends(get_session)) -> AIIntelligenceResponse:
     company = company_repo.get_company(session, company_id)
     if company is None:

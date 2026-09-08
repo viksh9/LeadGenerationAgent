@@ -32,6 +32,22 @@ def health(settings: Settings = Depends(get_app_settings)) -> HealthResponse:
 
 
 @router.get(
+    "/health/live",
+    response_model=HealthResponse,
+    summary="Liveness probe",
+    description="Process is alive. No dependency checks — used by orchestrators to "
+                "decide whether to restart the container.",
+)
+def liveness(settings: Settings = Depends(get_app_settings)) -> HealthResponse:
+    return HealthResponse(
+        status="alive",
+        app=settings.app_name,
+        environment=settings.environment,
+        version=settings.version,
+    )
+
+
+@router.get(
     "/health/ready",
     response_model=ReadinessResponse,
     summary="Readiness check",
