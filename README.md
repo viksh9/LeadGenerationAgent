@@ -31,6 +31,28 @@ Nothing here claims a real source is "connected" unless a collector has actually
 been implemented, configured, and verified against the live source. See
 [Current source integration status](#current-source-integration-status).
 
+## Documentation
+
+| Topic | Doc |
+|---|---|
+| Architecture map (all layers, data lineage) | [docs/architecture-map.md](docs/architecture-map.md) |
+| Daily sales workflow | [docs/user-workflow.md](docs/user-workflow.md) |
+| Data quality & validation (`app.audit` commands) | [docs/data-quality-and-validation.md](docs/data-quality-and-validation.md) |
+| AI reasoning layer | [docs/ai-reasoning-layer.md](docs/ai-reasoning-layer.md) |
+| Monitoring & scheduling | [docs/monitoring-scheduler.md](docs/monitoring-scheduler.md) |
+| CRM & outreach lifecycle | [docs/crm-outreach.md](docs/crm-outreach.md) |
+| Source matrix & integration status | [docs/source-matrix.md](docs/source-matrix.md) |
+| Deployment | [docs/deployment.md](docs/deployment.md) |
+| Operations (daily checks, incidents, backup) | [OPERATIONS.md](OPERATIONS.md) · [docs/operations-runbook.md](docs/operations-runbook.md) |
+| Production-readiness checklist | [docs/production-readiness-checklist.md](docs/production-readiness-checklist.md) |
+| **Known limitations** (read this) | [docs/known-limitations.md](docs/known-limitations.md) |
+
+**Troubleshooting:** most operational issues (source/DB/AI/email/CRM/scheduler
+failures, rate limits, data-quality) have step-by-step responses in
+[OPERATIONS.md](OPERATIONS.md) and [docs/operations-runbook.md](docs/operations-runbook.md).
+Correlate any failing request by its `X-Request-ID` (returned on every response and
+in every error body) against the logs.
+
 ## Architecture — the real-data flow
 
 Every stage preserves provenance:
