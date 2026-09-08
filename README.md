@@ -914,3 +914,31 @@ Operational procedures: [docs/operations-runbook.md](docs/operations-runbook.md)
 Backups remain a **manual** documented procedure (not automated), and high
 availability is **not** implemented — see the runbook for what auto-recovers vs
 what needs manual action.
+
+## Validation & audits
+
+Real-data validation tooling proves what actually works, reporting **actual**
+counts (never fabricated). Full reference:
+[docs/data-quality-and-validation.md](docs/data-quality-and-validation.md);
+architecture map: [docs/architecture-map.md](docs/architecture-map.md).
+
+```bash
+python -m app.audit validate-data          # data-quality / integrity (actual counts)
+python -m app.audit provenance             # every record traceable to a real source
+python -m app.audit synthetic-data         # synthetic records (DB) + runtime scan
+python -m app.audit quality                # data-quality scorecard (real %)
+python -m app.audit source-inventory       # per-source impl/config/connection/licensing
+python -m app.audit production-readiness   # fails on critical security/real-data gaps
+python -m app.audit full-report            # all sections PASS/WARN/FAIL/NOT_CONFIGURED
+python -m app.audit go-no-go               # GO only when critical requirements pass
+python -m app.audit scorecard              # real-data readiness summary
+# opt-in, real network:
+python -m app.audit live-sources --source adzuna              # real connectivity check
+python -m app.audit live-ingestion --source adzuna            # dry-run (safe); add --persist
+python -m app.audit trace-lead                                # trace a real lead → evidence → source
+```
+
+Status vocabulary is honest by design (`IMPLEMENTED` / `CONFIGURED` /
+`LIVE-VERIFIED` / `NOT_CONFIGURED` / `NOT_IMPLEMENTED` / `REQUIRES_REVIEW`); the
+DB synthetic check is the authoritative fail, and thresholds are never weakened to
+manufacture leads — zero real leads is preferred over fabricated ones.
