@@ -106,11 +106,18 @@ def _summary_text(agg: CompanyAggregate, opportunity: str) -> str:
 
 
 def _location(agg: CompanyAggregate) -> Optional[str]:
+    # Compact form for the UI: top city + "+N more" when there are several.
     cities = agg.cities.most_common()
     if not cities:
         return None
     top = cities[0][0]
     return f"{top} +{len(cities) - 1} more" if len(cities) > 1 else top
+
+
+def _location_all(agg: CompanyAggregate) -> Optional[str]:
+    # Full list (most active first) for the Excel export — every real hiring city.
+    cities = [c for c, _ in agg.cities.most_common() if c]
+    return ", ".join(cities) if cities else None
 
 
 def _primary_source_url(agg: CompanyAggregate) -> Optional[str]:
@@ -204,7 +211,8 @@ def build_lead_fields(
         "company_domain": agg.company_domain,
         "company_type": agg.company_type,
         "industry": (agg.industries.most_common(1)[0][0] if agg.industries else None),
-        "location": _location(agg),
+        "location": _location(agg),            # compact "Top +N more" for the UI
+        "location_all": _location_all(agg),    # full city list for the Excel export
         "it_job_count": agg.it_job_count,
         "recent_job_count": agg.recent_job_count,
         "hiring_intensity": agg.hiring_intensity,

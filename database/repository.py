@@ -43,6 +43,7 @@ _WRITABLE_FIELDS: frozenset[str] = frozenset(
         "company_type",
         "industry",
         "location",
+        "location_all",
         "company_size",
         "company_website",
         "it_job_count",

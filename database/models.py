@@ -251,7 +251,8 @@ class Lead(Base):
         SAEnum(CompanyType, native_enum=False, length=32), nullable=True
     )
     industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)   # compact "Top +N more" (UI)
+    location_all: Mapped[str | None] = mapped_column(String(1024), nullable=True)  # full city list (Excel export)
     company_size: Mapped[str | None] = mapped_column(String(64), nullable=True)
     company_website: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

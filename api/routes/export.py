@@ -31,15 +31,16 @@ router = APIRouter(prefix="/export", tags=["export"])
 _XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _ALLOWED_SCOPES = {"all", "leads", "companies", "jobs", "opportunities", "contacts"}
 
-# Any authenticated role may export (read operation); ADMIN always allowed. Open
-# locally when no ADMIN_API_KEY is configured (consistent with read endpoints).
-_export_role = require_role(UserRole.VIEWER, UserRole.RESEARCHER, UserRole.SALES)
+# Exporting ALL lead intelligence requires SALES (or ADMIN). When no ADMIN_API_KEY
+# is configured the app is open locally (resolves to ADMIN); once a key is set,
+# an unauthenticated caller (default VIEWER) is blocked (§30/§36).
+_export_role = require_role(UserRole.SALES)
 _export_limit = rate_limit("export_excel", 12)   # at most 12 exports/min process-wide
 
 
 def _safe_filename(scope: str, now: datetime) -> str:
-    scope_slug = re.sub(r"[^a-z0-9]+", "_", scope.lower()).strip("_") or "all"
-    return f"leadgenerationagent_{scope_slug}_data_{now.date().isoformat()}.xlsx"
+    # The export is always the single "Lead Data" report.
+    return f"leadgenerationagent_lead_data_{now.date().isoformat()}.xlsx"
 
 
 @router.get("/summary", summary="Counts of what an export would contain (real)")

@@ -980,28 +980,35 @@ manufacture leads — zero real leads is preferred over fabricated ones.
 ## Dashboard Excel export
 
 The **Dashboard** has a prominent **"Export All Data"** button (top action area,
-next to the range filter). It generates a professional `.xlsx` workbook of the
-**actual current database contents** — real data only, never demo/sample rows.
+next to the range filter). It generates a professional, sales-ready `.xlsx` of the
+**actual current lead intelligence** — real data only, never demo/sample rows.
 
-- **What "All Data" means:** every stored business entity, one worksheet each —
-  `README` (with actual counts + data policy), `Data Dictionary`, Companies,
-  Canonical Jobs, Job Source Listings, Signals, Evidence, Opportunities, Sales
-  Opportunities, Leads, Contacts, CRM Activities, Outreach, Alerts, AI
-  Intelligence, Sources, Ingestion Runs. Empty tables show their headers and a
-  "No real data available yet." note — never fabricated rows.
-- **Scopes:** `GET /export/excel?scope=all` (default) or `leads` / `companies` /
-  `jobs` / `opportunities` / `contacts`. `GET /export/summary` returns actual
-  counts for the confirmation dialog.
-- **Provenance preserved:** source, source URL (clickable hyperlink), evidence
-  references, verification status, and confidence columns are included; AI FACT vs
-  INFERENCE is retained.
-- **Security:** endpoint is authenticated + role-guarded server-side (any role may
-  export; open locally when no `ADMIN_API_KEY`), rate-limited, and every export is
-  written to the audit log. **No secrets** (API keys/tokens/passwords) are ever
-  exported. Text cells are protected against spreadsheet **formula injection**
-  (leading `= + - @` are neutralised).
-- **Generation:** synchronous, in-memory, streamed as a download (no server-side
-  file is stored — nothing to leak or expire); suitable for the current data
-  volume. Large tables are read in bounded batches. On failure the UI shows
-  *"Unable to generate the Excel export."* — no fake fallback.
-- **File name:** `leadgenerationagent_<scope>_data_<YYYY-MM-DD>.xlsx`.
+- **One worksheet, named `Lead Data`.** No other sheets. **One row per
+  company-level lead** (the Lead table is already the deduplicated company-level
+  aggregation — syndicated jobs across Adzuna/Jooble/Greenhouse/Lever are never
+  counted as separate rows).
+- **Exactly 16 columns, in this order:** Sr No, Company Name, No of Openings,
+  Location, Intensity, Signal, Technology, Target POC Details, Score, Priority,
+  Status, Contact Number, Email, Opportunity, Signal Date, Source. `Sr No` is a
+  1-based export row number (not a DB id); `No of Openings` is the canonical
+  observed count (`it_job_count`), blank when not confidently known.
+- **POC & contacts are real or blank.** A source-verified person is shown as
+  `Name — Role`; otherwise `<role> — Recommended Role`. Contact Number / Email are
+  only ever the source-verified business values — **never guessed**; blank when
+  absent.
+- **Real-data filter:** only leads with provenance REAL are exported; synthetic
+  records are excluded. Empty state writes the headers + a single
+  `"No real lead data available."` note — never a fake row.
+- **Formatting:** frozen + filtered header, sensible column widths, wrapped text,
+  `dd-mmm-yyyy` dates, restrained priority shading (colour + the value text, never
+  colour-alone). Default sort: priority ↓, score ↓, signal date ↓.
+- **Security:** endpoint requires SALES/ADMIN server-side (open locally when no
+  `ADMIN_API_KEY`; an unauthenticated caller is blocked once a key is set),
+  rate-limited, and every export is audited. **No secrets** are exported; text is
+  protected against spreadsheet **formula injection** (genuine phone numbers are
+  kept clean).
+- **API:** `GET /export/excel` streams the workbook; `GET /export/summary` returns
+  the actual eligible lead count for the confirmation dialog. Generation is
+  synchronous + in-memory (no server-side file stored); leads are read via
+  preloaded joins (no N+1). File name:
+  `leadgenerationagent_lead_data_<YYYY-MM-DD>.xlsx`.
