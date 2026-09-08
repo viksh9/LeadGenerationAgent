@@ -242,44 +242,185 @@ def production_readiness(session: Session) -> dict:
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     parser = argparse.ArgumentParser(prog="python -m app.audit",
-                                     description="Real-data + production-readiness audits.")
+                                     description="Real-data validation, provenance & production audits.")
     sub = parser.add_subparsers(dest="command", required=True)
-    p1 = sub.add_parser("validate-data", help="Report data-quality issues (actual counts).")
-    p1.add_argument("--json", action="store_true")
-    p1.add_argument("--fail-on-issues", action="store_true")
-    p2 = sub.add_parser("production-readiness", help="Fail on real-data/security violations.")
-    p2.add_argument("--json", action="store_true")
+    for name, helptext in [
+        ("validate-data", "Report data-quality/integrity issues (actual counts)."),
+        ("production-readiness", "Fail on real-data/security violations."),
+        ("provenance", "Verify every business record is traceable to a real source (§3)."),
+        ("synthetic-data", "Detect synthetic production records + runtime fabrication paths (§4)."),
+        ("quality", "Data-quality scorecard with actual percentages (§11-19)."),
+        ("source-inventory", "Per-source implementation/config/connection/licensing (§5)."),
+        ("full-report", "All sections with PASS/WARN/FAIL/NOT_CONFIGURED (§51)."),
+        ("go-no-go", "GO only when all critical requirements pass (§52)."),
+        ("scorecard", "Real-data readiness summary (actual counts, §53)."),
+    ]:
+        sp = sub.add_parser(name, help=helptext)
+        sp.add_argument("--json", action="store_true")
+        if name in ("validate-data",):
+            sp.add_argument("--fail-on-issues", action="store_true")
+    # Live (network) subcommands.
+    ls = sub.add_parser("live-sources", help="Real connectivity check for configured sources (§7).")
+    ls.add_argument("--json", action="store_true")
+    ls.add_argument("--source", default=None)
+    li = sub.add_parser("live-ingestion", help="Fetch a small real sample through the pipeline (§8).")
+    li.add_argument("--source", required=True)
+    li.add_argument("--persist", action="store_true", help="Persist real records (default: dry-run).")
+    li.add_argument("--max-records", type=int, default=20)
+    li.add_argument("--json", action="store_true")
+    tl = sub.add_parser("trace-lead", help="Trace one real lead → evidence → source (§21).")
+    tl.add_argument("--lead-id", type=int, default=None)
+    tl.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
     session = _session()
     try:
         if args.command == "validate-data":
             result = validate_data(session)
-            if args.json:
-                print(json.dumps(result, indent=2))
-            else:
-                print(f"Data validation — {result['total_records']} records, "
-                      f"{result['total_issues']} issue(s):")
-                for k, v in result["issues"].items():
-                    flag = "" if v == 0 else "  <-- "
-                    print(f"  {k:34} {v}{flag}")
-                print("CLEAN" if result["clean"] else "ISSUES FOUND")
-            if args.fail_on_issues and not result["clean"]:
-                return EXIT_ISSUES
+            _print_json_or(args, result, lambda: _print_validate(result))
+            return EXIT_ISSUES if (getattr(args, "fail_on_issues", False) and not result["clean"]) else EXIT_OK
+
+        if args.command == "production-readiness":
+            result = production_readiness(session)
+            _print_json_or(args, result, lambda: _print_readiness(result))
+            return EXIT_OK if result["ready"] else EXIT_ISSUES
+
+        if args.command == "provenance":
+            from app.provenance_audit import provenance_report
+            result = provenance_report(session)
+            _print_json_or(args, result, lambda: _print_provenance(result))
+            return EXIT_OK if result["ok"] else EXIT_ISSUES
+
+        if args.command == "synthetic-data":
+            from app.synthetic_audit import synthetic_report
+            result = synthetic_report(session)
+            _print_json_or(args, result, lambda: _print_synthetic(result))
+            return EXIT_OK if result["ok"] else EXIT_ISSUES
+
+        if args.command == "quality":
+            from app.quality_audit import quality_report
+            result = quality_report(session)
+            _print_json_or(args, result, lambda: print(json.dumps(result, indent=2)))
             return EXIT_OK
 
-        result = production_readiness(session)
-        if args.json:
-            print(json.dumps(result, indent=2))
-        else:
-            print(f"Production readiness ({result['environment']}): "
-                  f"{'READY' if result['ready'] else 'NOT READY'}")
-            for c in result["checks"]:
-                mark = "PASS" if c["passed"] else ("FAIL" if c["critical"] else "warn")
-                print(f"  [{mark}] {c['check']}: {c['detail']}")
-        return EXIT_OK if result["ready"] else EXIT_ISSUES
+        if args.command == "source-inventory":
+            from app.source_inventory import source_inventory
+            result = {"sources": source_inventory(session)}
+            _print_json_or(args, result, lambda: _print_inventory(result["sources"]))
+            return EXIT_OK
+
+        if args.command == "full-report":
+            from app.report import full_report
+            result = full_report(session)
+            _print_json_or(args, result, lambda: _print_full_report(result))
+            return EXIT_OK
+
+        if args.command == "go-no-go":
+            from app.report import go_no_go
+            result = go_no_go(session)
+            _print_json_or(args, result, lambda: _print_go_no_go(result))
+            return EXIT_OK if result["verdict"] == "GO" else EXIT_ISSUES
+
+        if args.command == "scorecard":
+            from app.report import real_data_scorecard
+            result = real_data_scorecard(session)
+            _print_json_or(args, result, lambda: _print_scorecard(result))
+            return EXIT_OK
+
+        if args.command == "live-sources":
+            from app.live_audit import live_sources
+            result = {"sources": live_sources(session, only=args.source)}
+            _print_json_or(args, result, lambda: [print(f"  {s['source_id']:14} {s['status']:20} "
+                                                        f"{s.get('detail','')}") for s in result["sources"]])
+            return EXIT_OK
+
+        if args.command == "live-ingestion":
+            from app.live_audit import live_ingestion
+            result = live_ingestion(session, source_id=args.source, persist=args.persist,
+                                    max_records=args.max_records)
+            _print_json_or(args, result, lambda: print(json.dumps(result, indent=2)))
+            return EXIT_OK
+
+        if args.command == "trace-lead":
+            from app.live_audit import trace_lead
+            result = trace_lead(session, lead_id=args.lead_id)
+            _print_json_or(args, result, lambda: print(json.dumps(result, indent=2)))
+            return EXIT_OK
+
+        return EXIT_OK
     finally:
         session.close()
+
+
+def _print_json_or(args, result, printer) -> None:
+    if getattr(args, "json", False):
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        printer()
+
+
+def _print_validate(result) -> None:
+    print(f"Data validation — {result['total_records']} records, {result['total_issues']} issue(s):")
+    for k, v in result["issues"].items():
+        print(f"  {k:34} {v}{'' if v == 0 else '  <-- '}")
+    print("CLEAN" if result["clean"] else "ISSUES FOUND")
+
+
+def _print_readiness(result) -> None:
+    print(f"Production readiness ({result['environment']}): {'READY' if result['ready'] else 'NOT READY'}")
+    for c in result["checks"]:
+        mark = "PASS" if c["passed"] else ("FAIL" if c["critical"] else "warn")
+        print(f"  [{mark}] {c['check']}: {c['detail']}")
+
+
+def _print_provenance(result) -> None:
+    print(f"Provenance audit — {result['total_failures']} failure(s):")
+    for c in result["checks"]:
+        print(f"  [{'PASS' if c['ok'] else 'FAIL'}] {c['name']:34} {c['failures']}  {c['detail']}")
+    print("OK" if result["ok"] else "PROVENANCE FAILURES")
+
+
+def _print_synthetic(result) -> None:
+    db, rt = result["database"], result["runtime"]
+    print(f"Synthetic-data audit — DB synthetic: {db['synthetic_records']} "
+          f"({'PASS' if db['ok'] else 'FAIL'})")
+    if db["by_table"]:
+        for t, n in db["by_table"].items():
+            print(f"    {t}: {n}")
+    print(f"Runtime fabrication hits (production code): {len(rt['production_runtime_hits'])} "
+          f"({'PASS' if rt['ok'] else 'FAIL'}); allowed/guard hits: {rt['allowed_or_guard_hits']}")
+    for h in rt["production_runtime_hits"][:20]:
+        print(f"    PRODUCTION_RUNTIME {h['file']}:{h['line']}  {h['text']}")
+    print("OK" if result["ok"] else "SYNTHETIC/FABRICATION FOUND")
+
+
+def _print_inventory(sources) -> None:
+    print(f"{'SOURCE':16}{'IMPL':16}{'CONFIG':18}{'CONNECTION':16}{'LICENSING'}")
+    for s in sources:
+        print(f"{s['source_id']:16}{s['implementation']:16}{s['configuration_status']:18}"
+              f"{s['connection_status']:16}{s['commercial_use_status']}")
+
+
+def _print_full_report(result) -> None:
+    print(f"FULL REPORT ({result['environment']}) @ {result['generated_at']}")
+    for name, sec in result["sections"].items():
+        st = sec.get("status", "")
+        print(f"  {name:22} {st}")
+    print("  scorecard:", json.dumps(result["scorecard"]))
+
+
+def _print_go_no_go(result) -> None:
+    print(f"GO/NO-GO ({result['environment']}): {result['verdict']}")
+    for b in result["blockers"]:
+        print(f"  BLOCKER: {b}")
+    if result["verdict"] == "GO":
+        print("  " + result["note"])
+
+
+def _print_scorecard(result) -> None:
+    print("REAL DATA READINESS")
+    for k, v in result.items():
+        print(f"  {k:22} {v}")
 
 
 if __name__ == "__main__":
