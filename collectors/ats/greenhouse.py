@@ -71,6 +71,8 @@ class GreenhouseConfig(BaseModel):
     timeout_seconds: float = 15.0
     max_records_per_board: int = 500
     india_only: bool = True   # India-first: keep only India-based roles (§15)
+    it_only: bool = False     # ATS board = a known IT/tech company -> capture EVERY role
+                              # (SDE, QA, HR, …). Set true to restrict to IT-technical roles.
 
     @property
     def is_configured(self) -> bool:
@@ -88,6 +90,7 @@ def load_greenhouse_config() -> GreenhouseConfig:
         timeout_seconds=float(os.environ.get("GREENHOUSE_TIMEOUT_SECONDS", 15) or 15),
         max_records_per_board=int(os.environ.get("GREENHOUSE_MAX_RECORDS", 500) or 500),
         india_only=(os.environ.get("ATS_INDIA_ONLY", "true").strip().lower() not in ("false", "0", "no")),
+        it_only=(os.environ.get("ATS_IT_ONLY", "false").strip().lower() in ("true", "1", "yes")),
     )
 
 
@@ -226,7 +229,7 @@ class GreenhouseCollector(BaseCollector):
         for item in jobs[: self.config.max_records_per_board]:
             if not isinstance(item, dict):
                 continue
-            if not is_it_relevant(item):
+            if self.config.it_only and not is_it_relevant(item):
                 skipped += 1
                 continue
             if self.config.india_only and not _is_india_job(item):

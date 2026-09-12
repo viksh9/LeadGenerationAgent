@@ -37,17 +37,24 @@ GH_PAYLOAD = {
 }
 
 
-def _gh_collector(handler, boards=("acme",)):
-    cfg = gh.GreenhouseConfig(boards=list(boards))
+def _gh_collector(handler, boards=("acme",), it_only=False):
+    cfg = gh.GreenhouseConfig(boards=list(boards), it_only=it_only)
     client = gh.GreenhouseClient(cfg, http=httpx.Client(transport=httpx.MockTransport(handler)))
     return gh.GreenhouseCollector(_src("greenhouse"), config=cfg, client=client)
 
 
-def test_greenhouse_maps_and_filters():
+def test_greenhouse_captures_all_roles_by_default():
+    # An ATS board is a known IT/tech company -> every role is captured (SDE, QA, HR, …).
     col = _gh_collector(lambda r: httpx.Response(200, json=GH_PAYLOAD))
     res = col.fetch(FetchRequest(board="acme"))
+    assert res.total_records == 2 and res.records_count == 2   # engineer + receptionist both kept
+
+
+def test_greenhouse_it_only_filters_non_it():
+    col = _gh_collector(lambda r: httpx.Response(200, json=GH_PAYLOAD), it_only=True)
+    res = col.fetch(FetchRequest(board="acme"))
     assert res.total_records == 2
-    assert res.records_count == 1                      # receptionist filtered as non-IT
+    assert res.records_count == 1                      # receptionist filtered when it_only=True
     d = res.records[0]
     assert d.source_id == "greenhouse" and d.is_synthetic is False
     assert d.external_id == "123"
@@ -85,17 +92,23 @@ LV_PAYLOAD = [
 ]
 
 
-def _lv_collector(handler, sites=("acme",)):
-    cfg = lv.LeverConfig(sites=list(sites))
+def _lv_collector(handler, sites=("acme",), it_only=False):
+    cfg = lv.LeverConfig(sites=list(sites), it_only=it_only)
     client = lv.LeverClient(cfg, http=httpx.Client(transport=httpx.MockTransport(handler)))
     return lv.LeverCollector(_src("lever"), config=cfg, client=client)
 
 
-def test_lever_maps_and_filters():
+def test_lever_captures_all_roles_by_default():
     col = _lv_collector(lambda r: httpx.Response(200, json=LV_PAYLOAD))
     res = col.fetch(FetchRequest(board="acme", limit=10))
+    assert res.total_records == 2 and res.records_count == 2   # every role kept by default
+
+
+def test_lever_it_only_filters_non_it():
+    col = _lv_collector(lambda r: httpx.Response(200, json=LV_PAYLOAD), it_only=True)
+    res = col.fetch(FetchRequest(board="acme", limit=10))
     assert res.total_records == 2
-    assert res.records_count == 1                      # driver filtered as non-IT
+    assert res.records_count == 1                      # driver filtered when it_only=True
     d = res.records[0]
     assert d.source_id == "lever" and d.is_synthetic is False
     assert d.external_id == "abc-1"
