@@ -23,7 +23,7 @@ export function LeadHeader({
   onDelete: () => void;
   deleting: boolean;
 }) {
-  const subtitle = [lead.industry, lead.location].filter(Boolean).join(' • ') || 'No company details';
+  const subtitle = [lead.industry, lead.location_all || lead.location].filter(Boolean).join(' • ') || 'No company details';
 
   return (
     <section className="card card-pad" aria-label="Lead summary">

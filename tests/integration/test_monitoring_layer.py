@@ -330,9 +330,12 @@ def test_should_trigger_ai_only_on_meaningful_change():
 # APIs
 # --------------------------------------------------------------------------- #
 def test_api_scheduler_jobs_seeded(client):
+    from config import get_settings
     body = client.get("/scheduler/jobs").json()
-    assert body["total"] >= 7                      # maintenance jobs at minimum
-    assert body["scheduler_enabled"] is False      # off by default
+    assert body["total"] >= 7                       # maintenance jobs at minimum
+    # scheduler_enabled reflects the deployment config (may be on when continuous
+    # collection is enabled) — assert it mirrors the real setting, not a hard-coded default.
+    assert body["scheduler_enabled"] == get_settings().scheduler_active
 
 
 def test_api_alerts_empty(client):

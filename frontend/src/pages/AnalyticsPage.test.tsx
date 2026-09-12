@@ -28,6 +28,7 @@ function makeLead(p: Partial<Lead> & Pick<Lead, 'id' | 'company_name'>): Lead {
     last_signal_date: null,
     industry: 'IT',
     location: 'Pune',
+    location_all: 'Pune',
     company_size: null,
     company_website: null,
     signal_type: 'HIRING',

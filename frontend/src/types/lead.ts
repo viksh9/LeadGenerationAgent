@@ -123,7 +123,8 @@ export interface Lead {
   company_domain: string | null;
   company_type: CompanyType | null;
   industry: string | null;
-  location: string | null;
+  location: string | null;          // compact "Top +N more"
+  location_all?: string | null;     // full city list (preferred for display when present)
   company_size: string | null;
   company_website: string | null;
   // Company-level hiring aggregation (one lead == one company opportunity).

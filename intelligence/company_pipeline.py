@@ -105,18 +105,29 @@ def _summary_text(agg: CompanyAggregate, opportunity: str) -> str:
     )
 
 
+# Country-level location tokens are NOT cities — a job that only says "India" carries
+# no city. We drop these from the displayed city list (unless they are all we have), so
+# the UI shows real cities ("Bengaluru, Hyderabad") instead of "India +N more".
+_COUNTRY_TOKENS = {"india", "bharat"}
+
+
+def _hiring_cities(agg: CompanyAggregate) -> list[str]:
+    """All real hiring cities, most-active first, with the bare country token removed.
+    If only the country is known (no city), it is kept rather than returning nothing."""
+    cities = [c.strip() for c, _ in agg.cities.most_common() if c and c.strip()]
+    real = [c for c in cities if c.lower() not in _COUNTRY_TOKENS]
+    return real or cities
+
+
 def _location(agg: CompanyAggregate) -> Optional[str]:
-    # Compact form for the UI: top city + "+N more" when there are several.
-    cities = agg.cities.most_common()
-    if not cities:
-        return None
-    top = cities[0][0]
-    return f"{top} +{len(cities) - 1} more" if len(cities) > 1 else top
+    # Full, explicit city list for the UI — every real hiring city, no "+N more".
+    cities = _hiring_cities(agg)
+    return ", ".join(cities) if cities else None
 
 
 def _location_all(agg: CompanyAggregate) -> Optional[str]:
-    # Full list (most active first) for the Excel export — every real hiring city.
-    cities = [c for c, _ in agg.cities.most_common() if c]
+    # Same real-city list for the Excel export.
+    cities = _hiring_cities(agg)
     return ", ".join(cities) if cities else None
 
 
