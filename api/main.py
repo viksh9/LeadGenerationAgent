@@ -31,6 +31,7 @@ from api.routes import (
     enrichment,
     export,
     health,
+    intelligence,
     leads,
     observability,
     outreach,
@@ -130,3 +131,4 @@ app.include_router(webhooks.router)
 app.include_router(observability.router)
 app.include_router(export.router)
 app.include_router(enrichment.router)
+app.include_router(intelligence.router)

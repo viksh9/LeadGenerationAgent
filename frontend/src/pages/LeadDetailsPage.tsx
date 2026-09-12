@@ -16,6 +16,7 @@ import { TargetPOCPanel } from '@/components/leads/detail/TargetPOCPanel';
 import { EvidencePanel } from '@/components/leads/detail/EvidencePanel';
 import { VerificationPanel } from '@/components/leads/detail/VerificationPanel';
 import { AIIntelligencePanel } from '@/components/leads/detail/AIIntelligencePanel';
+import { AIProfileHighlightsPanel } from '@/components/leads/detail/AIProfileHighlightsPanel';
 import { OutreachPanel } from '@/components/leads/detail/OutreachPanel';
 import { RecommendationCard } from '@/components/leads/detail/RecommendationCard';
 import {
@@ -123,6 +124,7 @@ export function LeadDetailsPage() {
           {/* Main analysis */}
           <div className="space-y-4 lg:col-span-2">
             <OpportunityPanel lead={lead} />
+            <AIProfileHighlightsPanel leadId={lead.id} />
             <SignalPanel lead={lead} />
             <TechnologyList lead={lead} />
             <CompanySummaryCard lead={lead} />

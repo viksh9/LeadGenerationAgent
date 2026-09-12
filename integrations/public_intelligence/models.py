@@ -11,12 +11,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-# POC status states (§22).
+# POC status states (§22 / Prompt 50 §7).
 STATUS_VERIFIED = "VERIFIED"
 STATUS_LIKELY = "LIKELY"
 STATUS_RECOMMENDED_ROLE_ONLY = "RECOMMENDED_ROLE_ONLY"
 STATUS_UNVERIFIED = "UNVERIFIED"
 STATUS_STALE = "STALE"
+STATUS_FORMER = "FORMER"
 
 # Company-match confidence (§11).
 MATCH_VERIFIED = "VERIFIED"
