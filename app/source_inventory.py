@@ -14,18 +14,40 @@ from sqlalchemy.orm import Session
 
 from collectors.registry import runnable_source_ids
 from collectors.source_status import all_source_status
-from database.models import SourceHealth
+from database.models import AtsProvider, CompanyCareerSource, SourceHealth
+
+# ATS sources are configured via DB-registered boards (CompanyCareerSource), not env —
+# reflect that so a wired board (e.g. a Greenhouse board) reads CONFIGURED/CONNECTED
+# rather than the env-only DISCOVERY_REQUIRED.
+_ATS_SOURCE_PROVIDER = {"greenhouse": AtsProvider.GREENHOUSE, "lever": AtsProvider.LEVER}
 
 
 def source_inventory(session: Session) -> list[dict]:
     runnable = runnable_source_ids()
     health_by_id = {h.source_id: h for h in session.execute(select(SourceHealth)).scalars().all()}
 
+    # Enabled registered ATS boards per provider (with the latest real success time).
+    ats_boards: dict[AtsProvider, list[CompanyCareerSource]] = {}
+    for cs in session.execute(select(CompanyCareerSource).where(CompanyCareerSource.enabled.is_(True))).scalars():
+        if cs.board_identifier:
+            ats_boards.setdefault(cs.ats_provider, []).append(cs)
+
     inventory: list[dict] = []
     for report in all_source_status():
         health = health_by_id.get(report.source_id)
         connection = (health.connection_status.value if health and hasattr(health.connection_status, "value")
                       else (str(health.connection_status) if health else "NOT_CHECKED"))
+        config_status = report.status.value if hasattr(report.status, "value") else str(report.status)
+
+        # ATS override: a DB-registered enabled board means the source IS configured;
+        # connection reflects the board's last real success (only a real fetch sets it).
+        boards = ats_boards.get(_ATS_SOURCE_PROVIDER.get(report.source_id))
+        if boards:
+            config_status = "CONFIGURED"
+            successes = [b.last_success_at for b in boards if b.last_success_at]
+            if successes:
+                connection = "CONNECTED"
+
         inventory.append({
             "source_id": report.source_id,
             "name": report.name,
@@ -37,8 +59,8 @@ def source_inventory(session: Session) -> list[dict]:
             # Implementation: is there a runnable collector?
             "implementation": "IMPLEMENTED" if report.source_id in runnable
                               else ("IMPLEMENTED" if report.collector_implemented else "NOT_IMPLEMENTED"),
-            # Configuration: derived from the runtime status report (config gate).
-            "configuration_status": report.status.value if hasattr(report.status, "value") else str(report.status),
+            # Configuration: from the runtime status report, or DB-registered ATS boards.
+            "configuration_status": config_status,
             # Connection: ONLY from a persisted real health check.
             "connection_status": connection,
             "last_success_at": (health.last_success_at.isoformat()
