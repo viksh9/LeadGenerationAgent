@@ -19,16 +19,81 @@ export interface PublicIntelligenceDiscovery {
   pocs: POC[];
 }
 
+export interface CompanyLocation {
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  state_or_region: string | null;
+  postal_code: string | null;
+  country: string | null;
+  full_address: string | null;
+  location_type: string;
+  is_headquarters: boolean;
+  source: string | null;
+  source_url: string | null;
+  trust_score: number;
+}
+
+export interface CompanyFieldSource {
+  field: string;
+  value: string | null;
+  source: string | null;
+  source_type: string | null;
+  source_url: string | null;
+  evidence_text: string | null;
+  trust_score: number;
+  retrieved_at: string | null;
+}
+
 export interface CompanyPublicIntelligence {
   company_id: number;
   company_name: string;
   website: string | null;
   linkedin_url: string | null;
-  country: string | null;
   industry: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  full_address: string | null;
+  postal_code: string | null;
+  company_phone: string | null;
+  company_email: string | null;
+  contact_url: string | null;
+  careers_url: string | null;
+  leadership_url: string | null;
   wikidata_id: string | null;
+  data_trust_score: number;
+  official_verified_at: string | null;
   india_locations: string[];
+  locations: CompanyLocation[];
+  field_sources: CompanyFieldSource[];
   public_leadership: POC[];
+}
+
+export interface CompanyIntelDiscovery {
+  company_id: number;
+  company_name: string;
+  status: 'SUCCESS' | 'PARTIAL' | 'SOURCE_UNAVAILABLE' | 'ERROR';
+  provider_status: Record<string, string>;
+  fields_updated: string[];
+  people_persisted: number;
+  data_trust_score: number;
+  reason: string;
+}
+
+export async function discoverCompanyPublicIntelligence(
+  companyId: number, force = false,
+): Promise<CompanyIntelDiscovery> {
+  const { data } = await api.post<CompanyIntelDiscovery>(
+    `/companies/${companyId}/public-intelligence/discover`, null, { params: { force } });
+  return data;
+}
+
+export async function fetchCompanySources(
+  companyId: number, signal?: AbortSignal,
+): Promise<CompanyFieldSource[]> {
+  const { data } = await api.get<CompanyFieldSource[]>(`/companies/${companyId}/sources`, { signal });
+  return data;
 }
 
 export interface PublicIntelligenceTest {

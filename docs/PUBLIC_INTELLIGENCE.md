@@ -112,6 +112,49 @@ contacts/hidden APIs; robots and site terms are respected. If GitHub/Wikidata/we
 fail or return nothing, the field stays unavailable and role recommendations are shown
 — never invented people/emails/phones (§29/§32).
 
+## Official Company Intelligence (Prompt 46)
+
+The `official_company` provider is the highest-priority source. From the company's
+**verified own domain** it fetches only bounded, relevant public pages (home, about,
+contact, leadership/team, careers, locations — never a full crawl; robots + SSRF +
+rate/page caps respected) and extracts, structured-data first (JSON-LD Organization /
+LocalBusiness / PostalAddress / ContactPoint):
+
+- **Website** (canonical https), **LinkedIn company URL** (only from `sameAs`/social
+  links — never constructed from the name), **company phone** and **company email**
+  (only when explicitly published — never guessed), **address** (structured
+  line1/line2/city/state/postal/country + `full_address`, city canonicalized via the
+  app geo map), **contact / careers / leadership** page URLs, and **public leadership**
+  people. Missing fields stay unavailable — never invented; access denial → the page
+  is skipped and the status is truthful.
+
+Persistence (real, source-backed):
+- `Company` canonical fields (official source wins), additive `data_trust_score` /
+  `official_verified_at` / `full_address` / `company_phone` / `company_email` /
+  `contact_url` / `careers_url` / `leadership_url` / `postal_code`.
+- **`CompanyLocation`** rows — multiple offices without duplicating the company;
+  `is_headquarters` only on evidence.
+- **`CompanyFieldEvidence`** — field-level provenance: value + source label + source
+  type + **clickable source URL** + evidence snippet + per-field trust + priority.
+  Conflicting sources are RETAINED (both rows kept); the canonical value is the
+  highest-priority source (§20/§22).
+
+**Company Data Trust** (`official_company/trust.py`, max 100): official website
+confirms identity **+30**, contact page confirms address **+25**, page confirms
+phone/email **+15**, official LinkedIn **+10**, careers/ATS relation **+10**, fresh
+retrieval **+10** — awarded only on real evidence.
+
+Endpoints: `POST /companies/{id}/public-intelligence/discover` (company-level, SALES,
+rate-limited → `SUCCESS`/`PARTIAL`/`SOURCE_UNAVAILABLE`/`ERROR`), `GET
+/companies/{id}/public-intelligence` (profile + field sources + trust + locations),
+`GET /companies/{id}/sources` (all field evidence). UI: `OfficialCompanyPanel` on the
+Company Details page (website/address/phone/email/careers/LinkedIn + clickable source
+URLs + Data Trust). Config: `OFFICIAL_COMPANY_MAX_REQUESTS_PER_MINUTE`,
+`OFFICIAL_COMPANY_REQUEST_TIMEOUT_SECONDS`, `OFFICIAL_COMPANY_MAX_PAGES_PER_COMPANY`,
+`OFFICIAL_COMPANY_DATA_TTL_DAYS`. Excel is unchanged (16 columns; Source names the
+real source). Tests: `tests/unit/test_official_company.py`,
+`tests/integration/test_official_company.py`.
+
 ## Testing
 
 Offline (mocked transports): `tests/unit/test_public_intelligence.py`,

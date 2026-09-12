@@ -1334,6 +1334,16 @@ class Company(Base):
     # Public-intelligence identity (Prompt 45) — additive; filled from public sources.
     linkedin_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     wikidata_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Official company intelligence (Prompt 46) — additive.
+    contact_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    careers_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    leadership_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    company_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    company_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    full_address: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    postal_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    data_trust_score: Mapped[int] = mapped_column(Integer, default=0)
+    official_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     industry: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     sub_industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -1417,6 +1427,64 @@ class CompanySourceReference(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     company: Mapped["Company"] = relationship(back_populates="source_references")
+
+
+class CompanyLocation(Base):
+    """A real, source-backed company office/location (Prompt 46). Multiple locations
+    per company are supported without duplicating the company. Only components a
+    source actually provided are stored — never invented."""
+
+    __tablename__ = "company_locations"
+    __table_args__ = (
+        UniqueConstraint("company_id", "normalized_key", name="uq_company_location"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    address_line_1: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address_line_2: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    state_or_region: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    postal_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    full_address: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    normalized_key: Mapped[str] = mapped_column(String(255), index=True)   # dedup key
+    location_type: Mapped[str] = mapped_column(String(24), default="UNKNOWN")  # HEADQUARTERS/OFFICE/...
+    is_headquarters: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Provenance.
+    source: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    trust_score: Mapped[int] = mapped_column(Integer, default=0)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class CompanyFieldEvidence(Base):
+    """Field-level provenance + evidence for a company fact (Prompt 46, §18/§19/§22).
+    One row per (field, source): conflicting sources are RETAINED, never overwritten;
+    the canonical value is chosen by source priority at read time."""
+
+    __tablename__ = "company_field_evidence"
+    __table_args__ = (
+        UniqueConstraint("company_id", "field", "source", name="uq_company_field_source"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    field: Mapped[str] = mapped_column(String(48), index=True)   # website_url / address / company_phone / ...
+    value: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(128), nullable=True)     # label, e.g. "Official Company Website"
+    source_type: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    evidence_text: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_priority: Mapped[int] = mapped_column(Integer, default=99)
+    trust_score: Mapped[int] = mapped_column(Integer, default=0)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class CompanyResolutionCandidate(Base):

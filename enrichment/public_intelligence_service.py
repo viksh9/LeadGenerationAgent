@@ -26,6 +26,8 @@ from config import get_settings
 from crm.audit import record_audit
 from database.models import (
     Company,
+    CompanyFieldEvidence,
+    CompanyLocation,
     ContactType,
     DataProvenance,
     DecisionMaker,
@@ -35,6 +37,7 @@ from database.models import (
     RoleCategory,
     VerificationStatus,
 )
+from integrations.public_intelligence.models import PublicCompanyFacts
 from enrichment.contactout_poc import resolve_company_for_lead, _role_category_for  # reuse
 from enrichment.stakeholder import recommend_for_lead
 from integrations.public_intelligence import (
@@ -195,7 +198,7 @@ def discover_public_intelligence_for_lead(
     provider_list = providers if providers is not None else build_providers(http=http)
 
     all_people: list[PublicPerson] = []
-    best_facts_by_field: dict[str, tuple[int, str, Optional[str], Optional[str]]] = {}
+    facts_list: list[PublicCompanyFacts] = []
     for provider in provider_list:
         result = provider.discover(ctx, roles)
         summary.provider_status[provider.name] = result.status
@@ -204,11 +207,13 @@ def discover_public_intelligence_for_lead(
                     provider.name, result.records_found)
         all_people.extend(result.people)
         if result.company_facts:
-            _collect_company_facts(result.company_facts, provider.name, best_facts_by_field)
+            facts_list.append(result.company_facts)
 
-    # Merge company facts into the Company (fill blanks only; never overwrite; §20).
+    # Merge + persist company facts (Company fields + locations + field evidence + trust).
     if company is not None:
-        summary.company_facts_updated = _apply_company_facts(company, best_facts_by_field, now)
+        merged_facts = _merge_company_facts(facts_list)
+        if merged_facts is not None:
+            summary.company_facts_updated = _persist_company_facts(session, company, merged_facts, now)
 
     merged = _merge_people([p for p in all_people if p.full_name])
     summary.people_found = len(merged)
@@ -237,30 +242,205 @@ def discover_public_intelligence_for_lead(
     return summary
 
 
-# --------------------------------------------------------------------------- #
-# Company facts
-# --------------------------------------------------------------------------- #
-def _collect_company_facts(facts, provider_name, best: dict) -> None:
-    rank = SOURCE_PRIORITY.get(provider_name, 99)
-    for fname, value in (("website", facts.website), ("linkedin_url", facts.linkedin_url),
-                         ("headquarters_country", facts.country), ("industry", facts.industry),
-                         ("wikidata_id", facts.wikidata_id)):
-        if not value:
+@dataclass
+class CompanyIntelSummary:
+    company_id: int
+    company_name: str
+    status: str                              # SUCCESS | PARTIAL | SOURCE_UNAVAILABLE | ERROR
+    provider_status: dict = field(default_factory=dict)
+    fields_updated: list[str] = field(default_factory=list)
+    people_persisted: int = 0
+    data_trust_score: int = 0
+    reason: str = ""
+
+
+def discover_company_intelligence(
+    session: Session, company: Company, *, providers=None, http: httpx.Client | None = None,
+    force: bool = False, actor: str = "SYSTEM", now: Optional[datetime] = None,
+) -> CompanyIntelSummary:
+    """Company-level official intelligence discovery (§26/§39). Runs the official
+    company website + Wikidata providers, persists facts/locations/evidence/trust, and
+    returns a truthful status. Honours the official-company data freshness window."""
+    now = now or _now()
+    settings = get_settings()
+    summary = CompanyIntelSummary(company_id=company.id, company_name=company.canonical_name,
+                                  status="SOURCE_UNAVAILABLE")
+    if not settings.public_intelligence_active:
+        summary.status, summary.reason = "SOURCE_UNAVAILABLE", "Public intelligence is disabled."
+        return summary
+
+    # Freshness cache (§23/§35): skip re-fetch when recently verified.
+    ttl = timedelta(days=max(0, settings.official_company_data_ttl_days))
+    if not force and company.official_verified_at and (now - company.official_verified_at) < ttl:
+        summary.status = "SUCCESS"
+        summary.data_trust_score = company.data_trust_score or 0
+        summary.reason = "Reused recent official-company data within the freshness window."
+        return summary
+
+    ctx = CompanyContext(
+        company_id=company.id, company_name=company.canonical_name,
+        normalized_name=company.normalized_name, domain=company.primary_domain,
+        website=company.website, linkedin_url=company.linkedin_url,
+        country=company.headquarters_country)
+    provider_list = providers if providers is not None else build_providers(
+        names=[n for n in ("official_company", "wikidata")
+               if settings.public_intelligence_provider_enabled(n)], http=http)
+
+    facts_list: list[PublicCompanyFacts] = []
+    all_people: list[PublicPerson] = []
+    for provider in provider_list:
+        result = provider.discover(ctx, [])
+        summary.provider_status[provider.name] = result.status
+        if result.company_facts:
+            facts_list.append(result.company_facts)
+        all_people.extend(result.people)
+
+    merged = _merge_company_facts(facts_list)
+    if merged is not None:
+        summary.fields_updated = _persist_company_facts(session, company, merged, now)
+    # Persist public leadership discovered from official pages.
+    people = _merge_people([p for p in all_people if p.full_name])
+    persisted = 0
+    for person in people:
+        if person.company_match_status == MATCH_UNKNOWN:
             continue
-        cur = best.get(fname)
-        if cur is None or rank < cur[0]:
-            best[fname] = (rank, provider_name, value, facts.source_url)
+        if _upsert_public_person(session, ctx, person, [], now) is not None:
+            persisted += 1
+    summary.people_persisted = persisted
+    session.commit()
+
+    summary.data_trust_score = company.data_trust_score or 0
+    if merged is not None and merged.website:
+        # We reached the official site: SUCCESS when an address was found, else PARTIAL.
+        summary.status = "SUCCESS" if merged.full_address else "PARTIAL"
+        summary.reason = f"Discovered official company facts (trust {summary.data_trust_score})."
+    else:
+        # No official page could be reached (no domain / all fetches failed) — never faked.
+        summary.status = "SOURCE_UNAVAILABLE"
+        summary.reason = "Official sources could not be accessed."
+    logger.info("official_company.%s company_id=%s fields=%s people=%s trust=%s",
+                summary.status.lower(), company.id, len(summary.fields_updated), persisted,
+                summary.data_trust_score)
+    record_audit(session, entity_type="company", entity_id=company.id,
+                 action="OFFICIAL_COMPANY_DISCOVER", actor=actor,
+                 new_value=str(len(summary.fields_updated)),
+                 reason=f"status={summary.status} providers={summary.provider_status}", now=now)
+    session.commit()
+    return summary
 
 
-def _apply_company_facts(company: Company, best: dict, now: datetime) -> list[str]:
+# --------------------------------------------------------------------------- #
+# Company facts: merge across providers + persist (fields + locations + evidence)
+# --------------------------------------------------------------------------- #
+def _merge_company_facts(facts_list: list[PublicCompanyFacts]) -> Optional[PublicCompanyFacts]:
+    """Merge company facts from multiple providers. Official-company facts take
+    precedence for overlapping fields; Wikidata fills identity gaps (§20/§22). All
+    field-evidence + locations are retained (never dropped)."""
+    if not facts_list:
+        return None
+    # Official first (source priority), then others.
+    ordered = sorted(facts_list, key=lambda f: SOURCE_PRIORITY.get(f.source, 99))
+    merged = PublicCompanyFacts(source="public_intelligence", source_label="Public sources")
+    for f in ordered:
+        for attr in ("website", "linkedin_url", "country", "industry", "wikidata_id",
+                     "contact_url", "careers_url", "leadership_url", "company_phone",
+                     "company_email", "address_line_1", "address_line_2", "city",
+                     "state_or_region", "postal_code", "full_address"):
+            if not getattr(merged, attr) and getattr(f, attr):
+                setattr(merged, attr, getattr(f, attr))
+        merged.field_evidence.extend(f.field_evidence)
+        merged.locations.extend(f.locations)
+        for a in f.aliases:
+            if a not in merged.aliases:
+                merged.aliases.append(a)
+    return merged
+
+
+def _persist_company_facts(session: Session, company: Company, facts: PublicCompanyFacts,
+                           now: datetime) -> list[str]:
+    """Persist merged facts: field-level evidence (conflicts retained), canonical
+    Company fields (official source wins; retained evidence justifies the value),
+    CompanyLocation rows, and the company Data Trust score."""
+    from integrations.public_intelligence.official_company.trust import company_data_trust
+
     updated: list[str] = []
-    for fname, (_, _prov, value, _url) in best.items():
-        # Fill only when the canonical field is currently empty (never silently overwrite).
-        if getattr(company, fname, None) in (None, "", []):
-            setattr(company, fname, value)
-            updated.append(fname)
-    if updated:
-        company.last_seen_at = now
+
+    # 1) Field-level evidence — upsert by (field, source); conflicting sources kept.
+    for e in facts.field_evidence:
+        if not e.value:
+            continue
+        existing = session.scalar(select(CompanyFieldEvidence).where(
+            CompanyFieldEvidence.company_id == company.id,
+            CompanyFieldEvidence.field == e.field, CompanyFieldEvidence.source == e.source))
+        row = existing or CompanyFieldEvidence(company_id=company.id, field=e.field, source=e.source)
+        row.value, row.source_type, row.source_url = e.value, e.source_type, e.source_url
+        row.evidence_text, row.source_priority, row.trust_score = e.evidence_text, e.source_priority, e.trust_score
+        row.retrieved_at = row.last_verified_at = now
+        row.data_provenance = DataProvenance.REAL
+        if existing is None:
+            session.add(row)
+
+    # 2) Canonical Company fields. An OFFICIAL company-page source (authoritative) may
+    #    overwrite; any other/lower-priority source (e.g. Wikidata) only fills blanks
+    #    — existing values are never silently overwritten by weaker evidence (§22).
+    official_fields = {e.field for e in facts.field_evidence
+                       if (e.source_type or "").startswith("company_")}
+
+    def set_field(attr: str, value: Optional[str], *, official_of: Optional[str] = None,
+                  fill_only: bool = False):
+        if not value:
+            return
+        may_overwrite = (not fill_only) and (official_of in official_fields if official_of else True)
+        if not may_overwrite and getattr(company, attr, None) not in (None, "", []):
+            return
+        if getattr(company, attr, None) != value:
+            setattr(company, attr, value)
+            updated.append(attr)
+
+    set_field("website", facts.website, official_of="website_url")
+    set_field("linkedin_url", facts.linkedin_url, official_of="linkedin_url")
+    set_field("company_phone", facts.company_phone, official_of="company_phone")
+    set_field("company_email", facts.company_email, official_of="company_email")
+    set_field("contact_url", facts.contact_url, official_of="contact_url")
+    set_field("careers_url", facts.careers_url, official_of="careers_url")
+    set_field("leadership_url", facts.leadership_url, official_of="leadership_url")
+    set_field("full_address", facts.full_address, official_of="address")
+    set_field("postal_code", facts.postal_code, official_of="address")
+    set_field("headquarters_city", facts.city, fill_only=True)
+    set_field("headquarters_state", facts.state_or_region, fill_only=True)
+    set_field("headquarters_country", facts.country, fill_only=True)
+    set_field("industry", facts.industry, fill_only=True)
+    set_field("wikidata_id", facts.wikidata_id, fill_only=True)
+
+    # 3) Locations (multi-office) — dedup by normalized key; HQ only on evidence.
+    for loc in facts.locations:
+        key = (loc.full_address or "").lower().strip()
+        if not key:
+            continue
+        existing = session.scalar(select(CompanyLocation).where(
+            CompanyLocation.company_id == company.id, CompanyLocation.normalized_key == key))
+        if existing is not None:
+            existing.last_verified_at = now if hasattr(existing, "last_verified_at") else None
+            continue
+        session.add(CompanyLocation(
+            company_id=company.id, address_line_1=loc.address_line_1, address_line_2=loc.address_line_2,
+            city=loc.city, state_or_region=loc.state_or_region, postal_code=loc.postal_code,
+            country=loc.country, full_address=loc.full_address, normalized_key=key,
+            location_type=loc.location_type, is_headquarters=loc.is_headquarters,
+            source=loc.source, source_url=loc.source_url, trust_score=95,
+            data_provenance=DataProvenance.REAL, retrieved_at=now))
+
+    # 4) Company Data Trust (§20).
+    company.data_trust_score = company_data_trust(
+        identity_confirmed=bool(facts.website),
+        address_confirmed=bool(facts.full_address),
+        contact_confirmed=bool(facts.company_phone or facts.company_email),
+        linkedin_confirmed=bool(facts.linkedin_url),
+        careers_confirmed=bool(facts.careers_url),
+        fresh=True,
+    )
+    company.official_verified_at = now
+    company.last_seen_at = now
     return updated
 
 

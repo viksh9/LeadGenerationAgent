@@ -55,6 +55,16 @@ _ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
         # Public-intelligence identity (Prompt 45) — additive.
         "linkedin_url": "VARCHAR(512)",
         "wikidata_id": "VARCHAR(32)",
+        # Official company intelligence (Prompt 46) — additive.
+        "contact_url": "VARCHAR(1024)",
+        "careers_url": "VARCHAR(1024)",
+        "leadership_url": "VARCHAR(1024)",
+        "company_phone": "VARCHAR(64)",
+        "company_email": "VARCHAR(320)",
+        "full_address": "VARCHAR(512)",
+        "postal_code": "VARCHAR(32)",
+        "data_trust_score": "INTEGER DEFAULT 0",
+        "official_verified_at": "DATETIME",
     },
     "source_health": {
         "requests_used": "INTEGER DEFAULT 0",

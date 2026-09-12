@@ -100,8 +100,40 @@ class PublicContact:
 
 
 @dataclass
+class CompanyFieldEvidenceRecord:
+    """Field-level evidence (§18/§19): a single source's support for a company field."""
+
+    field: str
+    value: Optional[str]
+    source: str                       # human label, e.g. "Official Company Website"
+    source_type: str
+    source_url: Optional[str] = None
+    evidence_text: Optional[str] = None
+    source_priority: int = 99
+    trust_score: int = 0
+
+
+@dataclass
+class CompanyLocationRecord:
+    """A real, source-backed company office/location (§10)."""
+
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
+    city: Optional[str] = None
+    state_or_region: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+    full_address: Optional[str] = None
+    location_type: str = "UNKNOWN"
+    is_headquarters: bool = False
+    source: str = ""
+    source_url: Optional[str] = None
+
+
+@dataclass
 class PublicCompanyFacts:
-    """Public company identity facts (§3/§14). Only real, sourced values."""
+    """Public company identity facts (§3/§14). Only real, sourced values — every
+    important field is backed by a CompanyFieldEvidenceRecord."""
 
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
@@ -109,6 +141,20 @@ class PublicCompanyFacts:
     industry: Optional[str] = None
     aliases: list[str] = field(default_factory=list)
     wikidata_id: Optional[str] = None
+    # Official-company rich facts (§9/§11/§12/§13/§16).
+    contact_url: Optional[str] = None
+    careers_url: Optional[str] = None
+    leadership_url: Optional[str] = None
+    company_phone: Optional[str] = None
+    company_email: Optional[str] = None
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
+    city: Optional[str] = None
+    state_or_region: Optional[str] = None
+    postal_code: Optional[str] = None
+    full_address: Optional[str] = None
+    locations: list[CompanyLocationRecord] = field(default_factory=list)
+    field_evidence: list[CompanyFieldEvidenceRecord] = field(default_factory=list)
     source: str = ""
     source_label: str = ""
     source_url: Optional[str] = None
