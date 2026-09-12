@@ -123,3 +123,50 @@ def test_lever_client_typed_errors():
                           sleep=lambda _s: None)
     with pytest.raises(SourceRateLimitError):
         rate.list_postings("acme", limit=1)
+
+
+# --------------------------------------------------------------------------- #
+# India-only ATS filter (Prompt: India-first ATS targeting)
+# --------------------------------------------------------------------------- #
+_GH_MIXED = {
+    "meta": {"total": 2},
+    "jobs": [
+        {"id": 1, "title": "Senior Backend Engineer (Python)", "updated_at": "2026-09-01T10:00:00Z",
+         "location": {"name": "Bengaluru, Karnataka, India"},
+         "absolute_url": "https://boards.greenhouse.io/acme/jobs/1", "company_name": "Acme",
+         "content": "Python + AWS."},
+        {"id": 2, "title": "Senior Backend Engineer (Python)", "updated_at": "2026-09-01T10:00:00Z",
+         "location": {"name": "San Francisco, California, United States"},
+         "absolute_url": "https://boards.greenhouse.io/acme/jobs/2", "company_name": "Acme",
+         "content": "Python + AWS."},
+    ],
+}
+
+
+def _gh_mixed_collector(india_only: bool):
+    cfg = gh.GreenhouseConfig(boards=["acme"], india_only=india_only)
+    client = gh.GreenhouseClient(cfg, http=httpx.Client(
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, json=_GH_MIXED))))
+    return gh.GreenhouseCollector(_src("greenhouse"), config=cfg, client=client)
+
+
+def test_greenhouse_india_only_keeps_only_india_roles():
+    res = _gh_mixed_collector(india_only=True).fetch(FetchRequest(board="acme"))
+    assert res.records_count == 1
+    assert "India" in res.records[0].location
+    assert any("non-India" in w for w in res.warnings)
+
+
+def test_greenhouse_india_only_disabled_keeps_all():
+    res = _gh_mixed_collector(india_only=False).fetch(FetchRequest(board="acme"))
+    assert res.records_count == 2
+
+
+def test_is_india_location_helper():
+    from config.locations_in import is_india_location
+    assert is_india_location("Bengaluru, Karnataka, India")
+    assert is_india_location("Gurgaon")               # alias
+    assert is_india_location("Hyderabad")
+    assert not is_india_location("San Francisco, California, United States")
+    assert not is_india_location("London, UK")
+    assert not is_india_location("")
