@@ -10,6 +10,8 @@ import { CompanySummaryCard } from '@/components/leads/detail/CompanySummaryCard
 import { CompanyIntelligencePanel } from '@/components/leads/detail/CompanyIntelligencePanel';
 import { SignalPanel } from '@/components/leads/detail/SignalPanel';
 import { OpportunityPanel } from '@/components/leads/detail/OpportunityPanel';
+import { LeadActionBar } from '@/components/leads/detail/LeadActionBar';
+import { SalesActivityCard } from '@/components/leads/detail/SalesActivityCard';
 import { TechnologyList } from '@/components/leads/detail/TechnologyList';
 import { POCPanel } from '@/components/leads/detail/POCPanel';
 import { StakeholdersPanel } from '@/components/leads/detail/StakeholdersPanel';
@@ -124,6 +126,7 @@ export function LeadDetailsPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* Main analysis */}
           <div className="space-y-4 lg:col-span-2">
+            <LeadActionBar leadId={lead.id} status={lead.status} />
             <OpportunityPanel lead={lead} />
             <AIProfileHighlightsPanel leadId={lead.id} />
             <SignalPanel lead={lead} />
@@ -134,6 +137,7 @@ export function LeadDetailsPage() {
             <VerificationPanel leadId={lead.id} />
             <AIIntelligencePanel lead={lead} />
             <OutreachPanel lead={lead} />
+            <SalesActivityCard leadId={lead.id} />
             <LeadTimelineCard leadId={lead.id} />
             <LeadStatusHistoryCard leadId={lead.id} />
           </div>

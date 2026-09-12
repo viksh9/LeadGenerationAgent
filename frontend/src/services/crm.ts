@@ -211,6 +211,13 @@ export interface TransitionLeadBody {
   reason?: string;
 }
 
+export interface CreateFollowUpBody {
+  title: string;
+  due_at?: string;
+  task_type?: FollowUpTaskType;
+  reason?: string;
+}
+
 export interface CreateActivityBody {
   activity_type: ActivityType;
   lead_id?: number;
@@ -344,6 +351,15 @@ export async function fetchFollowUps(
   signal?: AbortSignal,
 ): Promise<FollowUpTaskList> {
   const { data } = await api.get<FollowUpTaskList>('/follow-ups', { params, signal });
+  return data;
+}
+
+/** Create a user follow-up for a lead (POST /leads/{id}/follow-ups). */
+export async function createLeadFollowUp(
+  leadId: number,
+  body: CreateFollowUpBody,
+): Promise<FollowUpTask> {
+  const { data } = await api.post<FollowUpTask>(`/leads/${leadId}/follow-ups`, body);
   return data;
 }
 

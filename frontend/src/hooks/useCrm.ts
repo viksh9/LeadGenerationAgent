@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createActivity,
+  createLeadFollowUp,
   createSalesOpportunity,
   fetchCrmAnalytics,
   fetchFollowUps,
@@ -20,6 +21,7 @@ import { useToast } from '@/contexts/ToastContext';
 import type { ApiErrorShape } from '@/services/api';
 import type {
   CreateActivityBody,
+  CreateFollowUpBody,
   CreateSalesOpportunityBody,
   FollowUpParams,
   FollowUpStatus,
@@ -134,6 +136,19 @@ export function useCreateActivity() {
       toast.success('Activity logged.');
     },
     onError: (e) => toast.error(errText(e, 'Unable to log the activity.')),
+  });
+}
+
+export function useCreateFollowUp(leadId: number) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (body: CreateFollowUpBody) => createLeadFollowUp(leadId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: crmKeys.all });
+      toast.success('Follow-up created.');
+    },
+    onError: (e) => toast.error(errText(e, 'Unable to create the follow-up.')),
   });
 }
 

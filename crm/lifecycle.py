@@ -111,6 +111,11 @@ class LeadLifecycleService:
                 f"(source '{required_source}') or explicit human action."
             )
 
+        # Disqualification requires an explicit, stored reason (§14). The underlying
+        # evidence is never deleted — only the sales status changes.
+        if new_status == LeadStatus.DISQUALIFIED and not (reason and reason.strip()):
+            raise ValidationError("Disqualifying a lead requires a reason.")
+
         lead.status = new_status
         lead.updated_at = now
         self.session.flush()

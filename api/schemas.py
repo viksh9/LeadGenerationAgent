@@ -1517,6 +1517,17 @@ class FollowUpStatusUpdate(BaseModel):
     status: str
 
 
+class CreateFollowUpRequest(BaseModel):
+    """User-created follow-up for a lead (§9). Business intelligence stays source-backed;
+    this is user-owned sales workflow data."""
+
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=255)
+    due_at: Optional[datetime] = None
+    task_type: Optional[str] = None          # FollowUpType; defaults to FOLLOW_UP
+    reason: Optional[str] = None
+
+
 class SalesOpportunityResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
