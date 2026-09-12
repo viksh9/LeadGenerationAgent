@@ -859,6 +859,20 @@ class CompanyFieldSourceResponse(BaseModel):
     retrieved_at: Optional[datetime] = None
 
 
+class CompanyOfficerResponse(BaseModel):
+    """A LEGAL officer/director (§12/§13) — never a sales/technical POC."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: Optional[str] = None
+    position: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    role_kind: str = "LEGAL_OFFICER"
+    source: Optional[str] = None
+    source_url: Optional[str] = None
+
+
 class CompanyPublicIntelligenceResponse(BaseModel):
     """Company profile facts (with sources) + real public leadership (§27/§28)."""
 
@@ -878,12 +892,33 @@ class CompanyPublicIntelligenceResponse(BaseModel):
     careers_url: Optional[str] = None
     leadership_url: Optional[str] = None
     wikidata_id: Optional[str] = None
+    # Legal / company verification (OpenCorporates, §7/§30) — distinct from operating brand.
+    legal_name: Optional[str] = None
+    company_number: Optional[str] = None
+    jurisdiction_code: Optional[str] = None
+    company_status: Optional[str] = None
+    incorporation_date: Optional[str] = None
+    registry_url: Optional[str] = None
+    opencorporates_url: Optional[str] = None
+    registered_address: Optional[str] = None
+    india_entity_type: Optional[str] = None
     data_trust_score: int = 0
     official_verified_at: Optional[datetime] = None
     india_locations: list[str] = Field(default_factory=list)
     locations: list[CompanyLocationResponse] = Field(default_factory=list)
+    officers: list[CompanyOfficerResponse] = Field(default_factory=list)
     field_sources: list[CompanyFieldSourceResponse] = Field(default_factory=list)
     public_leadership: list[POCResponse] = Field(default_factory=list)
+
+
+class OpenCorporatesStatusResponse(BaseModel):
+    """Admin diagnostics for OpenCorporates (§40). Never exposes the token."""
+
+    status: str                       # CONFIGURED | NOT_CONFIGURED | DISABLED
+    api_version: str
+    last_success_at: Optional[str] = None
+    last_error: Optional[str] = None
+    data_ttl_days: int = 0
 
 
 class CompanyIntelDiscoveryResponse(BaseModel):

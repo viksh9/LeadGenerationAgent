@@ -17,7 +17,9 @@ from api.schemas import (
     CompanyFieldSourceResponse,
     CompanyIntelDiscoveryResponse,
     CompanyLocationResponse,
+    CompanyOfficerResponse,
     CompanyPublicIntelligenceResponse,
+    OpenCorporatesStatusResponse,
     POCResponse,
     PublicIntelligenceDiscoveryResponse,
     PublicIntelligenceTestResponse,
@@ -48,6 +50,7 @@ _HEALTH_TO_RESULT = {
     HealthStatus.DEGRADED: "LIVE_VERIFIED",
     HealthStatus.RATE_LIMITED: "SOURCE_UNAVAILABLE",
     HealthStatus.UNAVAILABLE: "SOURCE_UNAVAILABLE",
+    HealthStatus.AUTHENTICATION_FAILED: "AUTHENTICATION_FAILED",
     HealthStatus.NOT_CONFIGURED: "NOT_CONFIGURED",
 }
 
@@ -105,8 +108,10 @@ def company_public_intelligence(company_id: int, session: Session = Depends(get_
     if company is None:
         raise NotFoundError(f"Company {company_id} not found.")
     from sqlalchemy import select
-    from database.models import (CompanyFieldEvidence, CompanyLocation, DataProvenance,
-                                 DecisionMaker)
+    from database.models import (CompanyFieldEvidence, CompanyLocation, CompanyOfficer,
+                                 DataProvenance, DecisionMaker)
+    officers = session.scalars(select(CompanyOfficer).where(
+        CompanyOfficer.company_id == company.id)).all()
     people = session.scalars(select(DecisionMaker).where(
         DecisionMaker.company_id == company.id,
         DecisionMaker.source_type.in_(PUBLIC_SOURCE_TYPES),
@@ -130,10 +135,17 @@ def company_public_intelligence(company_id: int, session: Session = Depends(get_
         postal_code=company.postal_code, company_phone=company.company_phone,
         company_email=company.company_email, contact_url=company.contact_url,
         careers_url=company.careers_url, leadership_url=company.leadership_url,
-        wikidata_id=company.wikidata_id, data_trust_score=company.data_trust_score or 0,
+        wikidata_id=company.wikidata_id,
+        legal_name=company.legal_name, company_number=company.company_number,
+        jurisdiction_code=company.jurisdiction_code, company_status=company.company_status,
+        incorporation_date=company.incorporation_date, registry_url=company.registry_url,
+        opencorporates_url=company.opencorporates_url, registered_address=company.registered_address,
+        india_entity_type=company.india_entity_type,
+        data_trust_score=company.data_trust_score or 0,
         official_verified_at=company.official_verified_at,
         india_locations=list(company.india_locations or []),
         locations=[CompanyLocationResponse.model_validate(l) for l in locations],
+        officers=[CompanyOfficerResponse.model_validate(o) for o in officers],
         field_sources=[CompanyFieldSourceResponse.model_validate(e) for e in best_by_field.values()],
         public_leadership=[POCResponse.model_validate(p) for p in people],
     )
@@ -152,6 +164,18 @@ def company_sources(company_id: int, session: Session = Depends(get_session)
         CompanyFieldEvidence.company_id == company_id).order_by(
         CompanyFieldEvidence.field, CompanyFieldEvidence.source_priority)).all()
     return [CompanyFieldSourceResponse.model_validate(e) for e in rows]
+
+
+@router.get("/integrations/opencorporates/status", response_model=OpenCorporatesStatusResponse,
+            summary="OpenCorporates admin diagnostics (no secrets)")
+def opencorporates_status() -> OpenCorporatesStatusResponse:
+    from integrations.public_intelligence.opencorporates.client import diagnostics
+    s = get_settings()
+    diag = diagnostics()
+    return OpenCorporatesStatusResponse(
+        status=s.opencorporates_config_status, api_version=s.opencorporates_api_version,
+        last_success_at=diag.get("last_success_at"), last_error=diag.get("last_error"),
+        data_ttl_days=s.opencorporates_data_ttl_days)
 
 
 @router.post("/public-intelligence/test", response_model=PublicIntelligenceTestResponse,

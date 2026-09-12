@@ -28,6 +28,7 @@ from database.models import (
     Company,
     CompanyFieldEvidence,
     CompanyLocation,
+    CompanyOfficer,
     ContactType,
     DataProvenance,
     DecisionMaker,
@@ -282,9 +283,11 @@ def discover_company_intelligence(
         normalized_name=company.normalized_name, domain=company.primary_domain,
         website=company.website, linkedin_url=company.linkedin_url,
         country=company.headquarters_country)
-    provider_list = providers if providers is not None else build_providers(
-        names=[n for n in ("official_company", "wikidata")
-               if settings.public_intelligence_provider_enabled(n)], http=http)
+    wanted = [n for n in ("official_company", "wikidata")
+              if settings.public_intelligence_provider_enabled(n)]
+    if settings.opencorporates_config_status == "CONFIGURED":
+        wanted.append("opencorporates")   # legal-entity verification (§1) when configured
+    provider_list = providers if providers is not None else build_providers(names=wanted, http=http)
 
     facts_list: list[PublicCompanyFacts] = []
     all_people: list[PublicPerson] = []
@@ -345,9 +348,17 @@ def _merge_company_facts(facts_list: list[PublicCompanyFacts]) -> Optional[Publi
         for attr in ("website", "linkedin_url", "country", "industry", "wikidata_id",
                      "contact_url", "careers_url", "leadership_url", "company_phone",
                      "company_email", "address_line_1", "address_line_2", "city",
-                     "state_or_region", "postal_code", "full_address"):
+                     "state_or_region", "postal_code", "full_address",
+                     # OpenCorporates legal identity (distinct from operating brand).
+                     "legal_name", "company_number", "jurisdiction_code", "company_status",
+                     "incorporation_date", "registry_url", "opencorporates_url",
+                     "opencorporates_id", "india_entity_type", "match_status"):
             if not getattr(merged, attr) and getattr(f, attr):
                 setattr(merged, attr, getattr(f, attr))
+        if merged.registered_location is None and f.registered_location is not None:
+            merged.registered_location = f.registered_location
+        if f.officers:
+            merged.officers.extend(f.officers)
         merged.field_evidence.extend(f.field_evidence)
         merged.locations.extend(f.locations)
         for a in f.aliases:
@@ -412,8 +423,34 @@ def _persist_company_facts(session: Session, company: Company, facts: PublicComp
     set_field("industry", facts.industry, fill_only=True)
     set_field("wikidata_id", facts.wikidata_id, fill_only=True)
 
+    # 2b) Legal identity (OpenCorporates) — kept DISTINCT from the operating brand;
+    #     the registered address never overwrites the operating address (§8/§9/§20).
+    set_field("legal_name", facts.legal_name)
+    set_field("company_number", facts.company_number)
+    set_field("jurisdiction_code", facts.jurisdiction_code)
+    set_field("company_status", facts.company_status)
+    set_field("incorporation_date", facts.incorporation_date)
+    set_field("registry_url", facts.registry_url)
+    set_field("opencorporates_url", facts.opencorporates_url)
+    set_field("opencorporates_id", facts.opencorporates_id)
+    if facts.registered_location and facts.registered_location.full_address:
+        set_field("registered_address", facts.registered_location.full_address)
+    # India entity type — refine with the company's known India presence (§2).
+    if facts.india_entity_type:
+        from integrations.public_intelligence.opencorporates.matching import (
+            INDIA_ENTITY, INDIA_OFFICE)
+        india_type = facts.india_entity_type
+        if india_type != INDIA_ENTITY and company.india_presence:
+            india_type = INDIA_OFFICE
+        set_field("india_entity_type", india_type)
+
     # 3) Locations (multi-office) — dedup by normalized key; HQ only on evidence.
-    for loc in facts.locations:
+    #    The OpenCorporates registered office is persisted as a distinct REGISTERED_OFFICE
+    #    location — never merged with the operating headquarters (§8/§9/§22).
+    all_locations = list(facts.locations)
+    if facts.registered_location is not None:
+        all_locations.append(facts.registered_location)
+    for loc in all_locations:
         key = (loc.full_address or "").lower().strip()
         if not key:
             continue
@@ -430,12 +467,33 @@ def _persist_company_facts(session: Session, company: Company, facts: PublicComp
             source=loc.source, source_url=loc.source_url, trust_score=95,
             data_provenance=DataProvenance.REAL, retrieved_at=now))
 
-    # 4) Company Data Trust (§20).
+    # 4) Officers (legal directors) — kept SEPARATE from POCs (§12/§13). Dedup by
+    #    (company_id, normalized_name, position). Real, source-backed records only.
+    for off in facts.officers:
+        name = off.get("name")
+        if not name:
+            continue
+        nkey = normalize_for_compare(name) or None
+        pos = off.get("position")
+        existing_off = session.scalar(select(CompanyOfficer).where(
+            CompanyOfficer.company_id == company.id, CompanyOfficer.normalized_name == nkey,
+            CompanyOfficer.position == pos))
+        if existing_off is not None:
+            continue
+        session.add(CompanyOfficer(
+            company_id=company.id, name=name, normalized_name=nkey, position=pos,
+            start_date=off.get("start_date"), end_date=off.get("end_date"),
+            role_kind="LEGAL_OFFICER", source=off.get("source"), source_url=off.get("source_url"),
+            data_provenance=DataProvenance.REAL, retrieved_at=now))
+
+    # 5) Company Data Trust (§18) — evidence-based; registry/OpenCorporates add points.
+    match_ok = (facts.match_status in ("VERIFIED_MATCH", "LIKELY_MATCH"))
     company.data_trust_score = company_data_trust(
         identity_confirmed=bool(facts.website),
+        website_confirmed=bool(facts.website),
         address_confirmed=bool(facts.full_address),
-        contact_confirmed=bool(facts.company_phone or facts.company_email),
-        linkedin_confirmed=bool(facts.linkedin_url),
+        registry_confirmed=bool(facts.registry_url),
+        opencorporates_match=match_ok,
         careers_confirmed=bool(facts.careers_url),
         fresh=True,
     )

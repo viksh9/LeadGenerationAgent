@@ -155,6 +155,57 @@ URLs + Data Trust). Config: `OFFICIAL_COMPANY_MAX_REQUESTS_PER_MINUTE`,
 real source). Tests: `tests/unit/test_official_company.py`,
 `tests/integration/test_official_company.py`.
 
+## OpenCorporates legal-entity verification (Prompt 47)
+
+The `opencorporates` provider (source priority **5** — below official-company sources)
+verifies a company's **legal identity** and captures its **registered address**. It is
+supporting evidence and NEVER overrides stronger official-company data.
+
+- **India-first** (§2/§37): matching prefers Indian jurisdictions; a company is
+  classified `INDIA_ENTITY` / `INDIA_OFFICE` / `INDIA_OPERATION` / `GLOBAL_COMPANY` /
+  `UNKNOWN` — a global company with an India office stays a valid India-market lead
+  and is never turned into a separate legal company.
+- **Entity matching** (`opencorporates/matching.py`): `VERIFIED_MATCH` /
+  `LIKELY_MATCH` / `MULTIPLE_MATCHES` / `NO_MATCH`. Never VERIFIED from name
+  similarity alone — a single exact normalized-name match is upgraded to VERIFIED only
+  with corroboration (a real company number + India jurisdiction when India-first).
+- **Legal fields** stored on `Company` (only what the source returns): `legal_name`,
+  `company_number`, `jurisdiction_code`, `company_status` (ACTIVE/INACTIVE/DISSOLVED/
+  UNKNOWN), `incorporation_date`, `registry_url`, `opencorporates_url`,
+  `india_entity_type`.
+- **Registered vs operating address** (§8/§9/§20): the registered office is persisted
+  as a DISTINCT `CompanyLocation` (`REGISTERED_OFFICE`) and never overwrites the
+  operating address from the official website. Conflicting sources are RETAINED as
+  separate `CompanyFieldEvidence` rows; the canonical value is the highest-priority
+  source.
+- **Officers/directors** are stored in a separate `CompanyOfficer` table as
+  `LEGAL_OFFICER` — NEVER treated as a sales/technical POC (§12/§13).
+- **Data Trust (§18)**: identity +30, website +20, address +15, government/registry
+  +15, OpenCorporates match +10, careers +5, fresh +5 (evidence-gated).
+- **Config**: `OPENCORPORATES_ENABLED`, `OPENCORPORATES_API_TOKEN` (env only, never
+  exposed), `OPENCORPORATES_API_VERSION` (default `v0.4`), `OPENCORPORATES_RATE_PER_MINUTE`,
+  `OPENCORPORATES_DATA_TTL_DAYS`. The token is passed as the `api_token` query param,
+  never logged, and never placed in the user-facing `opencorporates_url`/`registry_url`.
+- **Endpoints**: `POST /companies/{id}/public-intelligence/discover` runs
+  official-company + Wikidata + (when configured) OpenCorporates; `GET
+  /companies/{id}/public-intelligence` returns legal fields + registered address +
+  officers + India entity type; `GET /integrations/opencorporates/status` is the admin
+  diagnostic (CONFIGURED/NOT_CONFIGURED, last success/error — no secrets).
+
+### Full-intelligence export (§33)
+
+The fixed **16-column** business export (`export/excel.py`) is unchanged. A SEPARATE
+`GET /export/full-intelligence` (`export/full_intelligence.py`) exports all useful real
+fields — company + legal identity + operating/registered address + India presence +
+opportunity + POC + per-field source + Data/Contact Trust — one row per real
+company-level lead. No secrets/tokens/debug payloads are exported.
+
+### Paid-provider readiness (§35)
+
+The same `Company` + `DecisionMaker` + `CompanyFieldEvidence` model and source
+priority let ContactOut/Lusha/Apollo/Hunter/Prospeo enrich the same company/person
+later without overwriting official data — field-level provenance is preserved.
+
 ## Testing
 
 Offline (mocked transports): `tests/unit/test_public_intelligence.py`,

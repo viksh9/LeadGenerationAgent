@@ -63,7 +63,8 @@ def test_discovery_persists_company_facts(seed_session):
     assert company.full_address and "Bengaluru" in company.full_address   # canonicalized
     assert company.headquarters_city == "Bengaluru"
     assert company.linkedin_url == "https://www.linkedin.com/company/acme"
-    assert company.careers_url and company.data_trust_score >= 90
+    # §18: official-only (no registry / OpenCorporates) tops out around 75.
+    assert company.careers_url and company.data_trust_score >= 70
     assert company.official_verified_at is not None
 
 

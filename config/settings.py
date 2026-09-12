@@ -190,6 +190,21 @@ class Settings(BaseSettings):
         default=8, validation_alias=AliasChoices("OFFICIAL_COMPANY_MAX_PAGES_PER_COMPANY"))
     official_company_data_ttl_days: int = Field(
         default=30, validation_alias=AliasChoices("OFFICIAL_COMPANY_DATA_TTL_DAYS"))
+    # OpenCorporates legal-entity verification (Prompt 47). Supporting evidence only —
+    # never overrides stronger official-company data. Token read from env only; never
+    # exposed in responses/logs/DB/exports/errors, and never placed in a user-facing URL.
+    opencorporates_enabled: bool | None = Field(
+        default=None, validation_alias=AliasChoices("OPENCORPORATES_ENABLED"))
+    opencorporates_api_token: str | None = Field(
+        default=None, validation_alias=AliasChoices("OPENCORPORATES_API_TOKEN"))
+    opencorporates_api_version: str = Field(
+        default="v0.4", validation_alias=AliasChoices("OPENCORPORATES_API_VERSION"))
+    opencorporates_base_url: str = Field(
+        default="https://api.opencorporates.com", validation_alias=AliasChoices("OPENCORPORATES_BASE_URL"))
+    opencorporates_rate_per_minute: int = Field(
+        default=20, validation_alias=AliasChoices("OPENCORPORATES_RATE_PER_MINUTE"))
+    opencorporates_data_ttl_days: int = Field(
+        default=30, validation_alias=AliasChoices("OPENCORPORATES_DATA_TTL_DAYS"))
 
     # --- Production hardening (Prompt 40) ---------------------------------- #
     # Observability: structured JSON logs (opt-in), request/correlation IDs.
@@ -213,7 +228,7 @@ class Settings(BaseSettings):
         "contactout_enabled", "public_intelligence_enabled",
         "official_company_intelligence_enabled", "github_intelligence_enabled",
         "wikidata_intelligence_enabled", "public_registry_intelligence_enabled",
-        "rss_intelligence_enabled",
+        "rss_intelligence_enabled", "opencorporates_enabled",
         mode="before",
     )
     @classmethod
@@ -330,6 +345,14 @@ class Settings(BaseSettings):
     @property
     def public_intelligence_config_status(self) -> str:
         return "ENABLED" if self.public_intelligence_active else "DISABLED"
+
+    @property
+    def opencorporates_config_status(self) -> str:
+        """Config-level OpenCorporates status (NOT a live check). DISABLED when
+        explicitly off; CONFIGURED when a token is present; else NOT_CONFIGURED."""
+        if self.opencorporates_enabled is False:
+            return "DISABLED"
+        return "CONFIGURED" if self.opencorporates_api_token else "NOT_CONFIGURED"
 
 
 @lru_cache

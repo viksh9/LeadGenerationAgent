@@ -45,6 +45,16 @@ export interface CompanyFieldSource {
   retrieved_at: string | null;
 }
 
+export interface CompanyOfficer {
+  name: string | null;
+  position: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  role_kind: string;
+  source: string | null;
+  source_url: string | null;
+}
+
 export interface CompanyPublicIntelligence {
   company_id: number;
   company_name: string;
@@ -62,10 +72,21 @@ export interface CompanyPublicIntelligence {
   careers_url: string | null;
   leadership_url: string | null;
   wikidata_id: string | null;
+  // Legal / company verification (OpenCorporates) — distinct from the operating brand.
+  legal_name: string | null;
+  company_number: string | null;
+  jurisdiction_code: string | null;
+  company_status: string | null;
+  incorporation_date: string | null;
+  registry_url: string | null;
+  opencorporates_url: string | null;
+  registered_address: string | null;
+  india_entity_type: string | null;
   data_trust_score: number;
   official_verified_at: string | null;
   india_locations: string[];
   locations: CompanyLocation[];
+  officers: CompanyOfficer[];
   field_sources: CompanyFieldSource[];
   public_leadership: POC[];
 }

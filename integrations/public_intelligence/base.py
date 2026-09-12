@@ -68,3 +68,7 @@ class ProviderUnavailable(RuntimeError):
 
 class ProviderRateLimited(RuntimeError):
     """Source rate limited (429 / documented limit)."""
+
+
+class ProviderAuthError(RuntimeError):
+    """Credentials missing/invalid/forbidden (401/403). Never retried."""

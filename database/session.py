@@ -65,6 +65,16 @@ _ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
         "postal_code": "VARCHAR(32)",
         "data_trust_score": "INTEGER DEFAULT 0",
         "official_verified_at": "DATETIME",
+        # OpenCorporates legal verification (Prompt 47) — additive.
+        "company_number": "VARCHAR(64)",
+        "jurisdiction_code": "VARCHAR(16)",
+        "company_status": "VARCHAR(24)",
+        "incorporation_date": "VARCHAR(24)",
+        "registry_url": "VARCHAR(1024)",
+        "opencorporates_url": "VARCHAR(1024)",
+        "opencorporates_id": "VARCHAR(128)",
+        "registered_address": "VARCHAR(512)",
+        "india_entity_type": "VARCHAR(24)",
     },
     "source_health": {
         "requests_used": "INTEGER DEFAULT 0",

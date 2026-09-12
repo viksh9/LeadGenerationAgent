@@ -15,6 +15,7 @@ from config import get_settings
 from integrations.public_intelligence.base import PublicIntelligenceProvider
 from integrations.public_intelligence.github import GitHubProvider
 from integrations.public_intelligence.official_company import OfficialCompanyProvider
+from integrations.public_intelligence.opencorporates import OpenCorporatesProvider
 from integrations.public_intelligence.public_registry import PublicRegistryProvider
 from integrations.public_intelligence.rss import RssProvider
 from integrations.public_intelligence.wikidata import WikidataProvider
@@ -24,16 +25,25 @@ _FACTORIES = {
     "official_company": lambda **kw: OfficialCompanyProvider(),
     "github": lambda **kw: GitHubProvider(**kw),
     "wikidata": lambda **kw: WikidataProvider(**kw),
+    "opencorporates": lambda **kw: OpenCorporatesProvider(http=kw.get("http")),
     "public_registry": lambda **kw: PublicRegistryProvider(),
     "rss": lambda **kw: RssProvider(),
 }
+_HTTP_PROVIDERS = ("github", "wikidata", "opencorporates")
 
 PROVIDER_NAMES = tuple(_FACTORIES.keys())
 
 
-def enabled_provider_names() -> list[str]:
+def _provider_enabled(name: str) -> bool:
     s = get_settings()
-    return [n for n in PROVIDER_NAMES if s.public_intelligence_provider_enabled(n)]
+    # OpenCorporates has its own token-gated toggle (needs a configured API token).
+    if name == "opencorporates":
+        return s.opencorporates_config_status == "CONFIGURED"
+    return s.public_intelligence_provider_enabled(name)
+
+
+def enabled_provider_names() -> list[str]:
+    return [n for n in PROVIDER_NAMES if _provider_enabled(n)]
 
 
 def build_providers(*, names: Optional[list[str]] = None,
@@ -46,9 +56,5 @@ def build_providers(*, names: Optional[list[str]] = None,
         factory = _FACTORIES.get(name)
         if factory is None:
             continue
-        # Only the network providers accept an injected http client.
-        if name in ("github", "wikidata"):
-            providers.append(factory(http=http))
-        else:
-            providers.append(factory())
+        providers.append(factory(http=http) if name in _HTTP_PROVIDERS else factory())
     return providers
