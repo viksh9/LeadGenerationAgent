@@ -64,6 +64,7 @@ class LeverConfig(BaseModel):
     requests_per_minute: int = 30
     timeout_seconds: float = 15.0
     india_only: bool = True   # India-first: keep only India-based roles (§15)
+    it_only: bool = False     # ATS site = a known IT/tech company -> capture EVERY role.
 
     @property
     def is_configured(self) -> bool:
@@ -81,6 +82,7 @@ def load_lever_config() -> LeverConfig:
         requests_per_minute=int(os.environ.get("LEVER_REQUESTS_PER_MINUTE", 30) or 30),
         timeout_seconds=float(os.environ.get("LEVER_TIMEOUT_SECONDS", 15) or 15),
         india_only=(os.environ.get("ATS_INDIA_ONLY", "true").strip().lower() not in ("false", "0", "no")),
+        it_only=(os.environ.get("ATS_IT_ONLY", "false").strip().lower() in ("true", "1", "yes")),
     )
 
 
@@ -215,7 +217,7 @@ class LeverCollector(BaseCollector):
         for item in postings:
             if not isinstance(item, dict):
                 continue
-            if not is_it_relevant(item):
+            if self.config.it_only and not is_it_relevant(item):
                 skipped += 1
                 continue
             if self.config.india_only and not _is_india_job(item):
