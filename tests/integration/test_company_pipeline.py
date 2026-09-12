@@ -80,3 +80,22 @@ def test_cross_source_confirmation_sets_source_count(seed_session):
     leads, _ = query_leads(seed_session, provenance=DataProvenance.REAL, page_size=10)
     assert leads[0].it_job_count == 1
     assert leads[0].source_count == 2
+
+
+def test_location_lists_real_cities_dropping_country_and_plus_n():
+    """Location shows the full explicit city list (most-active first), never the bare
+    country token or a "+N more" summary (user-facing display requirement)."""
+    import types
+    from collections import Counter
+    from intelligence.company_pipeline import _location, _location_all
+    agg = types.SimpleNamespace(cities=Counter({"India": 10, "Bengaluru": 8, "Chennai": 5, "Hyderabad": 3}))
+    assert _location(agg) == "Bengaluru, Chennai, Hyderabad"       # country dropped, no "+N more"
+    assert _location_all(agg) == "Bengaluru, Chennai, Hyderabad"
+    # Two cities -> both shown explicitly.
+    two = types.SimpleNamespace(cities=Counter({"Bengaluru": 4, "Chennai": 2}))
+    assert _location(two) == "Bengaluru, Chennai"
+    # Only the country is known -> keep it (honest; never invent a city).
+    only_country = types.SimpleNamespace(cities=Counter({"India": 5}))
+    assert _location(only_country) == "India"
+    # No location data -> None (honest empty).
+    assert _location(types.SimpleNamespace(cities=Counter())) is None
