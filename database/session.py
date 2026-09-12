@@ -51,6 +51,11 @@ _ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
         "contact_trust_status": "VARCHAR(24)",
         "is_current": "BOOLEAN DEFAULT 1",
         "employment_status": "VARCHAR(24)",   # Prompt 48 §18
+        # Multi-provider enrichment (Prompt 49) — additive.
+        "role_match_score": "INTEGER DEFAULT 0",
+        "email_verification_status": "VARCHAR(16)",
+        "phone_type": "VARCHAR(24)",
+        "phone_verification_status": "VARCHAR(16)",
     },
     "companies": {
         # Public-intelligence identity (Prompt 45) — additive.

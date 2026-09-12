@@ -542,6 +542,47 @@ business-relevant, source-linked, minimized data. There is **no SMTP probing** a
 > enricher is unit-tested with real-shaped HTML over a mocked transport; no
 > credentials are required by the default test suite.
 
+### Multi-provider contact enrichment engine (Prompt 49)
+
+On top of ContactOut and the free/public sources (official website, GitHub, Wikidata,
+OpenCorporates — which **always run first**), a credit-aware **waterfall**
+(`enrichment/contact_enrichment.py`) adds paid providers behind one normalized
+interface (`integrations/enrichment/`):
+
+- **Apollo** — people search + person/company enrichment (`X-Api-Key`)
+- **Lusha** — person + company enrichment (`api_key` header)
+- **Hunter** — email finder + **email verification** (`api_key` query param)
+- **Prospeo** — email finder + mobile enrichment (`X-KEY`)
+
+A capability registry (`integrations/enrichment/registry.py`) declares each provider's
+capabilities; the waterfall discovers candidates, ranks them by a **Role Match Score**
+(opportunity fit — kept **separate** from Contact Trust and Lead Score), then enriches
+only the best few, credit-capped and **gated by lead priority/score** (only HOT/WARM or
+`lead_score >= ENRICHMENT_MIN_LEAD_SCORE` get paid enrichment). Email-verification
+statuses (`VALID` / `INVALID` / `ACCEPT_ALL` / `WEBMAIL` / `DISPOSABLE` / `UNKNOWN` /
+`UNVERIFIED`) and phone types (`BUSINESS_DIRECT` / `BUSINESS_MOBILE` /
+`COMPANY_SWITCHBOARD` / `UNKNOWN`) are preserved verbatim from the provider. A failure
+**never fabricates** a person, email, or phone — callers fall back to a role-only POC.
+
+Endpoints follow each provider's **current official contract**; where a live-doc check
+was unavailable at build time the mapping is marked `REQUIRES_REVIEW` (nothing invented).
+Keys are read from the environment only and are never logged, stored, or returned.
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /integrations/enrichment/status` | Config status + declared capabilities for every provider (no keys) |
+| `POST /integrations/{provider}/test` | Real per-provider connectivity test — `LIVE_VERIFIED` only after an actual request; `NOT_CONFIGURED` otherwise (SALES/ADMIN) |
+| `POST /leads/{id}/contacts/enrich` | Run the multi-provider waterfall for a lead (SALES/ADMIN, credit-capped) |
+
+The full-intelligence export gains **Role Match**, **Email Verification**, **Phone
+Type**, and **Phone Verification** columns; the fixed 16-column Excel export is
+**unchanged**. Settings ▸ *Contact enrichment providers* shows per-provider status and
+a real test button.
+
+> **No provider key is configured in this environment**, so every provider reports
+> `NOT_CONFIGURED` and **no live provider call has been made**. Clients are unit-tested
+> with real-shaped payloads over a mocked transport.
+
 ## AI reasoning layer
 
 A new **AI reasoning and prioritization** layer sits *over* the real,

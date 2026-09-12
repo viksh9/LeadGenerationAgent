@@ -853,6 +853,13 @@ class DecisionMaker(Base):
     # Current-employment verification (Prompt 48, §18): CURRENT_VERIFIED / CURRENT_LIKELY
     # / FORMER / UNKNOWN. GitHub's company field alone never proves current employment.
     employment_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    # Multi-provider enrichment (Prompt 49) — additive. Role match is opportunity-fit
+    # (distinct from Contact Trust and Lead Score). Verification statuses preserve the
+    # provider's own result (never upgraded).
+    role_match_score: Mapped[int] = mapped_column(Integer, default=0)
+    email_verification_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # VALID/INVALID/ACCEPT_ALL/...
+    phone_type: Mapped[str | None] = mapped_column(String(24), nullable=True)  # BUSINESS_DIRECT/BUSINESS_MOBILE/...
+    phone_verification_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     verification_status: Mapped[VerificationStatus] = mapped_column(
         SAEnum(VerificationStatus, native_enum=False, length=24),
