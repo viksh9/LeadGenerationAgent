@@ -2,7 +2,7 @@ import { RefreshCw, Search } from 'lucide-react';
 import { DetailCard, Field } from '@/components/leads/detail/DetailCard';
 import { ExternalLinkValue } from '@/components/leads/detail/primitives';
 import { formatDateTime } from '@/utils/format';
-import { useDiscoverPocs, useLeadPocs } from '@/hooks/useContactOut';
+import { useDiscoverPocs, useDiscoverPublicIntelligence, useLeadPocs } from '@/hooks/useContactOut';
 import { contactTrustDisplay, type POC, type RecommendedRole } from '@/services/contactOut';
 
 /**
@@ -13,6 +13,7 @@ import { contactTrustDisplay, type POC, type RecommendedRole } from '@/services/
 export function TargetPOCPanel({ leadId }: { leadId: number }) {
   const { data, isLoading, isError, refetch } = useLeadPocs(leadId);
   const discover = useDiscoverPocs(leadId);
+  const discoverPublic = useDiscoverPublicIntelligence(leadId);
 
   const configured = data?.contactout_status === 'CONFIGURED';
   const pocs = data?.pocs ?? [];
@@ -46,11 +47,23 @@ export function TargetPOCPanel({ leadId }: { leadId: number }) {
 
       {!isLoading && !isError && data && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              {configured ? 'ContactOut' : 'ContactOut not configured'}
+              {configured ? 'ContactOut + public sources' : 'Free public sources'}
             </p>
-            {discoverButton}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-secondary text-xs"
+                onClick={() => discoverPublic.mutate({ force: pocs.length > 0 })}
+                disabled={discoverPublic.isPending}
+                title="Official website, GitHub, Wikidata"
+              >
+                <Search className={discoverPublic.isPending ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} aria-hidden="true" />
+                {discoverPublic.isPending ? 'Searching…' : 'Public sources'}
+              </button>
+              {discoverButton}
+            </div>
           </div>
 
           {/* Real people (Primary / Secondary). */}

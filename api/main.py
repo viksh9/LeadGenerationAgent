@@ -34,6 +34,7 @@ from api.routes import (
     observability,
     outreach,
     pocs,
+    public_intelligence,
     scheduler,
     signals,
     sources,
@@ -118,6 +119,7 @@ app.include_router(career_sources.router)
 app.include_router(signals.router)
 app.include_router(contacts.router)
 app.include_router(pocs.router)
+app.include_router(public_intelligence.router)
 app.include_router(ai.router)
 app.include_router(scheduler.router)
 app.include_router(alerts.router)

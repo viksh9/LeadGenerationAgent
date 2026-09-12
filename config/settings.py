@@ -149,6 +149,39 @@ class Settings(BaseSettings):
     contactout_cache_ttl_hours: int = Field(
         default=168, validation_alias=AliasChoices("CONTACTOUT_CACHE_TTL_HOURS"))
 
+    # --- Free/public intelligence enrichment (Prompt 45) ------------------- #
+    # Discovers legitimately PUBLIC company + POC info from free sources (official
+    # company website, GitHub public API, Wikidata) — no paid providers, no guessed
+    # emails/phones, no fabricated people. Master switch + per-provider toggles.
+    public_intelligence_enabled: bool | None = Field(
+        default=None, validation_alias=AliasChoices("PUBLIC_INTELLIGENCE_ENABLED"))
+    official_company_intelligence_enabled: bool | None = Field(
+        default=None, validation_alias=AliasChoices("OFFICIAL_COMPANY_INTELLIGENCE_ENABLED"))
+    github_intelligence_enabled: bool | None = Field(
+        default=None, validation_alias=AliasChoices("GITHUB_INTELLIGENCE_ENABLED"))
+    wikidata_intelligence_enabled: bool | None = Field(
+        default=None, validation_alias=AliasChoices("WIKIDATA_INTELLIGENCE_ENABLED"))
+    public_registry_intelligence_enabled: bool | None = Field(
+        default=None, validation_alias=AliasChoices("PUBLIC_REGISTRY_INTELLIGENCE_ENABLED"))
+    rss_intelligence_enabled: bool | None = Field(
+        default=None, validation_alias=AliasChoices("RSS_INTELLIGENCE_ENABLED"))
+    # Optional GitHub token — NOT required (anonymous public requests work, at a lower
+    # rate limit). When present, raises the rate limit. Read from env only; never exposed.
+    github_api_token: str | None = Field(default=None, validation_alias=AliasChoices("GITHUB_API_TOKEN"))
+    # Descriptive User-Agent (Wikidata/GitHub etiquette) and comma-separated RSS feeds.
+    public_intelligence_user_agent: str = Field(
+        default="LeadGenerationAgent/1.0 (public-intelligence)",
+        validation_alias=AliasChoices("PUBLIC_INTELLIGENCE_USER_AGENT"))
+    rss_intelligence_feeds: str = Field(
+        default="", validation_alias=AliasChoices("RSS_INTELLIGENCE_FEEDS"))
+    # Per-provider client-side rate limits (requests/minute) + shared timeout.
+    github_rate_per_minute: int = Field(default=30, validation_alias=AliasChoices("GITHUB_RATE_PER_MINUTE"))
+    wikidata_rate_per_minute: int = Field(default=30, validation_alias=AliasChoices("WIKIDATA_RATE_PER_MINUTE"))
+    public_intelligence_timeout_seconds: float = Field(
+        default=20.0, validation_alias=AliasChoices("PUBLIC_INTELLIGENCE_TIMEOUT_SECONDS"))
+    public_intelligence_cache_ttl_hours: int = Field(
+        default=168, validation_alias=AliasChoices("PUBLIC_INTELLIGENCE_CACHE_TTL_HOURS"))
+
     # --- Production hardening (Prompt 40) ---------------------------------- #
     # Observability: structured JSON logs (opt-in), request/correlation IDs.
     log_format: str = Field(default="text", validation_alias=AliasChoices("LOG_FORMAT"))  # text | json
@@ -168,7 +201,10 @@ class Settings(BaseSettings):
 
     @field_validator(
         "show_synthetic_leads", "enforce_real_data", "ai_enabled", "scheduler_enabled",
-        "contactout_enabled",
+        "contactout_enabled", "public_intelligence_enabled",
+        "official_company_intelligence_enabled", "github_intelligence_enabled",
+        "wikidata_intelligence_enabled", "public_registry_intelligence_enabled",
+        "rss_intelligence_enabled",
         mode="before",
     )
     @classmethod
@@ -255,6 +291,36 @@ class Settings(BaseSettings):
         if self.contactout_enabled is False:
             return "DISABLED"
         return "CONFIGURED" if self.contactout_api_token else "NOT_CONFIGURED"
+
+    @property
+    def public_intelligence_active(self) -> bool:
+        """Free/public intelligence master switch (default ON — free sources, only
+        called on explicit discovery)."""
+        return True if self.public_intelligence_enabled is None else bool(self.public_intelligence_enabled)
+
+    def public_intelligence_provider_enabled(self, name: str) -> bool:
+        """Whether a specific public-intelligence provider is enabled. Providers with
+        no concrete data source (public_registry) or no configuration (rss without
+        feeds) default OFF; the others default ON when the master switch is on."""
+        if not self.public_intelligence_active:
+            return False
+        overrides = {
+            "official_company": self.official_company_intelligence_enabled,
+            "github": self.github_intelligence_enabled,
+            "wikidata": self.wikidata_intelligence_enabled,
+            "public_registry": self.public_registry_intelligence_enabled,
+            "rss": self.rss_intelligence_enabled,
+        }
+        defaults = {
+            "official_company": True, "github": True, "wikidata": True,
+            "public_registry": False, "rss": bool(self.rss_intelligence_feeds.strip()),
+        }
+        val = overrides.get(name)
+        return defaults.get(name, False) if val is None else bool(val)
+
+    @property
+    def public_intelligence_config_status(self) -> str:
+        return "ENABLED" if self.public_intelligence_active else "DISABLED"
 
 
 @lru_cache

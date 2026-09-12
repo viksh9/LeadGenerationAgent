@@ -812,6 +812,46 @@ class POCListResponse(BaseModel):
     note: Optional[str] = None
 
 
+class PublicIntelligenceDiscoveryResponse(BaseModel):
+    """Result of a free/public intelligence discovery run. Honest states only."""
+
+    lead_id: Optional[int] = None
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    status: str                       # ENRICHED | CACHED | NO_POC_FOUND | DISABLED
+    people_found: int = 0
+    persisted: int = 0
+    provider_status: dict[str, str] = Field(default_factory=dict)
+    company_facts_updated: list[str] = Field(default_factory=list)
+    reason: str = ""
+    pocs: list[POCResponse] = Field(default_factory=list)
+
+
+class CompanyPublicIntelligenceResponse(BaseModel):
+    """Company profile facts + real public leadership discovered from free sources."""
+
+    company_id: int
+    company_name: str
+    website: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    country: Optional[str] = None
+    industry: Optional[str] = None
+    wikidata_id: Optional[str] = None
+    india_locations: list[str] = Field(default_factory=list)
+    public_leadership: list[POCResponse] = Field(default_factory=list)
+
+
+class PublicIntelligenceTestResponse(BaseModel):
+    """Real connectivity check against a configured public source (§36)."""
+
+    provider: str
+    result: str                       # LIVE_VERIFIED | NOT_CONFIGURED | SOURCE_UNAVAILABLE | ERROR
+    status: str
+    message: Optional[str] = None
+    performed_request: bool
+    checked_at: datetime
+
+
 class ContactOutStatusResponse(BaseModel):
     """ContactOut integration config status for the Settings UI. Never exposes the
     token or base URL."""

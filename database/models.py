@@ -1331,6 +1331,9 @@ class Company(Base):
     website: Mapped[str | None] = mapped_column(String(512), nullable=True)
     primary_domain: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     alternate_domains: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Public-intelligence identity (Prompt 45) — additive; filled from public sources.
+    linkedin_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    wikidata_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     industry: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     sub_industry: Mapped[str | None] = mapped_column(String(128), nullable=True)

@@ -8,6 +8,7 @@ import {
   type ConnectionTestResult,
   type POCDiscovery,
 } from '@/services/contactOut';
+import { discoverPublicIntelligence } from '@/services/publicIntelligence';
 import { useToast } from '@/contexts/ToastContext';
 import type { ApiErrorShape } from '@/services/api';
 
@@ -73,6 +74,27 @@ export function useContactOutStatus() {
     queryFn: ({ signal }) => fetchContactOutStatus(signal),
     retry: false,
     staleTime: 60_000,
+  });
+}
+
+/** Discover free/public intelligence (official website, GitHub, Wikidata). */
+export function useDiscoverPublicIntelligence(leadId: number) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (args: { force?: boolean } | void) =>
+      discoverPublicIntelligence(leadId, (args && args.force) || false),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: pocKeys.lead(leadId) });
+      const map: Record<string, string> = {
+        ENRICHED: `Found ${res.persisted} public POC(s).`,
+        CACHED: 'Reused recent public POC(s).',
+        NO_POC_FOUND: 'No verified public POC found; role recommendations only.',
+        DISABLED: 'Public intelligence is disabled.',
+      };
+      toast.info(map[res.status] ?? res.reason);
+    },
+    onError: (e) => toast.error(errText(e, 'Public intelligence discovery could not run.')),
   });
 }
 

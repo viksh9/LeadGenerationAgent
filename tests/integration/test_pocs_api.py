@@ -65,7 +65,8 @@ def test_lead_pocs_returns_role_recommendations(client):
     lead_id = _seed(client)
     body = client.get(f"/leads/{lead_id}/pocs").json()
     assert body["contactout_status"] == "NOT_CONFIGURED"
-    assert body["note"] == "POC enrichment is not configured."
+    # ContactOut is not configured, but free public discovery is available.
+    assert "public sources" in (body["note"] or "").lower()
     assert len(body["recommended_roles"]) > 0            # role-only recommendations shown
     assert body["pocs"] == []                            # no fabricated people
 

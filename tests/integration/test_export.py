@@ -162,6 +162,28 @@ def test_contactout_poc_attached_by_company_name(seed_session):
     assert "ContactOut" in (row["Source"] or "")
 
 
+def test_public_source_poc_names_its_source(seed_session):
+    # A public-source (e.g. GitHub) POC appears in Target POC Details and its public
+    # source is named in the Source column — still exactly 16 columns.
+    seed_session.add(Company(canonical_name="Nimbus", normalized_name="nimbus",
+                             primary_domain="nimbus.com", data_provenance=DataProvenance.REAL))
+    seed_session.flush()
+    company = seed_session.query(Company).first()
+    _lead(seed_session, company="Nimbus", company_id=None)
+    seed_session.add(DecisionMaker(
+        company_id=company.id, company_name="Nimbus", full_name="Asha Kumar",
+        normalized_name="asha kumar", job_title="Head of Engineering",
+        professional_network_url="https://github.com/ashakumar", contact_source="GitHub",
+        source_type="github_public_profile", match_score=90, contact_trust_score=55,
+        contact_trust_status="VERIFIED", verification_status=VerificationStatus.VERIFIED,
+        is_current=True, data_provenance=DataProvenance.REAL))
+    seed_session.commit()
+    row = _row(seed_session)
+    assert row["Target POC Details"] == "Asha Kumar — Head of Engineering"
+    assert "GitHub" in (row["Source"] or "")
+    assert row["Email"] is None    # no public email published → blank, never fabricated
+
+
 def test_signal_mirrors_opportunities_tab(seed_session):
     # Readable type + specific title + confidence, exactly like the Opportunities tab.
     # No raw SCREAMING_CASE codes leak into the sheet.

@@ -135,12 +135,15 @@ def _humanize_signal(value) -> str:
     return _SIGNAL_LABELS.get(v, v) if v else ""
 
 
-def _source_text(lead: Lead, used_contactout: bool) -> str:
-    """Cleaned source, noting ContactOut when it materially backs the POC/contact (§33)."""
+def _source_text(lead: Lead, contact_sources: list[str] | None = None) -> str:
+    """Cleaned job source, plus any contact source(s) (Official Company Website /
+    GitHub / ContactOut) that materially back the shown POC/contact (§33)."""
     base = _clean_source(lead.source_name)
-    if used_contactout and "contactout" not in base.lower():
-        return f"{base} | ContactOut" if base else "ContactOut"
-    return base
+    parts = [base] if base else []
+    for src in (contact_sources or []):
+        if src and src.lower() not in " ".join(parts).lower():
+            parts.append(src)
+    return " | ".join(parts)
 
 
 def _signal_text(lead: Lead) -> str:
@@ -294,9 +297,14 @@ def build_workbook(session: Session, *, scope: str = "all", now: datetime | None
         people = bundle.people if bundle else []
         email_dm = bundle.email_contact if bundle else None
         phone_dm = bundle.phone_contact if bundle else None
-        # Source hint: note ContactOut when it materially backs the shown POC/contact (§33).
+        # Source hint: note the contact source(s) that materially back the shown
+        # POC/contact — e.g. Official Company Website / GitHub / ContactOut (§33).
         shown = people[:2] + [d for d in (email_dm, phone_dm) if d is not None]
-        used_contactout = any(getattr(d, "contact_source", None) == "ContactOut" for d in shown)
+        contact_sources = []
+        for d in shown:
+            src = getattr(d, "contact_source", None)
+            if src and src not in contact_sources:
+                contact_sources.append(src)
         openings = lead.it_job_count if (lead.it_job_count and lead.it_job_count > 0) else None
         sig_date = _signal_date(lead)
         # Opportunity column: same values as the Opportunity tab (§26) — Type,
@@ -319,7 +327,7 @@ def build_workbook(session: Session, *, scope: str = "all", now: datetime | None
             _safe(email_dm.business_email if email_dm else None),   # real business email, else blank
             _safe(opportunity_cell(oview)),                  # multi-line: Type / Staffing / Est. Team / Urgency
             sig_date,                                        # real date object → formatted below
-            _safe(_source_text(lead, used_contactout)),
+            _safe(_source_text(lead, contact_sources)),
         ]
         ws.append(values)
         row_count += 1

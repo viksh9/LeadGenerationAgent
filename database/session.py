@@ -51,6 +51,11 @@ _ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
         "contact_trust_status": "VARCHAR(24)",
         "is_current": "BOOLEAN DEFAULT 1",
     },
+    "companies": {
+        # Public-intelligence identity (Prompt 45) — additive.
+        "linkedin_url": "VARCHAR(512)",
+        "wikidata_id": "VARCHAR(32)",
+    },
     "source_health": {
         "requests_used": "INTEGER DEFAULT 0",
         "request_budget": "INTEGER",

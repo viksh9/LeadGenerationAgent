@@ -68,13 +68,22 @@ def list_lead_pocs(lead_id: int, session: Session = Depends(get_session)) -> POC
     lead = _get_lead(session, lead_id)
     settings = get_settings()
     _company, company_name, _domain = resolve_company_for_lead(session, lead)
-    pocs = get_pocs_for_lead(session, lead)
+    # All persisted people POCs for this company: ContactOut + free/public sources.
+    from enrichment.public_intelligence_service import get_public_pocs_for_lead
+    by_id = {p.id: p for p in get_pocs_for_lead(session, lead)}
+    for p in get_public_pocs_for_lead(session, lead):
+        by_id.setdefault(p.id, p)
+    pocs = sorted(by_id.values(), key=lambda d: (d.match_score or 0, d.contact_trust_score or 0), reverse=True)
     roles, conf = _roles_for(lead)
     note = None
-    if settings.contactout_config_status != "CONFIGURED":
-        note = "POC enrichment is not configured."
-    elif not pocs:
-        note = "No verified POC found for this opportunity yet. Run discovery to search ContactOut."
+    if not pocs:
+        public_on = settings.public_intelligence_active
+        contactout_on = settings.contactout_config_status == "CONFIGURED"
+        if public_on or contactout_on:
+            note = "No verified POC found yet. Run discovery to search free public sources" + (
+                " and ContactOut." if contactout_on else ".")
+        else:
+            note = "POC enrichment is not configured."
     return POCListResponse(
         lead_id=lead.id, company_name=company_name,
         contactout_status=settings.contactout_config_status,
