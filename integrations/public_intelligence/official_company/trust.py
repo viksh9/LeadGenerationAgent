@@ -1,25 +1,27 @@
-"""Company Data Trust scoring for official-company intelligence (Prompt 46, §20/§21).
+"""Company Data Trust scoring (Prompt 46 → enhanced Prompt 47, §18/§21).
 
-Points are awarded ONLY when the corresponding evidence actually exists — never
-assigned by default, and never reaching 100 unless every criterion is met.
+Evidence-based only — points are awarded ONLY when the corresponding evidence
+actually exists; never assigned by default; 100 requires the full evidence set.
 
 Company Data Trust (max 100):
-    official website confirms identity            +30
-    official contact page confirms address        +25
-    official page confirms phone/email             +15
-    official social/LinkedIn confirms identity     +10
-    official careers/ATS relation                  +10
-    fresh retrieval                                +10
+    official company identity verified            +30
+    official company website verified             +20
+    official address verified                     +15
+    government/registry evidence                  +15
+    OpenCorporates legal-entity match             +10
+    official career/ATS relationship               +5
+    fresh retrieval                                +5
 """
 
 from __future__ import annotations
 
 IDENTITY_POINTS = 30
-ADDRESS_POINTS = 25
-CONTACT_POINTS = 15
-LINKEDIN_POINTS = 10
-CAREERS_POINTS = 10
-FRESH_POINTS = 10
+WEBSITE_POINTS = 20
+ADDRESS_POINTS = 15
+REGISTRY_POINTS = 15
+OPENCORPORATES_POINTS = 10
+CAREERS_POINTS = 5
+FRESH_POINTS = 5
 
 # Field-level trust for a value sourced from an official company page (§21).
 FIELD_TRUST = {
@@ -32,21 +34,30 @@ FIELD_TRUST = {
     "contact_url": 100,
     "leadership_url": 100,
     "address": 95,
+    # OpenCorporates-sourced legal fields (§19).
+    "legal_name": 90,
+    "company_number": 95,
+    "registered_address": 85,
+    "registry_url": 90,
+    "opencorporates_url": 90,
 }
 
 
-def company_data_trust(*, identity_confirmed: bool, address_confirmed: bool,
-                       contact_confirmed: bool, linkedin_confirmed: bool,
-                       careers_confirmed: bool, fresh: bool) -> int:
+def company_data_trust(*, identity_confirmed: bool, website_confirmed: bool = False,
+                       address_confirmed: bool = False, registry_confirmed: bool = False,
+                       opencorporates_match: bool = False, careers_confirmed: bool = False,
+                       fresh: bool = False) -> int:
     score = 0
     if identity_confirmed:
         score += IDENTITY_POINTS
+    if website_confirmed:
+        score += WEBSITE_POINTS
     if address_confirmed:
         score += ADDRESS_POINTS
-    if contact_confirmed:
-        score += CONTACT_POINTS
-    if linkedin_confirmed:
-        score += LINKEDIN_POINTS
+    if registry_confirmed:
+        score += REGISTRY_POINTS
+    if opencorporates_match:
+        score += OPENCORPORATES_POINTS
     if careers_confirmed:
         score += CAREERS_POINTS
     if fresh:

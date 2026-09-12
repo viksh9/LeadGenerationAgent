@@ -23,12 +23,16 @@ MATCH_VERIFIED = "VERIFIED"
 MATCH_LIKELY = "LIKELY"
 MATCH_UNKNOWN = "UNKNOWN"
 
-# Source priority (§20): lower rank wins as the canonical field value.
+# Source priority (§1/§20): lower rank wins as the canonical field value. Official
+# company sources outrank registries/aggregators; OpenCorporates is supporting legal
+# evidence and never overrides stronger official-company data.
 SOURCE_PRIORITY = {
     "official_company": 1,
     "official_ats": 2,
-    "github": 3,
-    "wikidata": 4,
+    "government_registry": 4,
+    "opencorporates": 5,
+    "github": 6,
+    "wikidata": 7,
 }
 
 
@@ -154,6 +158,21 @@ class PublicCompanyFacts:
     postal_code: Optional[str] = None
     full_address: Optional[str] = None
     locations: list[CompanyLocationRecord] = field(default_factory=list)
+    # OpenCorporates legal-entity facts (§7/§8, Prompt 47). Legal identity is kept
+    # DISTINCT from the operating brand/address; a registered address never overwrites
+    # the operating address.
+    legal_name: Optional[str] = None
+    company_number: Optional[str] = None
+    jurisdiction_code: Optional[str] = None
+    company_status: Optional[str] = None       # ACTIVE / INACTIVE / DISSOLVED / UNKNOWN
+    incorporation_date: Optional[str] = None
+    registry_url: Optional[str] = None
+    opencorporates_url: Optional[str] = None
+    opencorporates_id: Optional[str] = None
+    india_entity_type: Optional[str] = None    # GLOBAL_COMPANY / INDIA_ENTITY / INDIA_OFFICE / ...
+    match_status: Optional[str] = None         # VERIFIED_MATCH / LIKELY_MATCH / MULTIPLE_MATCHES / NO_MATCH
+    registered_location: Optional[CompanyLocationRecord] = None
+    officers: list[dict] = field(default_factory=list)   # legal officers (name/position/dates) — NOT POCs
     field_evidence: list[CompanyFieldEvidenceRecord] = field(default_factory=list)
     source: str = ""
     source_label: str = ""

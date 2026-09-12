@@ -34,10 +34,12 @@ class WikidataProvider(PublicIntelligenceProvider):
 
     def health_check(self):
         from collectors.base import HealthStatus
-        from integrations.public_intelligence.base import ProviderRateLimited, ProviderUnavailable
+        from integrations.public_intelligence.base import ProviderAuthError, ProviderRateLimited, ProviderUnavailable
         try:
             self._client.find_company("Wikidata")   # trivial real query
             return HealthStatus.HEALTHY, "Wikidata SPARQL reachable."
+        except ProviderAuthError:
+            return HealthStatus.AUTHENTICATION_FAILED, "Authentication failed."
         except ProviderRateLimited:
             return HealthStatus.RATE_LIMITED, "Wikidata rate limit reached."
         except ProviderUnavailable as exc:

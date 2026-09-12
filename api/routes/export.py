@@ -24,6 +24,7 @@ from config.exceptions import ValidationError
 from crm.audit import record_audit
 from database.models import UserRole, utcnow
 from export.excel import build_workbook, workbook_counts
+from export.full_intelligence import build_full_intelligence_workbook
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/export", tags=["export"])
@@ -71,6 +72,31 @@ def export_excel(
     session.commit()
     logger.info("excel_export scope=%s rows=%s sheets=%s", scope, meta["total_rows"], len(meta["sheets"]))
 
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Export-Rows": str(meta["total_rows"]),
+        "X-Export-Filename": filename,
+    }
+    return StreamingResponse(iter([buffer.getvalue()]), media_type=_XLSX_MEDIA, headers=headers)
+
+
+@router.get("/full-intelligence", summary="Export the FULL intelligence workbook (real data)")
+def export_full_intelligence(
+    session: Session = Depends(get_session),
+    role=Depends(_export_role),
+    _rl=Depends(_export_limit),
+) -> StreamingResponse:
+    """Complete-intelligence export (separate from the fixed 16-column business export,
+    which is unchanged). One row per real company-level lead with company/legal/address/
+    opportunity/POC fields + per-field source. No secrets exported."""
+    now = utcnow()
+    buffer, meta = build_full_intelligence_workbook(session, now=now)
+    filename = f"leadgenerationagent_full_intelligence_{now.date().isoformat()}.xlsx"
+    record_audit(session, entity_type="export", action="FULL_INTELLIGENCE_EXPORT",
+                 actor=getattr(role, "value", str(role)),
+                 reason=f"{meta['total_rows']} rows, {meta['columns']} columns", now=now)
+    session.commit()
+    logger.info("full_intelligence_export rows=%s columns=%s", meta["total_rows"], meta["columns"])
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
         "X-Export-Rows": str(meta["total_rows"]),

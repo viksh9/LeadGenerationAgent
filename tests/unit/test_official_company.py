@@ -80,13 +80,14 @@ def test_postal_address_missing_parts_stay_none():
 
 # --- trust ------------------------------------------------------------------ #
 def test_company_data_trust_max_and_partial():
-    assert company_data_trust(identity_confirmed=True, address_confirmed=True, contact_confirmed=True,
-                              linkedin_confirmed=True, careers_confirmed=True, fresh=True) == 100
-    # only identity + fresh
-    assert company_data_trust(identity_confirmed=True, address_confirmed=False, contact_confirmed=False,
-                             linkedin_confirmed=False, careers_confirmed=False, fresh=True) == 40
-    assert company_data_trust(identity_confirmed=False, address_confirmed=False, contact_confirmed=False,
-                             linkedin_confirmed=False, careers_confirmed=False, fresh=False) == 0
+    # §18 framework: identity30 + website20 + address15 + registry15 + OC10 + careers5 + fresh5
+    assert company_data_trust(identity_confirmed=True, website_confirmed=True, address_confirmed=True,
+                              registry_confirmed=True, opencorporates_match=True,
+                              careers_confirmed=True, fresh=True) == 100
+    # official-only (no registry / no OpenCorporates): 30+20+15+5+5 = 75
+    assert company_data_trust(identity_confirmed=True, website_confirmed=True, address_confirmed=True,
+                              careers_confirmed=True, fresh=True) == 75
+    assert company_data_trust(identity_confirmed=False) == 0
 
 
 def test_field_trust():

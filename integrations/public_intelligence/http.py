@@ -14,7 +14,11 @@ from typing import Any, Callable, Optional
 import httpx
 
 from collectors.base import RateLimiter, RetryConfig, TimeoutConfig
-from integrations.public_intelligence.base import ProviderRateLimited, ProviderUnavailable
+from integrations.public_intelligence.base import (
+    ProviderAuthError,
+    ProviderRateLimited,
+    ProviderUnavailable,
+)
 
 logger = logging.getLogger("integrations.public_intelligence")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -61,6 +65,11 @@ class PublicJsonClient:
                         raise ProviderUnavailable(f"{provider} returned non-JSON.") from exc
                 if status == 404:
                     return None
+                # 401 (and 403 that is NOT a rate-limit signal) = auth failure — never retried.
+                if status == 401 or (status == 403 and resp.headers.get("X-RateLimit-Remaining") != "0"):
+                    logger.warning("public_intelligence.error provider=%s status_code=%s reason=auth",
+                                   provider, status)
+                    raise ProviderAuthError(f"{provider} authentication failed (HTTP {status}).")
                 rate_limited = status == 429 or (
                     status == 403 and resp.headers.get("X-RateLimit-Remaining") == "0")
                 if rate_limited:

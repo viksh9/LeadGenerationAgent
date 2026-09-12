@@ -66,6 +66,35 @@ export function OfficialCompanyPanel({ companyName }: { companyName: string }) {
             </Field>
           </dl>
 
+          {/* Operating vs Registered address kept visibly distinct (§29). */}
+          {data.registered_address && (
+            <div className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+              <Field label="Registered Address (OpenCorporates)">{data.registered_address}</Field>
+            </div>
+          )}
+
+          {/* Legal / company verification (§30) — only fields that exist. */}
+          {(data.legal_name || data.company_number || data.company_status || data.india_entity_type) && (
+            <div className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Legal / Company Verification
+              </p>
+              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {data.legal_name && <Field label="Legal Name">{data.legal_name}</Field>}
+                {data.company_number && <Field label="Company Number">{data.company_number}</Field>}
+                {data.jurisdiction_code && <Field label="Jurisdiction">{data.jurisdiction_code}</Field>}
+                {data.company_status && <Field label="Status">{data.company_status}</Field>}
+                {data.india_entity_type && <Field label="Entity">{data.india_entity_type.replace(/_/g, ' ')}</Field>}
+                {data.registry_url && (
+                  <Field label="Registry"><ExternalLinkValue href={data.registry_url} stripScheme /></Field>
+                )}
+                {data.opencorporates_url && (
+                  <Field label="OpenCorporates"><ExternalLinkValue href={data.opencorporates_url} stripScheme /></Field>
+                )}
+              </dl>
+            </div>
+          )}
+
           {data.official_verified_at && (
             <p className="text-xs text-slate-400 dark:text-slate-500">
               Verified: {formatDate(data.official_verified_at)}

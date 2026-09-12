@@ -1344,6 +1344,18 @@ class Company(Base):
     postal_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     data_trust_score: Mapped[int] = mapped_column(Integer, default=0)
     official_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # OpenCorporates legal-entity verification (Prompt 47) — additive. Legal identity is
+    # kept DISTINCT from the operating brand/website; nothing here overrides official data.
+    company_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    jurisdiction_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    company_status: Mapped[str | None] = mapped_column(String(24), nullable=True)  # ACTIVE/INACTIVE/DISSOLVED/UNKNOWN
+    incorporation_date: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    registry_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    opencorporates_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    opencorporates_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    registered_address: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # GLOBAL_COMPANY / INDIA_ENTITY / INDIA_OFFICE / INDIA_OPERATION / UNKNOWN (§2).
+    india_entity_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
 
     industry: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     sub_industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -1485,6 +1497,34 @@ class CompanyFieldEvidence(Base):
         SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True)
     retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class CompanyOfficer(Base):
+    """A LEGAL officer/director from a company registry (Prompt 47, §12/§13).
+
+    Kept STRICTLY separate from sales/technical POCs (DecisionMaker): a legal role is
+    NEVER treated as a CTO/VP/TA POC. Supporting company intelligence only. Real,
+    source-backed records only — never fabricated."""
+
+    __tablename__ = "company_officers"
+    __table_args__ = (
+        UniqueConstraint("company_id", "normalized_name", "position", name="uq_company_officer"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    normalized_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    position: Mapped[str | None] = mapped_column(String(128), nullable=True)   # legal position, NOT a POC role
+    start_date: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    end_date: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    role_kind: Mapped[str] = mapped_column(String(24), default="LEGAL_OFFICER")
+    source: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_record_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    data_provenance: Mapped[DataProvenance] = mapped_column(
+        SAEnum(DataProvenance, native_enum=False, length=16), default=DataProvenance.REAL, index=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class CompanyResolutionCandidate(Base):
