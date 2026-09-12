@@ -81,5 +81,19 @@ def test_intelligence_columns_present_and_populated(seed_session):
     assert row["AI Profile Highlights"] and "Hiring Trend" in row["AI Profile Highlights"]
 
 
+def test_prompt55_columns_present_and_populated(seed_session):
+    """Prompt 55 §4: Recommended POC Role, Source URL, Supporting Sources, Evidence."""
+    _seed(seed_session)
+    ws = _load(seed_session).active
+    headers = [c.value for c in ws[1]]
+    for col in ("Recommended POC Role", "Source URL", "Supporting Sources", "Evidence"):
+        assert col in headers
+    row = dict(zip(headers, [c.value for c in ws[2]]))
+    # Recommended role is opportunity-aware and present even alongside a real person.
+    assert row["Recommended POC Role"]
+    # Worksheet name is exactly "Full Intelligence".
+    assert ws.title == "Full Intelligence"
+
+
 def test_fixed_16_column_export_unchanged():
     assert len(FIXED_HEADERS) == 16       # extension never touched the fixed export

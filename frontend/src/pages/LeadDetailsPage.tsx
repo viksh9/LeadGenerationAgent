@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState } from '@/components/ui/States';
 import { LeadHeader } from '@/components/leads/detail/LeadHeader';
 import { CompanySummaryCard } from '@/components/leads/detail/CompanySummaryCard';
+import { CompanyIntelligencePanel } from '@/components/leads/detail/CompanyIntelligencePanel';
 import { SignalPanel } from '@/components/leads/detail/SignalPanel';
 import { OpportunityPanel } from '@/components/leads/detail/OpportunityPanel';
 import { TechnologyList } from '@/components/leads/detail/TechnologyList';
@@ -128,6 +129,7 @@ export function LeadDetailsPage() {
             <SignalPanel lead={lead} />
             <TechnologyList lead={lead} />
             <CompanySummaryCard lead={lead} />
+            <CompanyIntelligencePanel leadId={lead.id} />
             <EvidencePanel lead={lead} />
             <VerificationPanel leadId={lead.id} />
             <AIIntelligencePanel lead={lead} />

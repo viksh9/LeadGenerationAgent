@@ -46,6 +46,7 @@ been implemented, configured, and verified against the live source. See
 | **Official company career sources** (domain + ATS discovery) | [docs/OFFICIAL_CAREER_SOURCES.md](docs/OFFICIAL_CAREER_SOURCES.md) |
 | **ContactOut POC enrichment** (real decision-maker discovery, credit-aware, no fabrication) | [docs/CONTACTOUT_INTEGRATION.md](docs/CONTACTOUT_INTEGRATION.md) |
 | **Free/public intelligence** (official website + GitHub + Wikidata, provenance + trust, no fabrication) | [docs/PUBLIC_INTELLIGENCE.md](docs/PUBLIC_INTELLIGENCE.md) |
+| **Excel exports** (Lead Data + Full Intelligence formats) | [docs/EXCEL_EXPORTS.md](docs/EXCEL_EXPORTS.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
 | Operations (daily checks, incidents, backup) | [OPERATIONS.md](OPERATIONS.md) · [docs/operations-runbook.md](docs/operations-runbook.md) |
 | Production-readiness checklist | [docs/production-readiness-checklist.md](docs/production-readiness-checklist.md) |
