@@ -56,6 +56,23 @@ CITY_STATE: dict[str, str] = {
 }
 
 INDIA_KEYWORDS: tuple[str, ...] = ("india", "bharat", ", in", "(in)")
+
+# Flattened city aliases for fast India-location detection.
+_ALL_CITY_ALIASES: tuple[str, ...] = tuple(
+    alias for aliases in INDIAN_CITY_ALIASES.values() for alias in aliases
+)
+
+
+def is_india_location(text: str | None) -> bool:
+    """True when a free-text job location is in India — matches the country/region
+    keyword ('india'/'bharat') or a known Indian city alias. Conservative: unknown or
+    empty locations are NOT treated as India (never guessed)."""
+    if not text:
+        return False
+    t = text.lower()
+    if "india" in t or "bharat" in t:
+        return True
+    return any(alias in t for alias in _ALL_CITY_ALIASES)
 REMOTE_KEYWORDS: tuple[str, ...] = ("remote", "work from home", "wfh", "anywhere")
 HYBRID_KEYWORDS: tuple[str, ...] = ("hybrid",)
 ONSITE_KEYWORDS: tuple[str, ...] = ("on-site", "onsite", "on site", "in office", "in-office", "work from office")

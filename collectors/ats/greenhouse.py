@@ -43,6 +43,7 @@ from collectors.errors import (
     SourceUnavailableError,
 )
 from collectors.it_taxonomy import NOT_RELEVANT, classify_it_relevance
+from config.locations_in import is_india_location
 from collectors.raw_record import RawRecordDraft
 from collectors.source_registry import SourceDefinition
 
@@ -69,6 +70,7 @@ class GreenhouseConfig(BaseModel):
     requests_per_minute: int = 30
     timeout_seconds: float = 15.0
     max_records_per_board: int = 500
+    india_only: bool = True   # India-first: keep only India-based roles (§15)
 
     @property
     def is_configured(self) -> bool:
@@ -85,6 +87,7 @@ def load_greenhouse_config() -> GreenhouseConfig:
         requests_per_minute=int(os.environ.get("GREENHOUSE_REQUESTS_PER_MINUTE", 30) or 30),
         timeout_seconds=float(os.environ.get("GREENHOUSE_TIMEOUT_SECONDS", 15) or 15),
         max_records_per_board=int(os.environ.get("GREENHOUSE_MAX_RECORDS", 500) or 500),
+        india_only=(os.environ.get("ATS_INDIA_ONLY", "true").strip().lower() not in ("false", "0", "no")),
     )
 
 
@@ -183,6 +186,15 @@ def map_job(item: dict[str, Any], board: str) -> RawRecordDraft:
     )
 
 
+def _is_india_job(item: dict[str, Any]) -> bool:
+    """True when a Greenhouse job is in India — checks the primary location plus any
+    listed offices (a multi-location role counts if any office is in India)."""
+    loc = (item.get("location") or {}).get("name") or ""
+    offices = " ".join(
+        (o or {}).get("name") or "" for o in (item.get("offices") or []) if isinstance(o, dict))
+    return is_india_location(f"{loc} {offices}")
+
+
 def is_it_relevant(item: dict[str, Any]) -> bool:
     return classify_it_relevance(item.get("title"), _clean(item.get("content"))) != NOT_RELEVANT
 
@@ -210,11 +222,15 @@ class GreenhouseCollector(BaseCollector):
         records: list[RawRecordDraft] = []
         warnings: list[str] = []
         skipped = 0
+        skipped_non_india = 0
         for item in jobs[: self.config.max_records_per_board]:
             if not isinstance(item, dict):
                 continue
             if not is_it_relevant(item):
                 skipped += 1
+                continue
+            if self.config.india_only and not _is_india_job(item):
+                skipped_non_india += 1
                 continue
             try:
                 records.append(map_job(item, board))
@@ -222,6 +238,8 @@ class GreenhouseCollector(BaseCollector):
                 warnings.append(f"skipped a record: {exc}")
         if skipped:
             warnings.append(f"filtered {skipped} non-IT record(s)")
+        if skipped_non_india:
+            warnings.append(f"filtered {skipped_non_india} non-India record(s)")
         total = (payload.get("meta") or {}).get("total")
         return CollectorResult(
             source_id=SOURCE_ID, records=records, page=1, has_more=False,

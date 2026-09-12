@@ -40,6 +40,7 @@ from collectors.errors import (
     SourceUnavailableError,
 )
 from collectors.it_taxonomy import NOT_RELEVANT, classify_it_relevance
+from config.locations_in import is_india_location
 from collectors.raw_record import RawRecordDraft
 from collectors.source_registry import SourceDefinition
 
@@ -62,6 +63,7 @@ class LeverConfig(BaseModel):
     results_per_site: int = 100
     requests_per_minute: int = 30
     timeout_seconds: float = 15.0
+    india_only: bool = True   # India-first: keep only India-based roles (§15)
 
     @property
     def is_configured(self) -> bool:
@@ -78,6 +80,7 @@ def load_lever_config() -> LeverConfig:
         results_per_site=int(os.environ.get("LEVER_RESULTS_PER_SITE", 100) or 100),
         requests_per_minute=int(os.environ.get("LEVER_REQUESTS_PER_MINUTE", 30) or 30),
         timeout_seconds=float(os.environ.get("LEVER_TIMEOUT_SECONDS", 15) or 15),
+        india_only=(os.environ.get("ATS_INDIA_ONLY", "true").strip().lower() not in ("false", "0", "no")),
     )
 
 
@@ -172,6 +175,16 @@ def map_job(item: dict[str, Any], site: str) -> RawRecordDraft:
     )
 
 
+def _is_india_job(item: dict[str, Any]) -> bool:
+    """True when a Lever posting is in India — checks categories.location plus
+    categories.allLocations (multi-location roles count if any is in India)."""
+    cats = item.get("categories") or {}
+    loc = cats.get("location") or ""
+    all_locs = cats.get("allLocations") or []
+    extra = " ".join(str(x) for x in all_locs) if isinstance(all_locs, list) else str(all_locs)
+    return is_india_location(f"{loc} {extra}")
+
+
 def is_it_relevant(item: dict[str, Any]) -> bool:
     return classify_it_relevance(item.get("text"), item.get("descriptionPlain")) != NOT_RELEVANT
 
@@ -198,11 +211,15 @@ class LeverCollector(BaseCollector):
         records: list[RawRecordDraft] = []
         warnings: list[str] = []
         skipped = 0
+        skipped_non_india = 0
         for item in postings:
             if not isinstance(item, dict):
                 continue
             if not is_it_relevant(item):
                 skipped += 1
+                continue
+            if self.config.india_only and not _is_india_job(item):
+                skipped_non_india += 1
                 continue
             try:
                 records.append(map_job(item, site))
@@ -210,6 +227,8 @@ class LeverCollector(BaseCollector):
                 warnings.append(f"skipped a record: {exc}")
         if skipped:
             warnings.append(f"filtered {skipped} non-IT record(s)")
+        if skipped_non_india:
+            warnings.append(f"filtered {skipped_non_india} non-India record(s)")
         return CollectorResult(
             source_id=SOURCE_ID, records=records, page=1, has_more=False,
             total_records=len(postings), duration_seconds=round(time.monotonic() - started, 3),
