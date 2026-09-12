@@ -220,3 +220,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Real-data DB backups (never commit — contain real records)
+data/*.bak-*
+data/*.db.bak*

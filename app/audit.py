@@ -112,6 +112,15 @@ def validate_data(session: Session) -> dict:
     ).all()
     checks["duplicate_canonical_jobs"] = sum(int(n) - 1 for _, n in dup_rows)
 
+    # Duplicate company identities (same normalized_name more than once) — a
+    # canonicalization regression (§5): one real company must be one company row.
+    dup_co = session.execute(
+        select(Company.normalized_name, func.count(Company.id))
+        .where(Company.normalized_name.is_not(None), Company.normalized_name != "")
+        .group_by(Company.normalized_name).having(func.count(Company.id) > 1)
+    ).all()
+    checks["duplicate_companies"] = sum(int(n) - 1 for _, n in dup_co)
+
     # Orphaned CRM activities / sales opportunities (lead id points nowhere).
     lead_ids = select(Lead.id)
     checks["orphaned_crm_activities"] = _count(

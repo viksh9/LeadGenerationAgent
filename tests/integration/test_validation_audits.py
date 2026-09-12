@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.audit import validate_data
 from app.provenance_audit import provenance_report
 from app.quality_audit import INSUFFICIENT, quality_report
 from app.report import go_no_go, real_data_scorecard
@@ -16,6 +17,7 @@ from app.source_inventory import source_inventory
 from app.synthetic_audit import db_synthetic_report
 from app.live_audit import trace_lead
 from database.models import (
+    Company,
     DataProvenance,
     EvidenceRecord,
     EvidenceType,
@@ -156,3 +158,28 @@ def test_trace_lead_returns_real_chain(seed_session):
     assert result["lead"]["company"] == "Acme Tech"
     assert result["evidence_count"] == 1
     assert result["evidence_chain"][0]["source_name"] == "adzuna"
+
+
+# --------------------------------------------------------------------------- #
+# Duplicate-company check (Prompt 57 — canonicalization regression guard)
+# --------------------------------------------------------------------------- #
+def test_validate_data_flags_duplicate_companies(seed_session):
+    """Two REAL companies sharing a normalized_name is a canonicalization defect and
+    must be reported (this class of issue previously slipped through green)."""
+    seed_session.add_all([
+        Company(canonical_name="Adobe", normalized_name="adobe", data_provenance=DataProvenance.REAL),
+        Company(canonical_name="Adobe Inc", normalized_name="adobe", data_provenance=DataProvenance.REAL),
+    ])
+    seed_session.commit()
+    result = validate_data(seed_session)
+    assert result["issues"]["duplicate_companies"] == 1
+    assert result["clean"] is False
+
+
+def test_validate_data_clean_when_companies_unique(seed_session):
+    seed_session.add_all([
+        Company(canonical_name="Adobe", normalized_name="adobe", data_provenance=DataProvenance.REAL),
+        Company(canonical_name="Infosys", normalized_name="infosys", data_provenance=DataProvenance.REAL),
+    ])
+    seed_session.commit()
+    assert validate_data(seed_session)["issues"]["duplicate_companies"] == 0

@@ -49,6 +49,26 @@ def _count(session, model):
     return session.scalar(select(func.count()).select_from(model))
 
 
+def test_reobserving_same_name_no_domain_links_not_duplicates(seed_session):
+    """Prompt 57 regression: the SAME real company re-observed by exact normalized name
+    with no domain (typical Adzuna re-ingestion) must LINK to the existing company, never
+    create a duplicate identity."""
+    from company.resolver import ObservedCompany
+    svc = CompanyResolutionService(seed_session)
+    obs = lambda: ObservedCompany(name="Zeta Systems", domain=None, city="Pune",
+                                  source_id="adzuna", source_url=None)
+    c1, _ = svc.resolve_and_upsert(obs(), provenance=DataProvenance.REAL, now=NOW)
+    seed_session.commit()
+    c2, _ = svc.resolve_and_upsert(obs(), provenance=DataProvenance.REAL, now=NOW)
+    seed_session.commit()
+    assert c1.id == c2.id                       # linked, same company
+    assert _count(seed_session, Company) == 1   # no duplicate created
+    dups = seed_session.execute(
+        select(Company.normalized_name, func.count(Company.id))
+        .group_by(Company.normalized_name).having(func.count(Company.id) > 1)).all()
+    assert dups == []
+
+
 def test_same_domain_different_names_one_company(seed_session):
     _job(seed_session, company="ABC Technologies", domain="abc.com", ext="j1")
     _job(seed_session, company="ABC Technologies Pvt Ltd", domain="abc.com", ext="j2", title="Python Developer", techs=("Python",))

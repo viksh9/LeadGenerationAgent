@@ -73,10 +73,26 @@ class CompanyResolutionService:
         guard_provenance(provenance, entity="company")
         result = self.resolve(obs, provenance=provenance)
         domain = normalize_domain(obs.domain or obs.website)
+        norm = normalize_name(obs.name).normalized_name
 
-        if result.recommended_action == "LINK" and result.matched_company_id is not None:
-            company = repo.get_company(self.session, result.matched_company_id)
+        matched_id = result.matched_company_id if result.recommended_action == "LINK" else None
+        # Idempotency guard (§6/§15): the same real company re-observed by an EXACT
+        # normalized name with a COMPATIBLE domain (both missing, or equal) must LINK,
+        # not spawn a duplicate identity on re-ingestion. Differing domains still fall
+        # through to the conservative REVIEW/CREATE path (§5: never wrongly merge).
+        if matched_id is None and norm:
+            exact = list(self.session.scalars(select(Company).where(
+                Company.normalized_name == norm, Company.data_provenance == provenance)))
+            compatible = [c for c in exact
+                          if not (c.primary_domain and domain and c.primary_domain != domain)]
+            if len(compatible) == 1:
+                matched_id = compatible[0].id
+
+        if matched_id is not None:
+            company = repo.get_company(self.session, matched_id)
             company.last_seen_at = now
+            if domain and not company.primary_domain:
+                company.primary_domain = domain      # enrich, never overwrite
             created = False
         else:
             company = repo.create_company(
