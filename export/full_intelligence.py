@@ -44,16 +44,18 @@ COLUMNS: list[tuple[str, int]] = [
     ("Industry", 20), ("Website", 30), ("Operating Address", 34), ("Registered Address", 34),
     ("City", 16), ("State", 16), ("Country", 14), ("India Presence", 14), ("India Entity Type", 18),
     ("Company Status", 14), ("Career URL", 28), ("Contact URL", 28), ("Leadership URL", 28),
-    ("LinkedIn Company URL", 30), ("Signal", 34), ("Signal Summary", 40), ("Technology", 30),
+    ("LinkedIn Company URL", 30), ("GitHub Company/Organization URL", 34),
+    ("Signal", 34), ("Signal Summary", 40), ("Technology", 30),
     ("Opening Count", 12), ("Opportunity", 22), ("Staffing", 12), ("Estimated Team", 14),
     ("Urgency", 12), ("Score", 8), ("Priority", 10), ("Status", 14),
-    ("Target POC", 30), ("POC Role", 22), ("POC LinkedIn", 30), ("Work Email", 28),
-    ("Business Phone", 18), ("Data Trust", 10), ("Contact Trust", 12),
+    ("Target POC", 30), ("POC Role", 22), ("POC LinkedIn", 30), ("POC GitHub", 30),
+    ("Work Email", 28), ("Business Phone", 18), ("Data Trust", 10), ("Contact Trust", 12),
     ("Website Source", 24), ("Address Source", 26), ("Registered Address Source", 24),
     ("POC Source", 20), ("Source", 26), ("Registry URL", 30), ("OpenCorporates URL", 34),
     ("Data Trust Verified", 20), ("Signal Date", 16),
 ]
 HEADERS = [c[0] for c in COLUMNS]
+_COL_INDEX = {h: i for i, h in enumerate(HEADERS, start=1)}   # header -> 1-based column
 
 _HEADER_FILL = PatternFill("solid", fgColor="1F2937")
 _HEADER_FONT = Font(bold=True, color="FFFFFF")
@@ -145,6 +147,7 @@ def build_full_intelligence_workbook(session: Session, *, now: datetime | None =
             _safe(company.contact_url if company else None),
             _safe(company.leadership_url if company else None),
             _safe(company.linkedin_url if company else None),
+            _safe(company.github_url if company else None),
             _safe(_signal_text(lead)), _safe(lead.signal_description or lead.opportunity_summary),
             _safe(_tech_text(lead)), openings,
             _safe(oview.label), _safe(oview.staffing_need),
@@ -153,6 +156,7 @@ def build_full_intelligence_workbook(session: Session, *, now: datetime | None =
             _safe(_poc_text(lead, people)),
             _safe(top.job_title if top else None),
             _safe(top.professional_network_url if top else None),
+            _safe(top.source_url if (top and top.contact_source == "GitHub") else None),  # POC GitHub
             _safe(email_dm.business_email if email_dm else None),
             _safe(phone_dm.business_phone if phone_dm else None),
             (company.data_trust_score if company else 0),
@@ -170,11 +174,13 @@ def build_full_intelligence_workbook(session: Session, *, now: datetime | None =
         ws.append(row)
         row_count += 1
         r = row_count + 1
-        for col in (2, 3, 7, 8, 19, 20, 21, 30, 41, 42):
-            ws.cell(row=r, column=col).alignment = _WRAP
-        for date_col in (44, 45):   # Data Trust Verified, Signal Date
-            if ws.cell(row=r, column=date_col).value is not None:
-                ws.cell(row=r, column=date_col).number_format = "dd-mmm-yyyy"
+        # Robust formatting by header name (column indices shift as columns evolve).
+        for name in ("Company Name", "Legal Company Name", "Operating Address", "Registered Address",
+                     "Signal", "Signal Summary", "Technology", "Target POC", "Source", "Registry URL"):
+            ws.cell(row=r, column=_COL_INDEX[name]).alignment = _WRAP
+        for name in ("Data Trust Verified", "Signal Date"):
+            if ws.cell(row=r, column=_COL_INDEX[name]).value is not None:
+                ws.cell(row=r, column=_COL_INDEX[name]).number_format = "dd-mmm-yyyy"
 
     if row_count == 0:
         ws.append(["No real lead data available."] + [None] * (len(HEADERS) - 1))

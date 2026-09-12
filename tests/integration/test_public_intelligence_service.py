@@ -71,6 +71,22 @@ def _official(**kw):
     return PublicPerson(company_match_status=MATCH_VERIFIED, is_current=True, **kw)
 
 
+def test_employment_status_official_vs_github(seed_session):
+    lead = _seed(seed_session)
+    official = _Stub("official_company", label="Official Company Website", stype="company_profile",
+                     people=[_official(full_name="Jane Doe", job_title="VP Engineering",
+                                       source_url="https://acme.com/team")])
+    github = _Stub("github", label="GitHub", stype="github_public_profile",
+                   people=[PublicPerson(full_name="Bob Cloud", job_title="Cloud Lead",
+                                        company_match_status=MATCH_LIKELY, is_current=True,
+                                        source_url="https://github.com/bobcloud")])
+    summ = discover_public_intelligence_for_lead(seed_session, lead, providers=[official, github])
+    by_name = {p.full_name: p for p in summ.pocs}
+    # Official company source → CURRENT_VERIFIED; GitHub alone → only CURRENT_LIKELY (§18).
+    assert by_name["Jane Doe"].employment_status == "CURRENT_VERIFIED"
+    assert by_name["Bob Cloud"].employment_status == "CURRENT_LIKELY"
+
+
 def test_official_person_persisted_with_trust(seed_session):
     lead = _seed(seed_session)
     official = _Stub("official_company", label="Official Company Website", stype="company_profile",

@@ -50,11 +50,14 @@ _ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
         "contact_trust_score": "INTEGER DEFAULT 0",
         "contact_trust_status": "VARCHAR(24)",
         "is_current": "BOOLEAN DEFAULT 1",
+        "employment_status": "VARCHAR(24)",   # Prompt 48 §18
     },
     "companies": {
         # Public-intelligence identity (Prompt 45) — additive.
         "linkedin_url": "VARCHAR(512)",
         "wikidata_id": "VARCHAR(32)",
+        "github_url": "VARCHAR(512)",   # Prompt 48 — official GitHub org URL
+
         # Official company intelligence (Prompt 46) — additive.
         "contact_url": "VARCHAR(1024)",
         "careers_url": "VARCHAR(1024)",

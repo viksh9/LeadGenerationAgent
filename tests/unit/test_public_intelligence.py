@@ -165,6 +165,32 @@ def test_wikidata_provider_resolves_entity():
     assert facts.source_url == "https://www.wikidata.org/wiki/Q42"
 
 
+def test_github_org_matched_by_domain():
+    def h(req):
+        if req.url.path == "/search/users":
+            return httpx.Response(200, json={"items": [{"login": "acme"}]})
+        if req.url.path == "/orgs/acme":
+            return httpx.Response(200, json={"login": "acme", "name": "Acme Corp",
+                "blog": "https://acme.com", "html_url": "https://github.com/acme"})
+        return httpx.Response(404)
+    prov = GitHubProvider(http=httpx.Client(transport=httpx.MockTransport(h)), sleep=lambda s: None)
+    facts = prov.discover_company(CTX)   # CTX domain=acme.com
+    assert facts is not None and facts.github_url == "https://github.com/acme"
+    assert any(e.field == "github_url" for e in facts.field_evidence)
+
+
+def test_github_org_rejected_on_domain_mismatch():
+    def h(req):
+        if req.url.path == "/search/users":
+            return httpx.Response(200, json={"items": [{"login": "acme"}]})
+        if req.url.path == "/orgs/acme":
+            return httpx.Response(200, json={"login": "acme", "name": "Acme Corp",
+                "blog": "https://different.com", "html_url": "https://github.com/acme"})
+        return httpx.Response(404)
+    prov = GitHubProvider(http=httpx.Client(transport=httpx.MockTransport(h)), sleep=lambda s: None)
+    assert prov.discover_company(CTX) is None   # name matches but domain does not → not matched
+
+
 def test_provider_error_yields_status_not_fabrication():
     prov = GitHubProvider(http=httpx.Client(transport=httpx.MockTransport(
         lambda r: httpx.Response(500))), sleep=lambda s: None)

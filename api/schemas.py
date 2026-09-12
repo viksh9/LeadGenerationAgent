@@ -780,6 +780,7 @@ class POCResponse(DecisionMakerResponse):
     contact_trust_score: int = 0
     contact_trust_status: Optional[str] = None
     is_current: bool = True
+    employment_status: Optional[str] = None   # CURRENT_VERIFIED / CURRENT_LIKELY / FORMER / UNKNOWN
 
 
 class POCDiscoveryResponse(BaseModel):
@@ -880,6 +881,7 @@ class CompanyPublicIntelligenceResponse(BaseModel):
     company_name: str
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
     industry: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None

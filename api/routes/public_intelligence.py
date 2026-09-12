@@ -129,7 +129,8 @@ def company_public_intelligence(company_id: int, session: Session = Depends(get_
         best_by_field.setdefault(e.field, e)
     return CompanyPublicIntelligenceResponse(
         company_id=company.id, company_name=company.canonical_name,
-        website=company.website, linkedin_url=company.linkedin_url, industry=company.industry,
+        website=company.website, linkedin_url=company.linkedin_url, github_url=company.github_url,
+        industry=company.industry,
         city=company.headquarters_city, state=company.headquarters_state,
         country=company.headquarters_country, full_address=company.full_address,
         postal_code=company.postal_code, company_phone=company.company_phone,

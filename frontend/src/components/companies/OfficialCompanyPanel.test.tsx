@@ -18,7 +18,7 @@ const mockSearch = vi.mocked(searchCompanies);
 const mockFetch = vi.mocked(fetchCompanyPublicIntelligence);
 
 const profile: CompanyPublicIntelligence = {
-  company_id: 1, company_name: 'Acme', website: 'https://acme.com', linkedin_url: 'https://linkedin.com/company/acme',
+  company_id: 1, company_name: 'Acme', website: 'https://acme.com', linkedin_url: 'https://linkedin.com/company/acme', github_url: 'https://github.com/acme',
   industry: 'IT', city: 'Bengaluru', state: 'Karnataka', country: 'India',
   full_address: '12 MG Road, Bengaluru, Karnataka, India', postal_code: '560001',
   company_phone: '+91-80-1', company_email: 'info@acme.com', contact_url: 'https://acme.com/contact',

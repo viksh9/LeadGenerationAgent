@@ -45,6 +45,7 @@ export interface POC {
   contact_trust_score: number;
   contact_trust_status: ContactTrustStatus | null;
   is_current: boolean;
+  employment_status: string | null;   // CURRENT_VERIFIED / CURRENT_LIKELY / FORMER / UNKNOWN
   verification_status: string;
   last_verified_at: string | null;
 }
