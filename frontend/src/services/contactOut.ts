@@ -46,6 +46,10 @@ export interface POC {
   contact_trust_status: ContactTrustStatus | null;
   is_current: boolean;
   employment_status: string | null;   // CURRENT_VERIFIED / CURRENT_LIKELY / FORMER / UNKNOWN
+  role_match_score?: number;          // §18 — separate from contact trust + lead score
+  email_verification_status?: string | null;  // VALID/INVALID/ACCEPT_ALL/WEBMAIL/DISPOSABLE/UNKNOWN/UNVERIFIED
+  phone_type?: string | null;         // BUSINESS_DIRECT/BUSINESS_MOBILE/COMPANY_SWITCHBOARD/UNKNOWN
+  phone_verification_status?: string | null;
   verification_status: string;
   last_verified_at: string | null;
 }

@@ -5,6 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Select } from '@/components/ui/Select';
 import { SettingRow, SettingsSection } from '@/components/settings/SettingsSection';
 import { ContactOutSection } from '@/components/settings/ContactOutSection';
+import { EnrichmentProvidersSection } from '@/components/settings/EnrichmentProvidersSection';
 import { usePreferences } from '@/hooks/usePreferences';
 import {
   useNotificationPreferences,
@@ -435,6 +436,8 @@ export function SettingsPage() {
         </SettingsSection>
 
         <ContactOutSection />
+
+        <EnrichmentProvidersSection />
 
         <div className="lg:col-span-2">
           <ProvidersSection />

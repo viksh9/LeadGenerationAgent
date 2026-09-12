@@ -781,6 +781,10 @@ class POCResponse(DecisionMakerResponse):
     contact_trust_status: Optional[str] = None
     is_current: bool = True
     employment_status: Optional[str] = None   # CURRENT_VERIFIED / CURRENT_LIKELY / FORMER / UNKNOWN
+    role_match_score: int = 0                  # §18 — separate from contact trust + lead score
+    email_verification_status: Optional[str] = None   # VALID/INVALID/ACCEPT_ALL/WEBMAIL/DISPOSABLE/UNKNOWN/UNVERIFIED
+    phone_type: Optional[str] = None           # BUSINESS_DIRECT/BUSINESS_MOBILE/COMPANY_SWITCHBOARD/UNKNOWN
+    phone_verification_status: Optional[str] = None
 
 
 class POCDiscoveryResponse(BaseModel):
@@ -911,6 +915,30 @@ class CompanyPublicIntelligenceResponse(BaseModel):
     officers: list[CompanyOfficerResponse] = Field(default_factory=list)
     field_sources: list[CompanyFieldSourceResponse] = Field(default_factory=list)
     public_leadership: list[POCResponse] = Field(default_factory=list)
+
+
+class EnrichmentProviderStatus(BaseModel):
+    """One enrichment provider's config status + declared capabilities (no key)."""
+
+    provider: str
+    status: str                       # CONFIGURED | NOT_CONFIGURED | DISABLED
+    capabilities: dict[str, bool] = Field(default_factory=dict)
+
+
+class EnrichmentStatusResponse(BaseModel):
+    """Admin view of all enrichment providers (§46). Never exposes API keys."""
+
+    providers: list[EnrichmentProviderStatus] = Field(default_factory=list)
+
+
+class ProviderTestResponse(BaseModel):
+    """Result of a real per-provider connectivity test (§45)."""
+
+    provider: str
+    result: str                       # LIVE_VERIFIED / NOT_CONFIGURED / AUTHENTICATION_FAILED / FORBIDDEN / RATE_LIMITED / SOURCE_UNAVAILABLE / ERROR
+    message: Optional[str] = None
+    performed_request: bool
+    checked_at: datetime
 
 
 class OpenCorporatesStatusResponse(BaseModel):

@@ -206,6 +206,35 @@ class Settings(BaseSettings):
     opencorporates_data_ttl_days: int = Field(
         default=30, validation_alias=AliasChoices("OPENCORPORATES_DATA_TTL_DAYS"))
 
+    # --- Multi-provider contact enrichment (Prompt 49) --------------------- #
+    # Paid providers — each NOT_CONFIGURED (no calls) unless a key is set. Keys are read
+    # from the environment only and NEVER exposed in responses/logs/DB/exports/errors.
+    lusha_enabled: bool | None = Field(default=None, validation_alias=AliasChoices("LUSHA_ENABLED"))
+    lusha_api_key: str | None = Field(default=None, validation_alias=AliasChoices("LUSHA_API_KEY"))
+    lusha_base_url: str = Field(default="https://api.lusha.com", validation_alias=AliasChoices("LUSHA_BASE_URL"))
+    apollo_enabled: bool | None = Field(default=None, validation_alias=AliasChoices("APOLLO_ENABLED"))
+    apollo_api_key: str | None = Field(default=None, validation_alias=AliasChoices("APOLLO_API_KEY"))
+    apollo_base_url: str = Field(default="https://api.apollo.io", validation_alias=AliasChoices("APOLLO_BASE_URL"))
+    hunter_enabled: bool | None = Field(default=None, validation_alias=AliasChoices("HUNTER_ENABLED"))
+    hunter_api_key: str | None = Field(default=None, validation_alias=AliasChoices("HUNTER_API_KEY"))
+    hunter_base_url: str = Field(default="https://api.hunter.io", validation_alias=AliasChoices("HUNTER_BASE_URL"))
+    prospeo_enabled: bool | None = Field(default=None, validation_alias=AliasChoices("PROSPEO_ENABLED"))
+    prospeo_api_key: str | None = Field(default=None, validation_alias=AliasChoices("PROSPEO_API_KEY"))
+    prospeo_base_url: str = Field(default="https://api.prospeo.io", validation_alias=AliasChoices("PROSPEO_BASE_URL"))
+    enrichment_rate_per_minute: int = Field(
+        default=60, validation_alias=AliasChoices("ENRICHMENT_RATE_PER_MINUTE"))
+    enrichment_timeout_seconds: float = Field(
+        default=20.0, validation_alias=AliasChoices("ENRICHMENT_TIMEOUT_SECONDS"))
+    # Credit-aware controls (§28/§29). Conservative, configurable.
+    max_provider_calls_per_opportunity: int = Field(
+        default=4, validation_alias=AliasChoices("MAX_PROVIDER_CALLS_PER_OPPORTUNITY"))
+    max_contact_enrichments_per_opportunity: int = Field(
+        default=3, validation_alias=AliasChoices("MAX_CONTACT_ENRICHMENTS_PER_OPPORTUNITY"))
+    enrichment_min_lead_score: int = Field(
+        default=60, validation_alias=AliasChoices("ENRICHMENT_MIN_LEAD_SCORE"))
+    enrichment_cache_ttl_hours: int = Field(
+        default=168, validation_alias=AliasChoices("ENRICHMENT_CACHE_TTL_HOURS"))
+
     # --- Production hardening (Prompt 40) ---------------------------------- #
     # Observability: structured JSON logs (opt-in), request/correlation IDs.
     log_format: str = Field(default="text", validation_alias=AliasChoices("LOG_FORMAT"))  # text | json
@@ -229,6 +258,7 @@ class Settings(BaseSettings):
         "official_company_intelligence_enabled", "github_intelligence_enabled",
         "wikidata_intelligence_enabled", "public_registry_intelligence_enabled",
         "rss_intelligence_enabled", "opencorporates_enabled",
+        "lusha_enabled", "apollo_enabled", "hunter_enabled", "prospeo_enabled",
         mode="before",
     )
     @classmethod
@@ -353,6 +383,17 @@ class Settings(BaseSettings):
         if self.opencorporates_enabled is False:
             return "DISABLED"
         return "CONFIGURED" if self.opencorporates_api_token else "NOT_CONFIGURED"
+
+    def enrichment_provider_status(self, name: str) -> str:
+        """Config-level status for a paid enrichment provider (NOT a live check).
+        DISABLED when explicitly off; CONFIGURED when a key is present; else NOT_CONFIGURED."""
+        enabled = {"lusha": self.lusha_enabled, "apollo": self.apollo_enabled,
+                   "hunter": self.hunter_enabled, "prospeo": self.prospeo_enabled}.get(name)
+        key = {"lusha": self.lusha_api_key, "apollo": self.apollo_api_key,
+               "hunter": self.hunter_api_key, "prospeo": self.prospeo_api_key}.get(name)
+        if enabled is False:
+            return "DISABLED"
+        return "CONFIGURED" if key else "NOT_CONFIGURED"
 
 
 @lru_cache

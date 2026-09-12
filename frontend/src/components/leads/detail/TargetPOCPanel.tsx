@@ -103,17 +103,41 @@ function PocRow({ poc, rank }: { poc: POC; rank: string }) {
         <span className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
           {rank}
         </span>
-        <span className={`badge ${trust.className}`} title={`Contact trust ${poc.contact_trust_score}%`}>
-          Contact Trust: {trust.label} · {poc.contact_trust_score}%
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {typeof poc.role_match_score === 'number' && poc.role_match_score > 0 && (
+            <span
+              className="badge bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
+              title="How well this person's role fits the opportunity (separate from contact trust and lead score)"
+            >
+              Role Match: {poc.role_match_score}%
+            </span>
+          )}
+          <span className={`badge ${trust.className}`} title={`Contact trust ${poc.contact_trust_score}%`}>
+            Contact Trust: {trust.label} · {poc.contact_trust_score}%
+          </span>
+        </div>
       </div>
       <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
         {poc.full_name}
       </p>
       {poc.job_title && <p className="text-sm text-slate-600 dark:text-slate-300">{poc.job_title}</p>}
       <dl className="mt-3 grid grid-cols-2 gap-3">
-        <Field label="Work Email">{poc.business_email || 'Not Publicly Available'}</Field>
-        <Field label="Business Phone">{poc.business_phone || 'Not Publicly Available'}</Field>
+        <Field label="Work Email">
+          {poc.business_email || 'Not Publicly Available'}
+          {poc.business_email && poc.email_verification_status && (
+            <span className="ml-1 text-xs text-slate-400 dark:text-slate-500">
+              ({poc.email_verification_status.replace(/_/g, ' ').toLowerCase()})
+            </span>
+          )}
+        </Field>
+        <Field label="Business Phone">
+          {poc.business_phone || 'Not Publicly Available'}
+          {poc.business_phone && poc.phone_type && (
+            <span className="ml-1 text-xs text-slate-400 dark:text-slate-500">
+              ({poc.phone_type.replace(/_/g, ' ').toLowerCase()})
+            </span>
+          )}
+        </Field>
         <Field label="LinkedIn">
           <ExternalLinkValue href={poc.professional_network_url} stripScheme />
         </Field>
