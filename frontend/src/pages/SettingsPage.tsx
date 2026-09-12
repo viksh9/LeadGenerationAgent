@@ -4,6 +4,7 @@ import { Check, RefreshCw } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Select } from '@/components/ui/Select';
 import { SettingRow, SettingsSection } from '@/components/settings/SettingsSection';
+import { ContactOutSection } from '@/components/settings/ContactOutSection';
 import { usePreferences } from '@/hooks/usePreferences';
 import {
   useNotificationPreferences,
@@ -432,6 +433,8 @@ export function SettingsPage() {
             <p className="py-2.5 text-sm text-slate-500 dark:text-slate-400">AI provider status unavailable.</p>
           )}
         </SettingsSection>
+
+        <ContactOutSection />
 
         <div className="lg:col-span-2">
           <ProvidersSection />

@@ -1,18 +1,19 @@
-"""Build the real-data Excel workbook (Prompt 45).
+"""Build the real-data lead export (Prompt 47).
 
-Every sheet is populated from the actual database via the same models the APIs use
-(§43). Empty tables get their headers + an honest "No real data available yet."
-note — never fabricated rows (§42). Text cells are sanitised against
-formula-injection (§33); no secrets are ever written (§32). Source URLs become
-clickable hyperlinks where present (§30/§31).
+The workbook contains EXACTLY ONE worksheet, "Lead Data", with a fixed 16-column
+sales report — one row per company-level lead (the Lead table is already the
+company-level aggregation from the pipeline, so one Lead == one row; syndicated
+jobs are never counted as separate rows). Real data only: only leads with
+provenance REAL are exported. Text cells are formula-injection-safe; no secrets;
+contacts/emails are only ever the source-verified values (never guessed).
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import datetime
 from io import BytesIO
-from typing import Callable, Iterable
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -21,570 +22,354 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from database.models import (
-    AIIntelligenceResult,
-    Alert,
-    BusinessSignal,
-    CRMActivity,
-    CollectionRun,
     Company,
+    ContactType,
+    DataProvenance,
     DecisionMaker,
-    EvidenceRecord,
-    JobRecord,
-    JobSourceReference,
+    EmailStatus,
     Lead,
-    OpportunityCandidate,
-    OutreachDraft,
-    SalesOpportunity,
+    LeadPriority,
+    VerificationStatus,
     utcnow,
 )
+from intelligence.opportunity_view import derive_opportunity_view, opportunity_cell
 
-# Safety caps (§38/§39): bound memory + rows per sheet.
-MAX_ROWS_PER_SHEET = 100_000
-_BATCH = 500
+SHEET_NAME = "Lead Data"
+
+# Exact column order (§2) — do not rename/add/remove.
+COLUMNS: list[tuple[str, int]] = [
+    ("Sr No", 8),
+    ("Company Name", 30),
+    ("No of Openings", 16),
+    ("Location", 25),
+    ("Intensity", 15),
+    ("Signal", 30),
+    ("Technology", 30),
+    ("Target POC Details", 35),
+    ("Score", 10),
+    ("Priority", 12),
+    ("Status", 18),
+    ("Contact Number", 20),
+    ("Email", 35),
+    ("Opportunity", 42),
+    ("Signal Date", 18),
+    ("Source", 30),
+]
+# Signal + Technology get a little more room for combined values (§30).
+COLUMNS[5] = ("Signal", 35)
+COLUMNS[6] = ("Technology", 35)
+HEADERS = [c[0] for c in COLUMNS]
 
 _HEADER_FILL = PatternFill("solid", fgColor="1F2937")
 _HEADER_FONT = Font(bold=True, color="FFFFFF")
 _WRAP = Alignment(vertical="top", wrap_text=True)
 _DANGEROUS = ("=", "+", "-", "@")
+# A genuine phone number may legitimately start with "+"; openpyxl stores it as a
+# string (only "=" becomes a formula), so a strict phone pattern is exempt from the
+# apostrophe guard for clean display while arbitrary text is still neutralised.
+_PHONE_RE = re.compile(r"^\+?[\d][\d\s\-().]{4,}$")
+
+# Restrained, colour+value (never colour-alone) conditional fills.
+_PRIORITY_FILL = {
+    "HOT": PatternFill("solid", fgColor="FDE2E1"),
+    "WARM": PatternFill("solid", fgColor="FDECC8"),
+    "NURTURE": PatternFill("solid", fgColor="E6F0FB"),
+    "LOW": PatternFill("solid", fgColor="EEF0F2"),
+}
+_PRIORITY_RANK = {LeadPriority.HOT: 3, LeadPriority.WARM: 2, LeadPriority.NURTURE: 1, LeadPriority.LOW: 0}
+_VERIFIED = {VerificationStatus.VERIFIED, VerificationStatus.PARTIALLY_VERIFIED}
 
 
 def _safe(value):
-    """Coerce a DB value to a spreadsheet-safe cell value. Neutralises
-    formula-injection on strings; formats dates; joins lists."""
+    """Formula-injection-safe text/number cell value (§31)."""
     if value is None:
         return None
     if isinstance(value, bool):
         return "Yes" if value else "No"
     if isinstance(value, (int, float)):
         return value
-    if isinstance(value, (datetime, date)):
+    if isinstance(value, datetime):
         return value
-    if hasattr(value, "value"):  # enum
+    if hasattr(value, "value"):
         value = value.value
-    if isinstance(value, (list, tuple)):
-        value = ", ".join(str(v) for v in value)
     text = str(value)
-    # Formula-injection protection (§33): prefix a leading control char with '.
+    if _PHONE_RE.match(text):
+        return text   # genuine phone number — safe as a string, keep it clean
     if text and (text[0] in _DANGEROUS or text[0] in ("\t", "\r")):
         text = "'" + text
     return text
 
 
-def _is_url(value) -> bool:
-    return isinstance(value, str) and (value.startswith("http://") or value.startswith("https://"))
+def _enum(v) -> str:
+    return v.value if hasattr(v, "value") else (str(v) if v is not None else "")
 
 
-@dataclass
-class Column:
-    header: str
-    get: Callable
-    is_url: bool = False
-
-
-@dataclass
-class Sheet:
-    name: str
-    columns: list[Column]
-    rows: Callable[[Session], Iterable]   # yields ORM objects / tuples
-
-
-def _count(session: Session, model) -> int:
-    return int(session.execute(select(func.count()).select_from(model)).scalar() or 0)
-
-
-def _batched(session: Session, stmt):
-    """Yield ORM rows in batches, capped, to avoid loading whole tables."""
-    stmt = stmt.limit(MAX_ROWS_PER_SHEET)
-    result = session.execute(stmt.execution_options(yield_per=_BATCH))
-    for row in result:
-        yield row[0] if len(row) == 1 else row
-
-
-# --------------------------------------------------------------------------- #
-# Sheet definitions (only real, stored entities).
-# --------------------------------------------------------------------------- #
-def _sheets() -> list[Sheet]:
-    C = Column
-    return [
-        Sheet("Companies", [
-            C("Company ID", lambda o: o.id),
-            C("Canonical Name", lambda o: o.canonical_name),
-            C("Legal Name", lambda o: o.legal_name),
-            C("Website", lambda o: o.website, is_url=True),
-            C("Primary Domain", lambda o: o.primary_domain),
-            C("Industry", lambda o: o.industry),
-            C("Company Type", lambda o: o.company_type),
-            C("HQ Country", lambda o: o.headquarters_country),
-            C("HQ City", lambda o: o.headquarters_city),
-            C("India Presence", lambda o: o.india_presence),
-            C("India Locations", lambda o: o.india_locations),
-            C("Employee Count", lambda o: o.employee_count),
-            C("Employee Count Source", lambda o: o.employee_count_source),
-            C("Identity Confidence", lambda o: o.identity_confidence),
-            C("Evidence Confidence", lambda o: o.evidence_confidence),
-            C("Verification Status", lambda o: o.verification_status),
-            C("Provenance", lambda o: o.data_provenance),
-            C("First Seen", lambda o: o.first_seen_at),
-            C("Last Seen", lambda o: o.last_seen_at),
-        ], lambda s: _batched(s, select(Company).order_by(Company.id))),
-
-        Sheet("Canonical Jobs", [
-            C("Canonical Job ID", lambda o: o.id),
-            C("Company", lambda o: o.company_name),
-            C("Canonical Title", lambda o: o.normalized_title or o.original_job_title),
-            C("Role", lambda o: o.normalized_role),
-            C("Technologies", lambda o: o.technologies),
-            C("City", lambda o: o.city),
-            C("State", lambda o: o.state),
-            C("Country", lambda o: o.country),
-            C("Remote Type", lambda o: o.remote_type),
-            C("Employment Type", lambda o: o.employment_type),
-            C("Experience", lambda o: o.experience_level),
-            C("Status", lambda o: o.job_status),
-            C("Source Reference Count", lambda o: o.source_count),
-            C("Primary Source", lambda o: o.primary_source),
-            C("Published", lambda o: o.published_at),
-            C("First Seen", lambda o: o.first_seen_at),
-            C("Last Seen", lambda o: o.last_seen_at),
-            C("Content Hash", lambda o: o.content_hash),
-            C("Provenance", lambda o: o.data_provenance),
-        ], lambda s: _batched(s, select(JobRecord).order_by(JobRecord.id))),
-
-        Sheet("Job Source Listings", [
-            C("Reference ID", lambda o: o.id),
-            C("Canonical Job ID", lambda o: o.job_record_id),
-            C("Source", lambda o: o.source_id),
-            C("Source Record ID", lambda o: o.external_id),
-            C("Source URL", lambda o: o.source_url, is_url=True),
-            C("Primary Source", lambda o: o.is_primary_source),
-            C("Source Confidence", lambda o: o.source_confidence),
-            C("Published", lambda o: o.published_at),
-            C("Observed At", lambda o: o.observed_at),
-        ], lambda s: _batched(s, select(JobSourceReference).order_by(JobSourceReference.id))),
-
-        Sheet("Signals", [
-            C("Signal ID", lambda o: o.id),
-            C("Company", lambda o: o.company_name),
-            C("Signal Type", lambda o: o.signal_type),
-            C("Title", lambda o: o.signal_title),
-            C("Description", lambda o: o.signal_description),
-            C("Technologies", lambda o: o.technology_terms),
-            C("Project", lambda o: o.project_name),
-            C("Signal Strength", lambda o: o.signal_strength),
-            C("Commercial Intent", lambda o: o.commercial_intent),
-            C("Evidence Confidence", lambda o: o.evidence_confidence),
-            C("Published", lambda o: o.published_at),
-            C("Collected At", lambda o: o.collected_at),
-            C("Source", lambda o: o.source_id),
-            C("Source URL", lambda o: o.signal_url, is_url=True),
-            C("Provenance", lambda o: o.data_provenance),
-        ], lambda s: _batched(s, select(BusinessSignal).order_by(BusinessSignal.id))),
-
-        Sheet("Evidence", [
-            C("Evidence ID", lambda o: o.id),
-            C("Company", lambda o: o.company_normalized_name),
-            C("Lead ID", lambda o: o.lead_id),
-            C("Evidence Type", lambda o: o.evidence_type),
-            C("Source", lambda o: o.source_name),
-            C("Source Category", lambda o: o.source_category),
-            C("Source Tier", lambda o: o.source_tier),
-            C("Source URL", lambda o: o.source_url, is_url=True),
-            C("Published At", lambda o: o.published_at),
-            C("Observed At", lambda o: o.observed_at),
-            C("Last Verified At", lambda o: o.last_verified_at),
-            C("Source Reliability", lambda o: o.source_reliability_score),
-            C("Freshness Score", lambda o: o.freshness_score),
-            C("Corroboration Score", lambda o: o.corroboration_score),
-            C("Evidence Confidence", lambda o: o.evidence_confidence),
-            C("Verification Status", lambda o: o.verification_status),
-            C("Provenance", lambda o: o.data_provenance),
-        ], lambda s: _batched(s, select(EvidenceRecord).order_by(EvidenceRecord.id))),
-
-        Sheet("Opportunities", [
-            C("Opportunity ID", lambda o: o.id),
-            C("Company", lambda o: o.company_name),
-            C("Lead ID", lambda o: o.lead_id),
-            C("Opportunity Types", lambda o: o.opportunity_types),
-            C("IT Job Count", lambda o: o.it_job_count),
-            C("Hiring Intensity", lambda o: o.hiring_intensity),
-            C("Top Technologies", lambda o: o.top_technologies),
-            C("Total Signals", lambda o: o.total_business_signals),
-            C("Confidence", lambda o: o.confidence),
-            C("Evidence Confidence", lambda o: o.evidence_confidence),
-            C("Reason", lambda o: o.reason),
-            C("Status", lambda o: o.status),
-            C("Provenance", lambda o: o.data_provenance),
-            C("Created At", lambda o: o.created_at),
-        ], lambda s: _batched(s, select(OpportunityCandidate).order_by(OpportunityCandidate.id))),
-
-        Sheet("Sales Opportunities", [
-            C("ID", lambda o: o.id),
-            C("Company ID", lambda o: o.company_id),
-            C("Lead ID", lambda o: o.lead_id),
-            C("Title", lambda o: o.title),
-            C("Type", lambda o: o.opportunity_type),
-            C("Stage", lambda o: o.stage),
-            C("Estimated Value", lambda o: o.estimated_value),
-            C("Currency", lambda o: o.estimated_value_currency),
-            C("Value Source", lambda o: o.value_source),
-            C("Probability", lambda o: o.probability),
-            C("Confidence", lambda o: o.confidence),
-            C("Owner", lambda o: o.owner),
-            C("Created At", lambda o: o.created_at),
-            C("Updated At", lambda o: o.updated_at),
-        ], lambda s: _batched(s, select(SalesOpportunity).order_by(SalesOpportunity.id))),
-
-        Sheet("Leads", [
-            C("Lead ID", lambda o: o.id),
-            C("Company", lambda o: o.company_name),
-            C("Industry", lambda o: o.industry),
-            C("Location", lambda o: o.location),
-            C("Lead Score", lambda o: o.lead_score),
-            C("Priority", lambda o: o.lead_priority),
-            C("Status", lambda o: o.status),
-            C("Signal Type", lambda o: o.signal_type),
-            C("Signal Title", lambda o: o.signal_title),
-            C("IT Job Count", lambda o: o.it_job_count),
-            C("Estimated Hiring", lambda o: o.estimated_hiring),
-            C("Technologies", lambda o: o.technologies),
-            C("Target Role", lambda o: o.primary_target_role),
-            C("Recommended Action", lambda o: o.recommended_action),
-            C("Evidence Confidence", lambda o: o.evidence_confidence),
-            C("Source Reliability", lambda o: o.source_reliability),
-            C("Verification Status", lambda o: o.verification_status),
-            C("Outreach Readiness", lambda o: o.lead_readiness),
-            C("Company Website", lambda o: o.company_website, is_url=True),
-            C("Source", lambda o: o.source_name),
-            C("Source URL", lambda o: o.source_url, is_url=True),
-            C("Provenance", lambda o: o.data_provenance),
-            C("Created At", lambda o: o.created_at),
-            C("Updated At", lambda o: o.updated_at),
-        ], lambda s: _batched(s, select(Lead).order_by(Lead.lead_score.desc(), Lead.id))),
-
-        Sheet("Contacts", [
-            C("Contact ID", lambda o: o.id),
-            C("Company", lambda o: o.company_name),
-            C("Full Name", lambda o: o.full_name),
-            C("Job Title", lambda o: o.job_title),
-            C("Normalized Role", lambda o: o.normalized_role),
-            C("Department", lambda o: o.department),
-            C("Geography", lambda o: o.geography),
-            C("Business Email", lambda o: o.business_email),
-            C("Business Phone", lambda o: o.business_phone),
-            C("Profile URL", lambda o: o.profile_url, is_url=True),
-            C("Contact Source", lambda o: o.contact_source),
-            C("Source URL", lambda o: o.source_url, is_url=True),
-            C("Identity Confidence", lambda o: o.identity_confidence),
-            C("Contact Confidence", lambda o: o.contact_confidence),
-            C("Email Status", lambda o: o.email_status),
-            C("Verification Status", lambda o: o.verification_status),
-            C("Last Verified", lambda o: o.last_verified_at),
-            C("Provenance", lambda o: o.data_provenance),
-        ], lambda s: _batched(s, select(DecisionMaker).order_by(DecisionMaker.id))),
-
-        Sheet("CRM Activities", [
-            C("Activity ID", lambda o: o.id),
-            C("Lead ID", lambda o: o.lead_id),
-            C("Company ID", lambda o: o.company_id),
-            C("Contact ID", lambda o: o.contact_id),
-            C("Opportunity ID", lambda o: o.opportunity_id),
-            C("Activity Type", lambda o: o.activity_type),
-            C("Direction", lambda o: o.direction),
-            C("Subject", lambda o: o.subject),
-            C("Status", lambda o: o.status),
-            C("System Event", lambda o: o.is_system_event),
-            C("Source", lambda o: o.source),
-            C("External ID", lambda o: o.external_id),
-            C("Occurred At", lambda o: o.occurred_at),
-            C("Created By", lambda o: o.created_by),
-        ], lambda s: _batched(s, select(CRMActivity).order_by(CRMActivity.id))),
-
-        Sheet("Outreach", [
-            C("Outreach ID", lambda o: o.id),
-            C("Lead ID", lambda o: o.lead_id),
-            C("Company ID", lambda o: o.company_id),
-            C("Contact ID", lambda o: o.contact_id),
-            C("Target Role", lambda o: o.target_role),
-            C("Channel", lambda o: o.channel),
-            C("Subject", lambda o: o.subject),
-            C("Message", lambda o: o.message),
-            C("Grounded", lambda o: o.grounding_ok),
-            C("AI Generated", lambda o: o.ai_generated),
-            C("Confidence", lambda o: o.confidence),
-            C("Status", lambda o: o.status),
-            C("Provider", lambda o: o.provider),
-            C("Created At", lambda o: o.created_at),
-            C("Approved At", lambda o: o.approved_at),
-            C("Sent At", lambda o: o.sent_at),
-            C("Evidence IDs", lambda o: o.evidence_ids),
-        ], lambda s: _batched(s, select(OutreachDraft).order_by(OutreachDraft.id))),
-
-        Sheet("Alerts", [
-            C("Alert ID", lambda o: o.id),
-            C("Alert Type", lambda o: o.alert_type),
-            C("Severity", lambda o: o.severity),
-            C("Company ID", lambda o: o.company_id),
-            C("Lead ID", lambda o: o.lead_id),
-            C("Opportunity ID", lambda o: o.opportunity_id),
-            C("Title", lambda o: o.title),
-            C("Message", lambda o: o.message),
-            C("Status", lambda o: o.status),
-            C("Triggered At", lambda o: o.triggered_at),
-            C("Evidence IDs", lambda o: o.evidence_ids),
-        ], lambda s: _batched(s, select(Alert).order_by(Alert.id))),
-
-        Sheet("AI Intelligence", [
-            C("AI ID", lambda o: o.id),
-            C("Subject Type", lambda o: o.subject_type),
-            C("Subject ID", lambda o: o.subject_id),
-            C("Company ID", lambda o: o.company_id),
-            C("Lead ID", lambda o: o.lead_id),
-            C("Executive Summary", lambda o: o.executive_summary),
-            C("Verified Facts", lambda o: _claims(o.verified_facts)),
-            C("Inferred Insights", lambda o: _claims(o.inferred_insights)),
-            C("Unknowns", lambda o: o.unknowns),
-            C("Recommended Action", lambda o: o.recommended_action),
-            C("Next Best Action", lambda o: o.next_best_action),
-            C("Sales Angle", lambda o: o.sales_angle),
-            C("Risk Flags", lambda o: o.risk_flags),
-            C("AI Confidence", lambda o: o.confidence),
-            C("Analysis Status", lambda o: o.analysis_status),
-            C("Model", lambda o: o.model_name),
-            C("Prompt Version", lambda o: o.prompt_version),
-            C("Generated At", lambda o: o.generated_at),
-            C("Evidence IDs", lambda o: o.evidence_ids),
-        ], lambda s: _batched(s, select(AIIntelligenceResult).order_by(AIIntelligenceResult.id))),
-
-        Sheet("Ingestion Runs", [
-            C("Run ID", lambda o: o.id),
-            C("Source", lambda o: o.source_id),
-            C("Query", lambda o: o.query),
-            C("Status", lambda o: o.status),
-            C("Started", lambda o: o.started_at),
-            C("Completed", lambda o: o.completed_at),
-            C("Duration (s)", lambda o: o.duration_seconds),
-            C("Pages", lambda o: o.pages),
-            C("Records Fetched", lambda o: o.records_fetched),
-            C("Records Created", lambda o: o.records_created),
-            C("Records Updated", lambda o: o.records_updated),
-            C("Duplicates", lambda o: o.duplicates),
-            C("Errors", lambda o: o.errors),
-        ], lambda s: _batched(s, select(CollectionRun).order_by(CollectionRun.id.desc()))),
-    ]
-
-
-def _claims(claims) -> str:
-    """Render AI claim dicts as 'text [FACT]' lines, preserving FACT vs INFERENCE."""
-    if not claims:
+def _clean_source(source_name: str | None) -> str:
+    """Turn '1 source(s): adzuna' into 'adzuna'; keep concise multi-source lists."""
+    if not source_name:
         return ""
-    out = []
-    for c in claims:
-        if isinstance(c, dict):
-            out.append(f"{c.get('claim_text', '')} [{c.get('claim_type', '')}]".strip())
-        else:
-            out.append(str(c))
-    return "\n".join(out)
+    text = source_name.strip()
+    if ":" in text and "source" in text.lower():
+        text = text.split(":", 1)[1].strip()
+    return text
 
 
-# Scope → sheet-name subset (primary is "all").
-_SCOPES = {
-    "leads": {"Leads"}, "companies": {"Companies"}, "jobs": {"Canonical Jobs", "Job Source Listings"},
-    "opportunities": {"Opportunities", "Sales Opportunities"}, "contacts": {"Contacts"},
+# Readable signal_type labels — mirrors the Opportunities tab (frontend
+# constants/leads.ts SIGNAL_LABELS). The tab never shows raw SCREAMING_CASE.
+_SIGNAL_LABELS = {
+    "HIRING": "Hiring",
+    "PROJECT_AWARD": "Project Award",
+    "PROJECT_EXECUTION": "Project Execution",
+    "EXPANSION": "Expansion",
+    "DIGITAL_TRANSFORMATION": "Digital Transformation",
+    "TECHNOLOGY_INITIATIVE": "Technology Initiative",
+    "VENDOR_REQUIREMENT": "Vendor Requirement",
+    "CONTRACT": "Contract",
+    "OTHER": "Other",
 }
 
 
+def _humanize_signal(value) -> str:
+    """signal_type -> readable label (mirrors frontend humanizeSignal)."""
+    v = _enum(value)
+    return _SIGNAL_LABELS.get(v, v) if v else ""
+
+
+def _source_text(lead: Lead, contact_sources: list[str] | None = None) -> str:
+    """Cleaned job source, plus any contact source(s) (Official Company Website /
+    GitHub / ContactOut) that materially back the shown POC/contact (§33)."""
+    base = _clean_source(lead.source_name)
+    parts = [base] if base else []
+    for src in (contact_sources or []):
+        if src and src.lower() not in " ".join(parts).lower():
+            parts.append(src)
+    return " | ".join(parts)
+
+
+def _signal_text(lead: Lead) -> str:
+    """Signal cell mirroring the Opportunities tab 'Signal' representation:
+    the readable signal type, the specific signal title, and confidence.
+    Real data only — nothing shown when a field is absent."""
+    lines: list[str] = [_humanize_signal(lead.signal_type) or "Not available"]
+    title = (lead.signal_title or "").strip()
+    if title:
+        lines.append(title)
+    if lead.signal_confidence is not None:
+        lines.append(f"Confidence: {round(float(lead.signal_confidence))}%")
+    return "\n".join(lines)
+
+
+def _tech_text(lead: Lead) -> str:
+    techs = [str(t).strip() for t in (lead.technologies or []) if str(t).strip()]
+    return " | ".join(dict.fromkeys(techs))   # de-dup, preserve order
+
+
+def _poc_text(lead: Lead, people: list[DecisionMaker]) -> str:
+    """Real people win (up to two — Primary/Secondary, §22/§33); otherwise a
+    clearly-labelled recommended role. A person's name is NEVER fabricated (§19)."""
+    named = [p for p in people if p.full_name][:2]
+    if named:
+        lines = []
+        for p in named:
+            role = p.job_title or p.normalized_role
+            lines.append(f"{p.full_name} — {role}" if role else p.full_name)
+        return "\n".join(lines)
+    if lead.poc_name:
+        return f"{lead.poc_name} — {lead.poc_title}" if lead.poc_title else lead.poc_name
+    role = lead.primary_target_role
+    if role:
+        return f"{role} — Recommended Role"
+    # Fall back to hiring roles as recommended roles, if any.
+    roles = [str(r).strip() for r in (lead.hiring_roles or []) if str(r).strip()]
+    if roles:
+        return " | ".join(roles[:3]) + " — Recommended Role"
+    return ""
+
+
+def _signal_date(lead: Lead) -> datetime | None:
+    return lead.signal_date or lead.last_signal_date
+
+
+def eligible_leads_query():
+    """Real leads only, sorted for sales usefulness (priority desc, score desc,
+    signal date desc)."""
+    return (
+        select(Lead)
+        .where(Lead.data_provenance == DataProvenance.REAL)
+        .order_by(Lead.lead_priority, Lead.lead_score.desc())  # refined in Python for enum rank
+    )
+
+
 def workbook_counts(session: Session) -> dict:
-    """Actual counts for the README (never hard-coded)."""
-    return {
-        "Companies": _count(session, Company),
-        "Canonical Jobs": _count(session, JobRecord),
-        "Job Source Listings": _count(session, JobSourceReference),
-        "Signals": _count(session, BusinessSignal),
-        "Evidence": _count(session, EvidenceRecord),
-        "Opportunities": _count(session, OpportunityCandidate),
-        "Sales Opportunities": _count(session, SalesOpportunity),
-        "Leads": _count(session, Lead),
-        "Contacts": _count(session, DecisionMaker),
-        "CRM Activities": _count(session, CRMActivity),
-        "Outreach": _count(session, OutreachDraft),
-        "Alerts": _count(session, Alert),
-        "AI Intelligence": _count(session, AIIntelligenceResult),
-        "Ingestion Runs": _count(session, CollectionRun),
-    }
+    """Actual eligible real-lead count (for the export summary/confirmation)."""
+    n = int(session.execute(
+        select(func.count(Lead.id)).where(Lead.data_provenance == DataProvenance.REAL)
+    ).scalar() or 0)
+    return {"Leads": n}
+
+
+@dataclass
+class _POCBundle:
+    """The real contacts available for one company: ranked people (for Target POC
+    Details) plus the best email/phone carriers (which may be the same people)."""
+
+    people: list[DecisionMaker]
+    email_contact: DecisionMaker | None
+    phone_contact: DecisionMaker | None
+
+
+_VERIF_RANK = {VerificationStatus.VERIFIED: 2, VerificationStatus.PARTIALLY_VERIFIED: 1}
+
+
+def _person_key(d: DecisionMaker) -> tuple:
+    return (d.match_score or 0, d.contact_trust_score or 0,
+            _VERIF_RANK.get(d.verification_status, 0), d.identity_confidence or 0)
+
+
+def _company_id_map(session: Session) -> dict[str, int]:
+    """normalized_company_name -> Company.id (leads carry no company_id, so the
+    export must resolve the link by normalized name)."""
+    rows = session.execute(select(Company.id, Company.normalized_name)).all()
+    return {name: cid for cid, name in rows if name}
+
+
+def _contacts_by_company(session: Session, company_ids: set[int]) -> dict[int, _POCBundle]:
+    """Preload real contacts per company (§35 — no N+1): ranked named people, the best
+    real business email, and the best real phone. Only actual stored values are used."""
+    ids = {cid for cid in company_ids if cid}
+    if not ids:
+        return {}
+    rows = session.execute(
+        select(DecisionMaker).where(DecisionMaker.company_id.in_(ids),
+                                    DecisionMaker.data_provenance == DataProvenance.REAL)
+    ).scalars().all()
+    by_co: dict[int, list[DecisionMaker]] = {}
+    for dm in rows:
+        by_co.setdefault(dm.company_id, []).append(dm)
+    bundles: dict[int, _POCBundle] = {}
+    for cid, dms in by_co.items():
+        people = sorted([d for d in dms if d.full_name and d.is_current is not False],
+                        key=_person_key, reverse=True)
+        emailers = sorted(
+            [d for d in dms if d.business_email and d.contact_type == ContactType.BUSINESS_EMAIL],
+            key=lambda d: ((d.email_status == EmailStatus.VERIFIED_SOURCE,) + _person_key(d)), reverse=True)
+        phoners = sorted([d for d in dms if d.business_phone], key=_person_key, reverse=True)
+        bundles[cid] = _POCBundle(
+            people=people,
+            email_contact=emailers[0] if emailers else None,
+            phone_contact=phoners[0] if phoners else None,
+        )
+    return bundles
 
 
 def build_workbook(session: Session, *, scope: str = "all", now: datetime | None = None,
                    timezone_label: str = "Asia/Kolkata") -> tuple[BytesIO, dict]:
-    """Build the .xlsx in memory. Returns (BytesIO, metadata). Metadata includes
-    actual per-sheet row counts and total rows exported."""
+    """Build the single-sheet 'Lead Data' workbook from REAL leads. ``scope`` is
+    accepted for API compatibility but the export is always the lead report."""
     now = now or utcnow()
     wb = Workbook()
-    wb.remove(wb.active)   # drop default sheet; we add our own
+    ws = wb.active
+    ws.title = SHEET_NAME
 
-    counts = workbook_counts(session)
-    all_sheets = _sheets()
-    scope = (scope or "all").lower()
-    wanted = _SCOPES.get(scope)   # None → all
-    sheets = [s for s in all_sheets if (wanted is None or s.name in wanted)]
+    ws.append(HEADERS)
+    for i, (_, width) in enumerate(COLUMNS, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
 
-    # README + Data Dictionary first.
-    _write_readme(wb, counts, now, timezone_label, scope)
-    _write_data_dictionary(wb, sheets)
+    leads = list(session.execute(eligible_leads_query()).scalars().all())
+    # Final sort by priority RANK desc, score desc, signal date desc (§17).
+    leads.sort(key=lambda l: (
+        _PRIORITY_RANK.get(l.lead_priority, -1),
+        float(l.lead_score or 0),
+        (_signal_date(l) or datetime.min),
+    ), reverse=True)
 
-    exported: dict[str, int] = {}
-    for sheet in sheets:
-        n = _write_sheet(wb, sheet, session)
-        exported[sheet.name] = n
+    # Resolve each lead to its Company entity by normalized name (leads carry no
+    # company_id), then preload real contacts for those companies.
+    name_map = _company_id_map(session)
+    lead_company_id = {
+        l.id: (l.company_id or name_map.get(l.normalized_company_name)) for l in leads
+    }
+    contacts = _contacts_by_company(session, set(lead_company_id.values()))
 
-    # Sources sheet (from the source inventory helper; never secrets).
-    _write_sources(wb, session)
+    row_count = 0
+    for idx, lead in enumerate(leads, start=1):
+        bundle = contacts.get(lead_company_id.get(lead.id))
+        people = bundle.people if bundle else []
+        email_dm = bundle.email_contact if bundle else None
+        phone_dm = bundle.phone_contact if bundle else None
+        # Source hint: note the contact source(s) that materially back the shown
+        # POC/contact — e.g. Official Company Website / GitHub / ContactOut (§33).
+        shown = people[:2] + [d for d in (email_dm, phone_dm) if d is not None]
+        contact_sources = []
+        for d in shown:
+            src = getattr(d, "contact_source", None)
+            if src and src not in contact_sources:
+                contact_sources.append(src)
+        openings = lead.it_job_count if (lead.it_job_count and lead.it_job_count > 0) else None
+        sig_date = _signal_date(lead)
+        # Opportunity column: same values as the Opportunity tab (§26) — Type,
+        # Staffing, Est. Team (actual estimated_hiring), Urgency — as ONE multi-line
+        # cell. Note: Est. Team is NOT the No of Openings above (§6).
+        oview = derive_opportunity_view(lead, signal_date=sig_date, now=now)
+        values = [
+            idx,                                             # Sr No (export row number)
+            _safe(lead.company_name),
+            openings,                                        # No of Openings (canonical; blank if unknown)
+            _safe(lead.location_all or lead.location),   # full city list (compact "+N more" is UI-only)
+            _enum(lead.hiring_intensity) or "UNKNOWN",
+            _safe(_signal_text(lead)),
+            _safe(_tech_text(lead)),
+            _safe(_poc_text(lead, people)),
+            round(float(lead.lead_score or 0)),
+            _enum(lead.lead_priority),
+            _enum(lead.status),
+            _safe(phone_dm.business_phone if phone_dm else None),   # real returned phone, else blank
+            _safe(email_dm.business_email if email_dm else None),   # real business email, else blank
+            _safe(opportunity_cell(oview)),                  # multi-line: Type / Staffing / Est. Team / Urgency
+            sig_date,                                        # real date object → formatted below
+            _safe(_source_text(lead, contact_sources)),
+        ]
+        ws.append(values)
+        row_count += 1
+        r = row_count + 1  # sheet row (1 = header)
+
+        # Signal Date format (§19).
+        if sig_date is not None:
+            ws.cell(row=r, column=15).number_format = "dd-mmm-yyyy"
+        # Wrap long text columns.
+        for col in (2, 4, 6, 7, 8, 14, 16):
+            ws.cell(row=r, column=col).alignment = _WRAP
+        # The Opportunity cell has 4 lines — give the row room to show them (§5).
+        ws.row_dimensions[r].height = 66
+        # Restrained priority fill (value is also present as text → not colour-alone).
+        pv = _enum(lead.lead_priority)
+        if pv in _PRIORITY_FILL:
+            ws.cell(row=r, column=10).fill = _PRIORITY_FILL[pv]
+        # Source hyperlink when a URL is available (§33) — no extra column.
+        if lead.source_url and str(lead.source_url).startswith(("http://", "https://")):
+            cell = ws.cell(row=r, column=16)
+            cell.hyperlink = lead.source_url
+            cell.style = "Hyperlink"
+
+    if row_count == 0:
+        ws.append(["No real lead data available."] + [None] * (len(HEADERS) - 1))
+
+    # Header styling + freeze + filter (§14/§16).
+    for c in range(1, len(HEADERS) + 1):
+        cell = ws.cell(row=1, column=c)
+        cell.fill = _HEADER_FILL
+        cell.font = _HEADER_FONT
+        cell.alignment = Alignment(vertical="center", wrap_text=True)
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(HEADERS))}{max(2, row_count + 1)}"
 
     buffer = BytesIO()
     wb.save(buffer)
     buffer.seek(0)
     meta = {
-        "scope": scope,
+        "scope": "all",
         "generated_at": now.isoformat(),
-        "sheets": list(wb.sheetnames),
-        "rows_by_sheet": exported,
-        "total_rows": sum(exported.values()),
-        "counts": counts,
+        "sheets": wb.sheetnames,
+        "total_rows": row_count,
     }
     return buffer, meta
-
-
-def _style_header(ws, ncols: int) -> None:
-    for c in range(1, ncols + 1):
-        cell = ws.cell(row=1, column=c)
-        cell.fill = _HEADER_FILL
-        cell.font = _HEADER_FONT
-        cell.alignment = Alignment(vertical="center")
-    ws.freeze_panes = "A2"
-    if ncols:
-        ws.auto_filter.ref = f"A1:{get_column_letter(ncols)}1"
-
-
-def _autosize(ws, headers: list[str], sample_widths: list[int]) -> None:
-    for i, header in enumerate(headers, start=1):
-        width = max(len(header) + 2, sample_widths[i - 1] if i - 1 < len(sample_widths) else 10)
-        ws.column_dimensions[get_column_letter(i)].width = min(max(width, 10), 60)
-
-
-def _write_sheet(wb: Workbook, sheet: Sheet, session: Session) -> int:
-    ws = wb.create_sheet(title=sheet.name[:31])
-    headers = [c.header for c in sheet.columns]
-    ws.append(headers)
-    widths = [len(h) for h in headers]
-
-    count = 0
-    for obj in sheet.rows(session):
-        row_vals = []
-        for ci, col in enumerate(sheet.columns):
-            try:
-                raw = col.get(obj)
-            except Exception:
-                raw = None
-            val = _safe(raw)
-            row_vals.append(val)
-            if isinstance(val, str):
-                widths[ci] = max(widths[ci], min(len(val), 60))
-        ws.append(row_vals)
-        count += 1
-        # Hyperlink URL columns.
-        for ci, col in enumerate(sheet.columns, start=1):
-            if col.is_url:
-                cell = ws.cell(row=count + 1, column=ci)
-                if _is_url(cell.value):
-                    cell.hyperlink = cell.value
-                    cell.style = "Hyperlink"
-
-    if count == 0:
-        ws.append(["No real data available yet." ] + [None] * (len(headers) - 1))
-    _style_header(ws, len(headers))
-    _autosize(ws, headers, widths)
-    return count
-
-
-def _write_readme(wb: Workbook, counts: dict, now: datetime, tz: str, scope: str) -> None:
-    ws = wb.create_sheet(title="README")
-    rows = [
-        ["LeadGenerationAgent — Real Data Export"],
-        [],
-        ["Export timestamp (UTC)", now.isoformat()],
-        ["Display timezone", tz],
-        ["Export scope", scope],
-        [],
-        ["Entity", "Total records (actual)"],
-    ]
-    for name, n in counts.items():
-        rows.append([name, n])
-    rows += [
-        [],
-        ["Data Policy",
-         "Business records in this workbook are exported from the application database "
-         "and retain their source/provenance information. This is REAL data only — no "
-         "demo, dummy, synthetic, or fabricated records are included."],
-    ]
-    for r in rows:
-        ws.append([_safe(v) for v in r])
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A7"].font = _HEADER_FONT
-    ws["B7"].font = _HEADER_FONT
-    ws["A7"].fill = _HEADER_FILL
-    ws["B7"].fill = _HEADER_FILL
-    ws.column_dimensions["A"].width = 28
-    ws.column_dimensions["B"].width = 90
-
-
-_DICT_ROWS = [
-    ("(all)", "Provenance", "REAL = collected from a permitted real source", "text", "system", "no",
-     "Synthetic never appears in production exports"),
-    ("Leads", "Lead Score", "0-100 composite intent score", "number", "scoring", "no",
-     "Distinct from Evidence Confidence and AI Confidence"),
-    ("Leads", "Evidence Confidence", "0-100 strength of source-backed evidence", "number", "verification",
-     "no", "Not the same as lead score"),
-    ("Leads", "Outreach Readiness", "READY / ROLE_ONLY / RESEARCH_REQUIRED / HOLD", "text", "verification",
-     "no", ""),
-    ("Evidence", "Source URL", "Clickable link to the originating source", "url", "collector", "yes",
-     "Provenance; some aggregator evidence carries source name not URL"),
-    ("Contacts", "Business Email", "Source-published business email only", "text", "enrichment", "yes",
-     "Never guessed/constructed"),
-    ("AI Intelligence", "Verified Facts", "FACT claims, each tagged [FACT], cite evidence", "text", "ai",
-     "yes", "AI never becomes source of truth"),
-    ("Sales Opportunities", "Estimated Value", "Only when user- or evidence-sourced", "number", "crm",
-     "yes", "Never inferred/fabricated"),
-]
-
-
-def _write_data_dictionary(wb: Workbook, sheets: list[Sheet]) -> None:
-    ws = wb.create_sheet(title="Data Dictionary")
-    headers = ["Sheet", "Field", "Description", "Data Type", "Source", "Nullable", "Notes"]
-    ws.append(headers)
-    for r in _DICT_ROWS:
-        ws.append([_safe(v) for v in r])
-    _style_header(ws, len(headers))
-    for i, w in enumerate([20, 22, 44, 12, 12, 10, 40], start=1):
-        ws.column_dimensions[get_column_letter(i)].width = w
-
-
-def _write_sources(wb: Workbook, session: Session) -> None:
-    from app.source_inventory import source_inventory
-    ws = wb.create_sheet(title="Sources")
-    headers = ["Source ID", "Provider", "Category", "Implementation", "Configuration",
-               "Connection", "Reliability Tier", "Capabilities", "Last Success", "Last Failure",
-               "Licensing", "Documentation URL", "Terms URL"]
-    ws.append(headers)
-    for s in source_inventory(session):
-        ws.append([_safe(s.get(k)) for k in (
-            "source_id", "provider", "category", "implementation", "configuration_status",
-            "connection_status", "reliability_tier", "capabilities", "last_success_at",
-            "last_failure_at", "commercial_use_status", "documentation_url", "terms_url")])
-    # Hyperlink doc/terms URL columns (12, 13).
-    for r in range(2, ws.max_row + 1):
-        for c in (12, 13):
-            cell = ws.cell(row=r, column=c)
-            if _is_url(cell.value):
-                cell.hyperlink = cell.value
-                cell.style = "Hyperlink"
-    _style_header(ws, len(headers))
-    _autosize(ws, headers, [len(h) for h in headers])

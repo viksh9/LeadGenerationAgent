@@ -1,0 +1,127 @@
+"""Normalized public-intelligence records (secret-free, nothing fabricated).
+
+Providers translate their own responses into these types so the orchestrator and UI
+never see provider-specific formats. Every fact carries provenance; a missing email/
+phone/LinkedIn stays None — availability is derived only from what a source published.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Optional
+
+# POC status states (§22).
+STATUS_VERIFIED = "VERIFIED"
+STATUS_LIKELY = "LIKELY"
+STATUS_RECOMMENDED_ROLE_ONLY = "RECOMMENDED_ROLE_ONLY"
+STATUS_UNVERIFIED = "UNVERIFIED"
+STATUS_STALE = "STALE"
+
+# Company-match confidence (§11).
+MATCH_VERIFIED = "VERIFIED"
+MATCH_LIKELY = "LIKELY"
+MATCH_UNKNOWN = "UNKNOWN"
+
+# Source priority (§20): lower rank wins as the canonical field value.
+SOURCE_PRIORITY = {
+    "official_company": 1,
+    "official_ats": 2,
+    "github": 3,
+    "wikidata": 4,
+}
+
+
+@dataclass
+class CompanyContext:
+    """Identifiers a provider may use to scope discovery to the target company."""
+
+    company_id: Optional[int]
+    company_name: str
+    normalized_name: str
+    domain: Optional[str] = None
+    website: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    country: Optional[str] = None
+
+
+@dataclass
+class FieldProvenance:
+    """Field-level source (§18): which source supplied a specific field value."""
+
+    field: str
+    value: Optional[str]
+    source: str
+    source_url: Optional[str] = None
+
+
+@dataclass
+class PublicPerson:
+    """A real person discovered from a public source. Contact fields are only the
+    values a source actually published (§6/§7) — never guessed or inferred."""
+
+    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    job_title: Optional[str] = None
+    department: Optional[str] = None
+    seniority: Optional[str] = None
+    company_name: Optional[str] = None
+    company_domain: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    work_email: Optional[str] = None          # explicitly published business email only
+    personal_email: Optional[str] = None
+    business_phone: Optional[str] = None       # explicitly published business phone only
+    location: Optional[str] = None
+    bio: Optional[str] = None
+    is_current: Optional[bool] = None
+    company_match_status: str = MATCH_UNKNOWN
+
+    # Provenance (mandatory).
+    source: str = ""                           # provider name, e.g. official_company
+    source_label: str = ""                     # human label, e.g. "Official Company Website"
+    source_type: str = ""
+    source_url: Optional[str] = None
+    source_record_id: Optional[str] = None
+    retrieved_at: Optional[datetime] = None
+    field_provenance: list[FieldProvenance] = field(default_factory=list)
+
+
+@dataclass
+class PublicContact:
+    """A company-level published contact (not attributed to a named person)."""
+
+    kind: str                                  # BUSINESS_EMAIL | COMPANY_PHONE | ...
+    value: str
+    source: str = ""
+    source_label: str = ""
+    source_type: str = ""
+    source_url: Optional[str] = None
+
+
+@dataclass
+class PublicCompanyFacts:
+    """Public company identity facts (§3/§14). Only real, sourced values."""
+
+    website: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    country: Optional[str] = None
+    industry: Optional[str] = None
+    aliases: list[str] = field(default_factory=list)
+    wikidata_id: Optional[str] = None
+    source: str = ""
+    source_label: str = ""
+    source_url: Optional[str] = None
+
+
+@dataclass
+class ProviderResult:
+    """One provider's normalized output for a company."""
+
+    provider: str
+    status: str = "OK"                         # OK | EMPTY | UNAVAILABLE | RATE_LIMITED | DISABLED | ERROR
+    people: list[PublicPerson] = field(default_factory=list)
+    contacts: list[PublicContact] = field(default_factory=list)
+    company_facts: Optional[PublicCompanyFacts] = None
+    records_found: int = 0
+    error: Optional[str] = None

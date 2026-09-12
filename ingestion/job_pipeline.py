@@ -19,6 +19,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from company.service import CompanyResolutionService
 from database.models import DataProvenance, RawSourceRecord, RecordType
 from ingestion.job_dedup import DedupSummary, JobDeduplicationService
 from ingestion.job_normalization import JobNormalizationService
@@ -32,6 +33,9 @@ class PipelineSummary:
     provenance: str
     dedup: DedupSummary
     companies: CompanyRunSummary
+    entities_created: int = 0
+    entities_updated: int = 0
+    entities_review: int = 0
 
 
 def build_job_records(
@@ -62,9 +66,19 @@ def run_company_pipeline(
     """Full pipeline: raw -> canonical JobRecords -> company-level leads."""
     now = now or datetime.now(timezone.utc).replace(tzinfo=None)
     dedup = build_job_records(session, provenance=provenance, now=now)
+    # Resolve canonical jobs into first-class Company entities (evidence-based, never
+    # merged on similarity alone — uncertain matches become REVIEW candidates). This
+    # populates the /companies API + company-intelligence panels; it does not fabricate.
+    entities = CompanyResolutionService(session).upsert_companies_from_jobs(provenance=provenance, now=now)
     companies = rebuild_company_leads(session, provenance=provenance, now=now, source="canonical")
     logger.info(
-        "company_pipeline provenance=%s canonical_jobs=%s companies=%s",
-        provenance.value, dedup.canonical_created + dedup.canonical_updated, companies.companies,
+        "company_pipeline provenance=%s canonical_jobs=%s entities(created=%s updated=%s review=%s) leads=%s",
+        provenance.value, dedup.canonical_created + dedup.canonical_updated,
+        entities.companies_created, entities.companies_updated, entities.review_candidates,
+        companies.companies,
     )
-    return PipelineSummary(provenance=provenance.value, dedup=dedup, companies=companies)
+    return PipelineSummary(
+        provenance=provenance.value, dedup=dedup, companies=companies,
+        entities_created=entities.companies_created, entities_updated=entities.companies_updated,
+        entities_review=entities.review_candidates,
+    )

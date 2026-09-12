@@ -30,9 +30,9 @@ describe('ExportAllData', () => {
   it('opens a confirmation dialog with the real record count', async () => {
     renderWithProviders(<ExportAllData />);
     await userEvent.click(screen.getByRole('button', { name: /export all data to excel/i }));
-    expect(await screen.findByText(/Export All Real Data/i)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/2,519 records/i)).toBeInTheDocument());
-    expect(screen.getByText(/application database/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Export All Lead Data/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/2,519 leads/i)).toBeInTheDocument());
+    expect(screen.getByText(/single Excel worksheet/i)).toBeInTheDocument();
     // Never described as demo/sample.
     expect(screen.queryByText(/demo|sample|dummy/i)).not.toBeInTheDocument();
   });

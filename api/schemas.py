@@ -542,6 +542,16 @@ class CareerSourceListResponse(BaseModel):
     total: int
 
 
+class DiscoverAdhocRequest(BaseModel):
+    """Ad-hoc career/ATS discovery from a provided company name + its official
+    domain or careers URL. No stored Company entity is required — this is a live,
+    SSRF-safe lookup of the domain the caller supplies; nothing is persisted."""
+
+    company_name: str = Field(..., min_length=1, max_length=255)
+    domain: Optional[str] = Field(default=None, max_length=255)
+    careers_url: Optional[str] = Field(default=None, max_length=1024)
+
+
 class DiscoverCareerSourceResponse(BaseModel):
     """Result of a company→ATS discovery attempt (real, safe fetch)."""
 
@@ -757,6 +767,103 @@ class LeadStakeholdersResponse(BaseModel):
     business_contacts: list[DecisionMakerResponse] = Field(default_factory=list)
     outreach_readiness: str = "RESEARCH_REQUIRED"
     outreach_reasons: list[str] = Field(default_factory=list)
+
+
+# --- ContactOut POC discovery/enrichment (Prompt 44) ----------------------- #
+class POCResponse(DecisionMakerResponse):
+    """A ContactOut-discovered POC. Adds the ranking match score and the contact
+    TRUST (reliability of the contact match — distinct from the business lead score).
+    Contact fields are only ever the real values ContactOut returned (never fabricated)."""
+
+    company_domain: Optional[str] = None
+    match_score: int = 0
+    contact_trust_score: int = 0
+    contact_trust_status: Optional[str] = None
+    is_current: bool = True
+
+
+class POCDiscoveryResponse(BaseModel):
+    """Result of a company-level POC discovery run. Honest states only — a failure
+    never yields a fabricated POC."""
+
+    lead_id: Optional[int] = None
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    status: str                       # ENRICHED | CACHED | NO_POC_FOUND | NOT_CONFIGURED | RATE_LIMITED | UNAVAILABLE
+    candidates_found: int = 0
+    searches_used: int = 0
+    enrichments_used: int = 0
+    persisted: int = 0
+    reason: str = ""
+    error_code: Optional[str] = None
+    pocs: list[POCResponse] = Field(default_factory=list)
+
+
+class POCListResponse(BaseModel):
+    """POCs for a lead: real people (when discovered/verified) plus role-only
+    recommendations (never presented as real people)."""
+
+    lead_id: int
+    company_name: Optional[str] = None
+    contactout_status: str            # config status (NOT a live check)
+    pocs: list[POCResponse] = Field(default_factory=list)
+    recommended_roles: list[StakeholderRoleResponse] = Field(default_factory=list)
+    recommendation_confidence: int = 0
+    note: Optional[str] = None
+
+
+class PublicIntelligenceDiscoveryResponse(BaseModel):
+    """Result of a free/public intelligence discovery run. Honest states only."""
+
+    lead_id: Optional[int] = None
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    status: str                       # ENRICHED | CACHED | NO_POC_FOUND | DISABLED
+    people_found: int = 0
+    persisted: int = 0
+    provider_status: dict[str, str] = Field(default_factory=dict)
+    company_facts_updated: list[str] = Field(default_factory=list)
+    reason: str = ""
+    pocs: list[POCResponse] = Field(default_factory=list)
+
+
+class CompanyPublicIntelligenceResponse(BaseModel):
+    """Company profile facts + real public leadership discovered from free sources."""
+
+    company_id: int
+    company_name: str
+    website: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    country: Optional[str] = None
+    industry: Optional[str] = None
+    wikidata_id: Optional[str] = None
+    india_locations: list[str] = Field(default_factory=list)
+    public_leadership: list[POCResponse] = Field(default_factory=list)
+
+
+class PublicIntelligenceTestResponse(BaseModel):
+    """Real connectivity check against a configured public source (§36)."""
+
+    provider: str
+    result: str                       # LIVE_VERIFIED | NOT_CONFIGURED | SOURCE_UNAVAILABLE | ERROR
+    status: str
+    message: Optional[str] = None
+    performed_request: bool
+    checked_at: datetime
+
+
+class ContactOutStatusResponse(BaseModel):
+    """ContactOut integration config status for the Settings UI. Never exposes the
+    token or base URL."""
+
+    status: str                       # NOT_CONFIGURED | CONFIGURED | DISABLED
+    configured: bool
+    note: str
+    people_search_rate_per_minute: int
+    other_rate_per_minute: int
+    max_poc_searches_per_opportunity: int
+    max_enrichments_per_opportunity: int
+    cache_ttl_hours: int
 
 
 class EnrichRunResponse(BaseModel):

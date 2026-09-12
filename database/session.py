@@ -40,6 +40,22 @@ def create_session_factory(engine: Engine | None = None) -> sessionmaker[Session
 # does NOT alter existing tables, so we add any missing ones idempotently on init.
 # ADD COLUMN is non-destructive; only additive, nullable/defaulted columns belong here.
 _ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
+    "leads": {
+        "location_all": "VARCHAR(1024)",   # full hiring-city list for the Excel export
+    },
+    "decision_makers": {
+        # ContactOut POC enrichment (Prompt 44) — additive, all nullable/defaulted.
+        "company_domain": "VARCHAR(255)",
+        "match_score": "INTEGER DEFAULT 0",
+        "contact_trust_score": "INTEGER DEFAULT 0",
+        "contact_trust_status": "VARCHAR(24)",
+        "is_current": "BOOLEAN DEFAULT 1",
+    },
+    "companies": {
+        # Public-intelligence identity (Prompt 45) — additive.
+        "linkedin_url": "VARCHAR(512)",
+        "wikidata_id": "VARCHAR(32)",
+    },
     "source_health": {
         "requests_used": "INTEGER DEFAULT 0",
         "request_budget": "INTEGER",

@@ -12,6 +12,7 @@ import { OpportunityPanel } from '@/components/leads/detail/OpportunityPanel';
 import { TechnologyList } from '@/components/leads/detail/TechnologyList';
 import { POCPanel } from '@/components/leads/detail/POCPanel';
 import { StakeholdersPanel } from '@/components/leads/detail/StakeholdersPanel';
+import { TargetPOCPanel } from '@/components/leads/detail/TargetPOCPanel';
 import { EvidencePanel } from '@/components/leads/detail/EvidencePanel';
 import { VerificationPanel } from '@/components/leads/detail/VerificationPanel';
 import { AIIntelligencePanel } from '@/components/leads/detail/AIIntelligencePanel';
@@ -137,6 +138,7 @@ export function LeadDetailsPage() {
           <div className="space-y-4">
             <RecommendationCard lead={lead} />
             <LeadNextActionCard leadId={lead.id} />
+            <TargetPOCPanel leadId={lead.id} />
             <POCPanel lead={lead} />
             <StakeholdersPanel leadId={lead.id} />
           </div>

@@ -45,8 +45,8 @@ export function ExportAllData() {
 
   const description =
     total === null
-      ? 'This will export all currently available real data from the application database to an Excel (.xlsx) workbook.'
-      : `This will export all currently available real data (${total.toLocaleString()} records) from the application database to an Excel (.xlsx) workbook.`;
+      ? 'This will export all currently available real lead intelligence into a single Excel worksheet.'
+      : `This will export all currently available real lead intelligence (${total.toLocaleString()} leads) into a single Excel worksheet.`;
 
   return (
     <>
@@ -62,7 +62,7 @@ export function ExportAllData() {
       </Button>
       <ConfirmDialog
         open={open}
-        title="Export All Real Data"
+        title="Export All Lead Data"
         description={description}
         confirmLabel={exporting ? 'Preparing…' : 'Export Excel'}
         cancelLabel="Cancel"

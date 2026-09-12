@@ -48,6 +48,44 @@ export async function fetchCareerSources(): Promise<CareerSourceList> {
   return data;
 }
 
+/** Inputs for an ad-hoc, live discovery (POST /career-sources/discover). */
+export interface DiscoverByDomainBody {
+  company_name: string;
+  domain?: string;
+  careers_url?: string;
+}
+
+/**
+ * Real result of a live, SSRF-safe discovery against a supplied domain / careers
+ * URL. `found` is true only when a real Greenhouse/Lever board id was detected;
+ * `verified` is true only when ownership was confirmed. Nothing is fabricated and
+ * nothing is persisted (no stored Company entity is involved).
+ */
+export interface DiscoverResult {
+  company_id: number | null;
+  company_name: string | null;
+  found: boolean;
+  verified: boolean;
+  provider: AtsProvider | null;
+  board_identifier: string | null;
+  careers_url: string | null;
+  discovery_method: string | null;
+  detail: string;
+}
+
+/** Run a live ATS/career-source discovery for a provided company + domain/URL. */
+export async function discoverCareerSourceByDomain(
+  body: DiscoverByDomainBody,
+): Promise<DiscoverResult> {
+  const payload = {
+    company_name: body.company_name.trim(),
+    domain: body.domain?.trim() || undefined,
+    careers_url: body.careers_url?.trim() || undefined,
+  };
+  const { data } = await api.post<DiscoverResult>('/career-sources/discover', payload);
+  return data;
+}
+
 /** Display label + honest Tailwind badge classes for a career-source status. */
 export interface CareerSourceStatusDisplay {
   label: string;

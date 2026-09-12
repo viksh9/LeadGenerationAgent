@@ -130,3 +130,49 @@ def test_discover_endpoint_registers(client, monkeypatch):
 
 def test_discover_endpoint_unknown_company_404(client):
     assert client.post("/companies/999999/discover-career-source").status_code == 404
+
+
+# --------------------------------------------------------------------------- #
+# Ad-hoc discovery from a provided domain / careers URL (no Company entity)
+# --------------------------------------------------------------------------- #
+def test_adhoc_discover_requires_domain_or_url(client):
+    # Company name alone is not enough — there's nothing real to probe.
+    r = client.post("/career-sources/discover", json={"company_name": "Acme"})
+    assert r.status_code == 422
+    assert "domain or careers URL" in r.json()["error"]["message"]
+
+
+def test_adhoc_discover_requires_company_name(client):
+    r = client.post("/career-sources/discover", json={"company_name": "", "domain": "acme.com"})
+    assert r.status_code == 422   # schema min_length
+
+
+def test_adhoc_discover_found(client, monkeypatch):
+    captured = {}
+
+    def fake_discover(**kwargs):
+        captured.update(kwargs)
+        return DiscoveryResult(company_id=kwargs.get("company_id"), company_name=kwargs.get("company_name"),
+                               provider=AtsProvider.GREENHOUSE, board_identifier="acmecorp",
+                               careers_url="https://acme.com/careers", verified=True,
+                               discovery_method="careers_page_link", detail="Found Greenhouse board 'acmecorp'.")
+    monkeypatch.setattr("api.routes.career_sources.discover_career_source", fake_discover)
+
+    body = client.post("/career-sources/discover",
+                       json={"company_name": "Acme", "domain": "acme.com"}).json()
+    assert body["found"] is True and body["verified"] is True
+    assert body["provider"] == "GREENHOUSE" and body["board_identifier"] == "acmecorp"
+    assert body["company_id"] is None and body["career_source"] is None   # nothing persisted
+    assert captured["company_id"] is None and captured["domain"] == "acme.com"
+
+
+def test_adhoc_discover_not_found_is_honest(client, monkeypatch):
+    monkeypatch.setattr(
+        "api.routes.career_sources.discover_career_source",
+        lambda **k: DiscoveryResult(company_id=None, company_name=k.get("company_name"),
+                                    verified=False, detail="No supported ATS detected on the page."),
+    )
+    body = client.post("/career-sources/discover",
+                       json={"company_name": "Acme", "careers_url": "https://acme.com/careers"}).json()
+    assert body["found"] is False and body["verified"] is False
+    assert body["provider"] is None and body["board_identifier"] is None

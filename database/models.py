@@ -13,6 +13,7 @@ from enum import Enum
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     Enum as SAEnum,
@@ -251,7 +252,8 @@ class Lead(Base):
         SAEnum(CompanyType, native_enum=False, length=32), nullable=True
     )
     industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)   # compact "Top +N more" (UI)
+    location_all: Mapped[str | None] = mapped_column(String(1024), nullable=True)  # full city list (Excel export)
     company_size: Mapped[str | None] = mapped_column(String(64), nullable=True)
     company_website: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
@@ -839,6 +841,16 @@ class DecisionMaker(Base):
     contact_confidence: Mapped[int] = mapped_column(Integer, default=0)
     evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
     freshness_score: Mapped[int] = mapped_column(Integer, default=0)
+
+    # ContactOut POC enrichment (Prompt 44) — additive. Ranking match score and the
+    # contact TRUST (reliability of the contact match) are kept distinct from the
+    # business lead score. company_domain aids current-employment validation.
+    company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    match_score: Mapped[int] = mapped_column(Integer, default=0)
+    contact_trust_score: Mapped[int] = mapped_column(Integer, default=0)
+    contact_trust_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+
     verification_status: Mapped[VerificationStatus] = mapped_column(
         SAEnum(VerificationStatus, native_enum=False, length=24),
         default=VerificationStatus.UNVERIFIED, index=True,
@@ -1319,6 +1331,9 @@ class Company(Base):
     website: Mapped[str | None] = mapped_column(String(512), nullable=True)
     primary_domain: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     alternate_domains: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Public-intelligence identity (Prompt 45) — additive; filled from public sources.
+    linkedin_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    wikidata_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     industry: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     sub_industry: Mapped[str | None] = mapped_column(String(128), nullable=True)

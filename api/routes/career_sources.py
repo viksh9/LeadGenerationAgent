@@ -18,9 +18,11 @@ from api.schemas import (
     CareerSourceCollectResponse,
     CareerSourceListResponse,
     CareerSourceResponse,
+    DiscoverAdhocRequest,
     DiscoverCareerSourceResponse,
     SourceCheckResponse,
 )
+from api.security import rate_limit
 from collectors import career_source_registry as csr
 from collectors.base import FetchRequest, HealthStatus
 from collectors.company.career_source_discovery import discover_career_source
@@ -33,6 +35,9 @@ from ingestion.job_pipeline import run_company_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["career-sources"])
+
+# Ad-hoc discovery makes real outbound (SSRF-safe) requests — cap the rate.
+_discover_limit = rate_limit("career_discover", 20)
 
 # HealthStatus -> CareerSourceStatus (persisted)
 _HEALTH_TO_CAREER = {
@@ -87,6 +92,38 @@ def company_career_sources_endpoint(company_id: int, session: Session = Depends(
     )
 
 
+@router.post("/career-sources/discover", response_model=DiscoverCareerSourceResponse,
+             summary="Discover an ATS/career source from a provided domain or careers URL")
+def discover_career_source_adhoc(
+    payload: DiscoverAdhocRequest, _: None = Depends(_discover_limit)
+) -> DiscoverCareerSourceResponse:
+    """Live, SSRF-safe discovery from a supplied company name + official domain or
+    careers URL. Requires no stored Company entity and persists nothing — it probes
+    the domain the caller provides and reports the real result (Greenhouse/Lever
+    board id when found, otherwise found=false; never a fabricated board)."""
+    name = payload.company_name.strip()
+    domain = (payload.domain or "").strip() or None
+    careers_url = (payload.careers_url or "").strip() or None
+    if not name:
+        raise ValidationError("Company name is required.")
+    if not domain and not careers_url:
+        raise ValidationError("Provide the company's official domain or careers URL to discover.")
+    try:
+        result = discover_career_source(
+            company_id=None, company_name=name, domain=domain, careers_url=careers_url,
+        )
+    except CollectorError as exc:
+        raise ValidationError(f"Discovery could not run: {exc}") from exc
+    return DiscoverCareerSourceResponse(
+        company_id=None, company_name=name,
+        found=bool(result.provider and result.board_identifier), verified=result.verified,
+        provider=result.provider.value if result.provider else None,
+        board_identifier=result.board_identifier, careers_url=result.careers_url,
+        discovery_method=result.discovery_method, detail=result.detail,
+        career_source=None,   # ad-hoc lookup — nothing is persisted (no Company entity)
+    )
+
+
 @router.post("/companies/{company_id}/discover-career-source", response_model=DiscoverCareerSourceResponse,
              summary="Discover + verify a company's official ATS/career source")
 def discover_career_source_endpoint(
@@ -95,9 +132,28 @@ def discover_career_source_endpoint(
     company = company_repo.get_company(session, company_id)
     if company is None:
         raise NotFoundError(f"Company {company_id} not found.")
+
+    # If the company has no known domain/website, derive the official domain from
+    # real signals (company name + a real lead's source URL) before probing (§4).
+    domain = company.primary_domain
+    if not domain and not company.website:
+        from collectors.company.domain_discovery import CompanyDomainDiscoveryService
+        from database.models import Lead
+        from sqlalchemy import select
+        lead = session.execute(
+            select(Lead).where(Lead.normalized_company_name == company.normalized_name)
+            .order_by(Lead.updated_at.desc()).limit(1)
+        ).scalars().first()
+        dd = CompanyDomainDiscoveryService().discover(
+            company_name=company.canonical_name,
+            source_url=(lead.source_url if lead else None),
+        )
+        if dd.selected_domain and dd.status in ("VERIFIED", "POSSIBLE"):
+            domain = dd.selected_domain
+
     result = discover_career_source(
         company_id=company.id, company_name=company.canonical_name,
-        domain=company.primary_domain, website=company.website,
+        domain=domain, website=company.website,
     )
     row = csr.register_from_discovery(session, result)
     return DiscoverCareerSourceResponse(
