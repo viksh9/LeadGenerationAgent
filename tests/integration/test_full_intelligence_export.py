@@ -68,5 +68,18 @@ def test_new_enrichment_columns_present_and_populated(seed_session):
     assert row["Contact Trust"] == 55
 
 
+def test_intelligence_columns_present_and_populated(seed_session):
+    """Prompt 50 §36: AI Profile Highlights + POC Status columns."""
+    _seed(seed_session)
+    ws = _load(seed_session).active
+    headers = [c.value for c in ws[1]]
+    for col in ("AI Profile Highlights", "POC Status", "POC Last Verified"):
+        assert col in headers
+    row = dict(zip(headers, [c.value for c in ws[2]]))
+    assert row["POC Status"] in ("VERIFIED", "LIKELY", "UNVERIFIED", "STALE", "FORMER")
+    # Deterministic highlights are real-data-derived (Hiring Trend present when openings exist).
+    assert row["AI Profile Highlights"] and "Hiring Trend" in row["AI Profile Highlights"]
+
+
 def test_fixed_16_column_export_unchanged():
     assert len(FIXED_HEADERS) == 16       # extension never touched the fixed export

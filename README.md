@@ -583,6 +583,45 @@ a real test button.
 > `NOT_CONFIGURED` and **no live provider call has been made**. Clients are unit-tested
 > with real-shaped payloads over a mocked transport.
 
+## Lead Intelligence layer (Prompt 50)
+
+The final read-model composes the real company + signal + opportunity + POC data into
+one traceable view (`intelligence/lead_intelligence.py`). It is an **aggregator, not a
+new scoring engine** — every value comes from an existing engine: Data Trust
+(`Company.data_trust_score`), Contact Trust and Role Match (`DecisionMaker`), Lead Score
+(`lead_scorer`), Freshness (`verification/freshness`), and the grounded AI layer below.
+
+- **POC Status** (`intelligence/poc_status.py`) — a deterministic function derives
+  `VERIFIED / LIKELY / RECOMMENDED_ROLE_ONLY / STALE / FORMER / UNVERIFIED` from existing
+  fields (employment, verification, freshness). Computed at read time — one source of
+  truth, no stored duplicate.
+- **Signal + Company Profile summaries** (`intelligence/summaries.py`) — deterministic,
+  evidence-only (e.g. "High technology hiring — 47 open IT roles"), India-aware.
+- **AI Profile Highlights** (`ai/highlights.py`) — deterministic structured highlights
+  (Hiring Trend, Technology Focus, Hiring Signal, Potential Opportunity) that are always
+  present from real data, plus **one AI Insight line** sourced from the already-validated
+  `AIIntelligenceResult`. Each highlight carries `trust_level` HIGH/MEDIUM/LOW from real
+  corroboration. When no AI provider is configured the AI insight is **"AI Profile
+  Highlights unavailable"** — never hard-coded fallback prose (§42).
+- **POCs are company/opportunity level** (never per job); primary/secondary ranked by
+  Role Match Score; a lead with no real person yields recommended roles only — never a
+  fabricated contact.
+
+| Method & path | Purpose |
+| --- | --- |
+| `GET /leads/{id}/intelligence` | Aggregated intelligence (cached; no forced provider call) |
+| `GET /leads/{id}/sources` | Every contributing source for the lead (field-level provenance) |
+| `POST /leads/{id}/intelligence/refresh` | Recompute (bounded AI re-analysis) — SALES/ADMIN, rate-limited |
+
+The lead-detail UI adds an **AI Profile Highlights** panel (distinct Data Trust /
+Contact Trust badges, contributing-source badges, a **View Evidence** drawer). The
+full-intelligence export gains **AI Profile Highlights**, **POC Status**, and
+**POC Last Verified** columns; the fixed 16-column export is unchanged.
+
+> **No AI provider is configured in this environment**, so AI highlights run on the
+> deterministic baseline and the AI insight reports unavailable. Validated against the
+> 326 real leads already in the database — no sample/demo data was created.
+
 ## AI reasoning layer
 
 A new **AI reasoning and prioritization** layer sits *over* the real,

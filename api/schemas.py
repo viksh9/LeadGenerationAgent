@@ -1068,6 +1068,121 @@ class AIStatusResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Lead Intelligence aggregation (Prompt 50)
+# ---------------------------------------------------------------------------
+class SourceRefResponse(BaseModel):
+    """One contributing source for a field (§11/§34). Real, contributing sources only."""
+
+    field: str
+    value: Optional[str] = None
+    source: str
+    source_type: Optional[str] = None
+    source_url: Optional[str] = None
+    source_record_id: Optional[str] = None
+    trust_score: int = 0
+    verification_status: Optional[str] = None
+    evidence: Optional[str] = None
+    retrieved_at: Optional[str] = None
+    last_verified_at: Optional[str] = None
+
+
+class ProfileHighlightResponse(BaseModel):
+    """A single evidence-grounded highlight (§16). trust_level is HIGH/MEDIUM/LOW."""
+
+    highlight_title: str
+    highlight_text: str
+    trust_level: str = "MEDIUM"
+    supporting_signal_ids: list[int] = Field(default_factory=list)
+    supporting_source_ids: list[str] = Field(default_factory=list)
+    ai_generated: bool = False
+
+
+class ProfileHighlightsResponse(BaseModel):
+    """AI Profile Highlights (§15-§18). ai_insight is null when AI is unavailable —
+    the UI shows 'AI Profile Highlights unavailable' (never fabricated prose, §42)."""
+
+    highlights: list[ProfileHighlightResponse] = Field(default_factory=list)
+    ai_available: bool = False
+    ai_insight: Optional[str] = None
+    model_version: Optional[str] = None
+    generated_at: Optional[str] = None
+
+
+class CompanyProfileResponse(BaseModel):
+    """Concise company profile from real fields only (§19)."""
+
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    india_presence: str = "UNKNOWN"
+    india_entity_type: Optional[str] = None
+    website: Optional[str] = None
+    primary_location: Optional[str] = None
+    registered_location: Optional[str] = None
+    career_site: Optional[str] = None
+    technology_focus: list[str] = Field(default_factory=list)
+    current_hiring_signal: Optional[str] = None
+    opportunity: Optional[str] = None
+    data_trust: int = 0
+    headline: str = ""
+
+
+class OpportunityViewResponse(BaseModel):
+    opportunity_type: str
+    label: str
+    staffing_need: str
+    estimated_team: Optional[int] = None
+    urgency: str
+    technologies: list[str] = Field(default_factory=list)
+    signals: list[str] = Field(default_factory=list)
+
+
+class POCIntelligenceResponse(BaseModel):
+    """A ranked POC with its derived status (§7/§21). poc is the full real record."""
+
+    poc: POCResponse
+    poc_status: str
+    role_match_score: int = 0
+    contact_trust_score: int = 0
+    contact_trust_status: Optional[str] = None
+    is_primary: bool = False
+
+
+class LeadIntelligenceResponse(BaseModel):
+    """The final aggregated lead intelligence view (§43). Every value is sourced from
+    an existing engine; a lead with no real person carries recommended_roles only."""
+
+    lead_id: int
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    lead_score: float = 0.0
+    lead_priority: Optional[str] = None
+    data_trust: int = 0
+    contact_trust: int = 0
+    signal_summary: str = ""
+    company_profile: CompanyProfileResponse
+    opportunity: OpportunityViewResponse
+    recommended_roles: list[StakeholderRoleResponse] = Field(default_factory=list)
+    recommendation_confidence: int = 0
+    primary_poc: Optional[POCIntelligenceResponse] = None
+    secondary_pocs: list[POCIntelligenceResponse] = Field(default_factory=list)
+    ai_highlights: ProfileHighlightsResponse
+    sources: list[SourceRefResponse] = Field(default_factory=list)
+    freshness_score: int = 0
+    freshness_status: str = "UNKNOWN"
+    sales_action: str = ""
+    generated_at: Optional[str] = None
+
+
+class LeadSourcesResponse(BaseModel):
+    """All contributing sources for a lead (§35 evidence drawer / source badges)."""
+
+    lead_id: int
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    sources: list[SourceRefResponse] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Monitoring & scheduling (Prompt 38)
 # ---------------------------------------------------------------------------
 def _enum_value(v):

@@ -34,7 +34,10 @@ from export.excel import (
     _PRIORITY_RANK,
     eligible_leads_query,
 )
+from ai.highlights import build_profile_highlights
+from ai.service import get_ai_result
 from intelligence.opportunity_view import derive_opportunity_view, opportunity_cell
+from intelligence.poc_status import derive_poc_status
 
 SHEET_NAME = "Full Intelligence"
 
@@ -48,12 +51,13 @@ COLUMNS: list[tuple[str, int]] = [
     ("Signal", 34), ("Signal Summary", 40), ("Technology", 30),
     ("Opening Count", 12), ("Opportunity", 22), ("Staffing", 12), ("Estimated Team", 14),
     ("Urgency", 12), ("Score", 8), ("Priority", 10), ("Status", 14),
-    ("Target POC", 30), ("POC Role", 22), ("POC LinkedIn", 30), ("POC GitHub", 30),
+    ("AI Profile Highlights", 52),
+    ("Target POC", 30), ("POC Role", 22), ("POC Status", 16), ("POC LinkedIn", 30), ("POC GitHub", 30),
     ("Work Email", 28), ("Business Phone", 18), ("Data Trust", 10), ("Contact Trust", 12),
     ("Role Match", 11), ("Email Verification", 18), ("Phone Type", 20), ("Phone Verification", 18),
     ("Website Source", 24), ("Address Source", 26), ("Registered Address Source", 24),
     ("POC Source", 20), ("Source", 26), ("Registry URL", 30), ("OpenCorporates URL", 34),
-    ("Data Trust Verified", 20), ("Signal Date", 16),
+    ("POC Last Verified", 18), ("Data Trust Verified", 20), ("Signal Date", 16),
 ]
 HEADERS = [c[0] for c in COLUMNS]
 _COL_INDEX = {h: i for i, h in enumerate(HEADERS, start=1)}   # header -> 1-based column
@@ -130,6 +134,14 @@ def build_full_intelligence_workbook(session: Session, *, now: datetime | None =
         registered_addr = company.registered_address if company else None
         shown_sources = [d.contact_source for d in (people[:2] + [d for d in (email_dm, phone_dm) if d])
                          if getattr(d, "contact_source", None)]
+        # AI Profile Highlights: deterministic highlights (real data) + AI insight only
+        # when a validated AI result is already persisted (export never triggers a call).
+        ai_res = get_ai_result(session, "LEAD", lead.id)
+        hl = build_profile_highlights(lead, ai_result=ai_res, opportunity=oview,
+                                      source_ids=shown_sources, source_count=len(set(shown_sources)))
+        highlights_cell = "\n".join(f"{h.highlight_title}: {h.highlight_text}" for h in hl.highlights)
+        poc_status_cell = derive_poc_status(top, now=now) if top else "RECOMMENDED_ROLE_ONLY"
+        poc_last_verified = top.last_verified_at if top else None
 
         row = [
             lead.id, _safe(lead.company_name),
@@ -154,8 +166,10 @@ def build_full_intelligence_workbook(session: Session, *, now: datetime | None =
             _safe(oview.label), _safe(oview.staffing_need),
             (f"{oview.estimated_team} eng" if oview.estimated_team else None), _safe(oview.urgency),
             round(float(lead.lead_score or 0)), _enum(lead.lead_priority), _enum(lead.status),
+            _safe(highlights_cell),
             _safe(_poc_text(lead, people)),
             _safe(top.job_title if top else None),
+            _safe(poc_status_cell),
             _safe(top.professional_network_url if top else None),
             _safe(top.source_url if (top and top.contact_source == "GitHub") else None),  # POC GitHub
             _safe(email_dm.business_email if email_dm else None),
@@ -173,6 +187,7 @@ def build_full_intelligence_workbook(session: Session, *, now: datetime | None =
             _safe(_source_text(lead, shown_sources)),
             _safe(company.registry_url if company else None),
             _safe(company.opencorporates_url if company else None),
+            poc_last_verified,
             (company.official_verified_at if company else None),
             sig_date,
         ]
@@ -181,9 +196,10 @@ def build_full_intelligence_workbook(session: Session, *, now: datetime | None =
         r = row_count + 1
         # Robust formatting by header name (column indices shift as columns evolve).
         for name in ("Company Name", "Legal Company Name", "Operating Address", "Registered Address",
-                     "Signal", "Signal Summary", "Technology", "Target POC", "Source", "Registry URL"):
+                     "Signal", "Signal Summary", "Technology", "AI Profile Highlights", "Target POC",
+                     "Source", "Registry URL"):
             ws.cell(row=r, column=_COL_INDEX[name]).alignment = _WRAP
-        for name in ("Data Trust Verified", "Signal Date"):
+        for name in ("POC Last Verified", "Data Trust Verified", "Signal Date"):
             if ws.cell(row=r, column=_COL_INDEX[name]).value is not None:
                 ws.cell(row=r, column=_COL_INDEX[name]).number_format = "dd-mmm-yyyy"
 
