@@ -18,9 +18,11 @@ from api.schemas import (
     CareerSourceCollectResponse,
     CareerSourceListResponse,
     CareerSourceResponse,
+    DiscoverAdhocRequest,
     DiscoverCareerSourceResponse,
     SourceCheckResponse,
 )
+from api.security import rate_limit
 from collectors import career_source_registry as csr
 from collectors.base import FetchRequest, HealthStatus
 from collectors.company.career_source_discovery import discover_career_source
@@ -33,6 +35,9 @@ from ingestion.job_pipeline import run_company_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["career-sources"])
+
+# Ad-hoc discovery makes real outbound (SSRF-safe) requests — cap the rate.
+_discover_limit = rate_limit("career_discover", 20)
 
 # HealthStatus -> CareerSourceStatus (persisted)
 _HEALTH_TO_CAREER = {
@@ -84,6 +89,38 @@ def company_career_sources_endpoint(company_id: int, session: Session = Depends(
     rows = csr.list_for_company(session, company_id)
     return CareerSourceListResponse(
         items=[CareerSourceResponse.model_validate(r) for r in rows], total=len(rows)
+    )
+
+
+@router.post("/career-sources/discover", response_model=DiscoverCareerSourceResponse,
+             summary="Discover an ATS/career source from a provided domain or careers URL")
+def discover_career_source_adhoc(
+    payload: DiscoverAdhocRequest, _: None = Depends(_discover_limit)
+) -> DiscoverCareerSourceResponse:
+    """Live, SSRF-safe discovery from a supplied company name + official domain or
+    careers URL. Requires no stored Company entity and persists nothing — it probes
+    the domain the caller provides and reports the real result (Greenhouse/Lever
+    board id when found, otherwise found=false; never a fabricated board)."""
+    name = payload.company_name.strip()
+    domain = (payload.domain or "").strip() or None
+    careers_url = (payload.careers_url or "").strip() or None
+    if not name:
+        raise ValidationError("Company name is required.")
+    if not domain and not careers_url:
+        raise ValidationError("Provide the company's official domain or careers URL to discover.")
+    try:
+        result = discover_career_source(
+            company_id=None, company_name=name, domain=domain, careers_url=careers_url,
+        )
+    except CollectorError as exc:
+        raise ValidationError(f"Discovery could not run: {exc}") from exc
+    return DiscoverCareerSourceResponse(
+        company_id=None, company_name=name,
+        found=bool(result.provider and result.board_identifier), verified=result.verified,
+        provider=result.provider.value if result.provider else None,
+        board_identifier=result.board_identifier, careers_url=result.careers_url,
+        discovery_method=result.discovery_method, detail=result.detail,
+        career_source=None,   # ad-hoc lookup — nothing is persisted (no Company entity)
     )
 
 

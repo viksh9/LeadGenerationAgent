@@ -542,6 +542,16 @@ class CareerSourceListResponse(BaseModel):
     total: int
 
 
+class DiscoverAdhocRequest(BaseModel):
+    """Ad-hoc career/ATS discovery from a provided company name + its official
+    domain or careers URL. No stored Company entity is required — this is a live,
+    SSRF-safe lookup of the domain the caller supplies; nothing is persisted."""
+
+    company_name: str = Field(..., min_length=1, max_length=255)
+    domain: Optional[str] = Field(default=None, max_length=255)
+    careers_url: Optional[str] = Field(default=None, max_length=1024)
+
+
 class DiscoverCareerSourceResponse(BaseModel):
     """Result of a company→ATS discovery attempt (real, safe fetch)."""
 

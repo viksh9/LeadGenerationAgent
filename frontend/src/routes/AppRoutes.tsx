@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AnalyzeLeadPage } from '@/pages/AnalyzeLeadPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { CareerIntegrationPage } from '@/pages/CareerIntegrationPage';
 import { CompaniesPage } from '@/pages/CompaniesPage';
 import { CompanyDetailsPage } from '@/pages/CompanyDetailsPage';
 import { ContactsPage } from '@/pages/ContactsPage';
@@ -29,6 +30,7 @@ export function AppRoutes() {
         <Route path="/leads/:id" element={<LeadDetailsPage />} />
         <Route path="/companies" element={<CompaniesPage />} />
         <Route path="/companies/:name" element={<CompanyDetailsPage />} />
+        <Route path="/career-integration" element={<CareerIntegrationPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
         <Route path="/pipeline" element={<PipelinePage />} />
         <Route path="/crm" element={<CrmPage />} />
