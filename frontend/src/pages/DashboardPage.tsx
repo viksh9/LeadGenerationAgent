@@ -11,6 +11,7 @@ import { PriorityDistributionChart } from '@/components/dashboard/PriorityDistri
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { RecentSignals } from '@/components/dashboard/RecentSignals';
+import { SalesQueue } from '@/components/dashboard/SalesQueue';
 import { SignalDistributionChart } from '@/components/dashboard/SignalDistributionChart';
 import { SourceCoverage } from '@/components/dashboard/SourceCoverage';
 import { TopOpportunitiesTable } from '@/components/dashboard/TopOpportunitiesTable';
@@ -148,6 +149,10 @@ export function DashboardPage() {
 
         <section className="mt-6">
           <TopOpportunitiesTable leads={data.topOpportunities} />
+        </section>
+
+        <section className="mt-6">
+          <SalesQueue />
         </section>
 
         <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">

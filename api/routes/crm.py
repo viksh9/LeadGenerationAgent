@@ -17,6 +17,7 @@ from api.schemas import (
     CRMActivityListResponse,
     CRMActivityResponse,
     CRMAnalyticsResponse,
+    CreateFollowUpRequest,
     FollowUpStatusUpdate,
     FollowUpTaskListResponse,
     FollowUpTaskResponse,
@@ -44,6 +45,7 @@ from database.models import (
     ActivityType,
     FollowUpStatus,
     FollowUpTask,
+    FollowUpType,
     Lead,
     LeadChangeEvent,
     LeadStatus,
@@ -226,6 +228,28 @@ def list_followups(status: str | None = None, lead_id: int | None = None,
     total = int(session.execute(select(func.count(FollowUpTask.id))).scalar() or 0)
     return FollowUpTaskListResponse(items=[FollowUpTaskResponse.model_validate(r) for r in rows],
                                     total=total)
+
+
+@router.post("/leads/{lead_id}/follow-ups", response_model=FollowUpTaskResponse,
+             summary="Create a user follow-up for a lead")
+def create_lead_followup(lead_id: int, payload: CreateFollowUpRequest,
+                         session: Session = Depends(get_session),
+                         role=Depends(_sales)) -> FollowUpTaskResponse:
+    lead = session.get(Lead, lead_id)
+    if lead is None:
+        raise NotFoundError(f"Lead {lead_id} not found.")
+    task_type = FollowUpType.FOLLOW_UP
+    if payload.task_type:
+        try:
+            task_type = FollowUpType(payload.task_type.upper())
+        except ValueError as exc:
+            raise ValidationError(f"Invalid follow-up type '{payload.task_type}'.") from exc
+    task = FollowUpService(session).create(
+        title=payload.title, task_type=task_type, lead_id=lead_id, company_id=lead.company_id,
+        due_at=payload.due_at, reason=payload.reason,
+        created_by=getattr(role, "value", str(role)))
+    session.commit()
+    return FollowUpTaskResponse.model_validate(task)
 
 
 @router.post("/follow-ups/{task_id}/status", response_model=FollowUpTaskResponse,
