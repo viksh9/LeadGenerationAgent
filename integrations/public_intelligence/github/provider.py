@@ -31,6 +31,7 @@ from integrations.public_intelligence.models import (
 
 # Keep GitHub calls bounded (anonymous rate limits are low): 1 search + a few fetches.
 _MAX_CANDIDATES = 8
+_MAX_MEMBERS = 10   # public org members fetched per company (bounded for rate limits)
 
 
 class GitHubProvider(PublicIntelligenceProvider):
@@ -40,6 +41,7 @@ class GitHubProvider(PublicIntelligenceProvider):
 
     def __init__(self, *, http: httpx.Client | None = None, sleep=None) -> None:
         self._client = GitHubClient(http=http, sleep=sleep)
+        self._org_cache: dict[str, Optional[dict]] = {}   # per-run org resolution cache
 
     def health_check(self):
         from collectors.base import HealthStatus
@@ -54,10 +56,14 @@ class GitHubProvider(PublicIntelligenceProvider):
         except ProviderUnavailable as exc:
             return HealthStatus.UNAVAILABLE, str(exc)
 
-    def discover_company(self, ctx: CompanyContext) -> Optional[PublicCompanyFacts]:
-        """Find the company's official GitHub ORGANIZATION — only when corroborated by
-        an exact normalized-name match AND (blog domain == company domain OR exact
-        name). Never guessed from the company name (§4/§5). Supporting evidence only."""
+    def _matched_org(self, ctx: CompanyContext) -> Optional[dict]:
+        """Resolve the company's official GitHub ORGANIZATION — only on an exact
+        normalized-name match AND (blog domain == company domain OR the company has no
+        known domain). Never guessed (§4/§5). Cached per provider instance."""
+        cache_key = normalize_company(ctx.company_name)
+        if cache_key in self._org_cache:
+            return self._org_cache[cache_key]
+        result: Optional[dict] = None
         items = self._client.search_users(f'"{ctx.company_name}" type:org', per_page=5)
         tgt_name = normalize_company(ctx.company_name)
         tgt_domain = domain_root(ctx.domain) or domain_root(ctx.website)
@@ -72,25 +78,35 @@ class GitHubProvider(PublicIntelligenceProvider):
             blog_domain = domain_root(org.get("blog"))
             name_ok = bool(org_name) and org_name == tgt_name
             domain_ok = bool(tgt_domain) and blog_domain == tgt_domain
-            if name_ok and (domain_ok or bool(tgt_domain) is False):
-                url = org.get("html_url")
-                if not url:
-                    continue
-                facts = PublicCompanyFacts(source=self.name, source_label=self.source_label,
-                                           source_url=url, github_url=url)
-                facts.field_evidence.append(CompanyFieldEvidenceRecord(
-                    field="github_url", value=url, source=self.source_label,
-                    source_type=self.source_type, source_url=url,
-                    evidence_text="Public GitHub organization matched by name/domain",
-                    source_priority=6, trust_score=80))
-                return facts
-        return None
+            if name_ok and (domain_ok or bool(tgt_domain) is False) and org.get("html_url"):
+                result = org
+                break
+        self._org_cache[cache_key] = result
+        return result
+
+    def discover_company(self, ctx: CompanyContext) -> Optional[PublicCompanyFacts]:
+        """Find the company's official GitHub ORGANIZATION (evidence-matched; supporting
+        source only, §4/§5)."""
+        org = self._matched_org(ctx)
+        if org is None:
+            return None
+        url = org["html_url"]
+        facts = PublicCompanyFacts(source=self.name, source_label=self.source_label,
+                                   source_url=url, github_url=url)
+        facts.field_evidence.append(CompanyFieldEvidenceRecord(
+            field="github_url", value=url, source=self.source_label,
+            source_type=self.source_type, source_url=url,
+            evidence_text="Public GitHub organization matched by name/domain",
+            source_priority=6, trust_score=80))
+        return facts
 
     def discover_people(self, ctx: CompanyContext, roles: list[str]) -> list[PublicPerson]:
-        query = f'"{ctx.company_name}" in:company type:user'
-        items = self._client.search_users(query, per_page=_MAX_CANDIDATES)
         people: list[PublicPerson] = []
         seen: set[str] = set()
+
+        # 1) Users who publicly list this company on their profile (self-declared).
+        items = self._client.search_users(f'"{ctx.company_name}" in:company type:user',
+                                          per_page=_MAX_CANDIDATES)
         for item in items[:_MAX_CANDIDATES]:
             login = item.get("login")
             if not login or login in seen:
@@ -101,6 +117,30 @@ class GitHubProvider(PublicIntelligenceProvider):
                 continue
             person = self._to_person(profile, ctx)
             if person and person.company_match_status != MATCH_UNKNOWN:
+                people.append(person)
+
+        # 2) PUBLIC members of the company's official GitHub org — authoritative current
+        # employees (membership is only visible when the person made it public). Stronger
+        # evidence than a self-declared profile company (§4/§5).
+        org = self._matched_org(ctx)
+        if org and org.get("login"):
+            members = self._client.get_org_public_members(org["login"], per_page=_MAX_MEMBERS)
+            for m in members[:_MAX_MEMBERS]:
+                login = m.get("login")
+                if not login or login in seen:
+                    continue
+                seen.add(login)
+                profile = self._client.get_user(login)
+                if not isinstance(profile, dict):
+                    continue
+                person = self._to_person(profile, ctx)
+                if person is None:
+                    continue
+                # Public org membership confirms the company + current employment.
+                person.company_match_status = MATCH_VERIFIED
+                person.is_current = True
+                if not person.company_name:
+                    person.company_name = org.get("name") or ctx.company_name
                 people.append(person)
         return people
 

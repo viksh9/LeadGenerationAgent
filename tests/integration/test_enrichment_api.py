@@ -8,8 +8,11 @@ credit-spending test/enrich endpoints.
 
 from __future__ import annotations
 
+import pytest
+
 import api.main
 from api.dependencies import get_session
+from config import get_settings
 from database.models import (
     Company,
     DataProvenance,
@@ -18,6 +21,17 @@ from database.models import (
     LeadStatus,
     SignalType,
 )
+
+
+@pytest.fixture(autouse=True)
+def _no_enrichment_providers(monkeypatch):
+    """These tests assert the honest NOT_CONFIGURED state, so ensure no paid provider is
+    configured regardless of the ambient .env (a real key in .env must not flip them)."""
+    s = get_settings()
+    for attr in ("apollo_api_key", "lusha_api_key", "hunter_api_key", "prospeo_api_key",
+                 "contactout_api_token"):
+        monkeypatch.setattr(s, attr, None, raising=False)
+    yield
 
 
 def test_status_lists_all_providers_with_capabilities_no_keys(client):

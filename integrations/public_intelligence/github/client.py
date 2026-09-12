@@ -42,3 +42,10 @@ class GitHubClient:
 
     def get_org(self, login: str) -> Optional[dict]:
         return self._c.get_json(f"/orgs/{login}", provider="github")
+
+    def get_org_public_members(self, login: str, *, per_page: int = 15) -> list[dict]:
+        """PUBLIC members of an org (only those who chose to show membership). Members
+        who keep membership private are never returned — no private data is inferred."""
+        data = self._c.get_json(f"/orgs/{login}/public_members",
+                                params={"per_page": per_page}, provider="github")
+        return data if isinstance(data, list) else []
