@@ -249,6 +249,7 @@ def main(argv: list[str] | None = None) -> int:
         ("production-readiness", "Fail on real-data/security violations."),
         ("provenance", "Verify every business record is traceable to a real source (§3)."),
         ("synthetic-data", "Detect synthetic production records + runtime fabrication paths (§4)."),
+        ("export-compliance", "Scan the Full Intelligence export for demo markers + missing provenance (§24)."),
         ("quality", "Data-quality scorecard with actual percentages (§11-19)."),
         ("source-inventory", "Per-source implementation/config/connection/licensing (§5)."),
         ("source-readiness", "Per-source production readiness verdict (§53)."),
@@ -296,6 +297,22 @@ def main(argv: list[str] | None = None) -> int:
             from app.synthetic_audit import synthetic_report
             result = synthetic_report(session)
             _print_json_or(args, result, lambda: _print_synthetic(result))
+            return EXIT_OK if result["ok"] else EXIT_ISSUES
+
+        if args.command == "export-compliance":
+            from export.compliance import check_full_intelligence_export
+            report = check_full_intelligence_export(session)
+            result = report.as_dict()
+
+            def _print_export():
+                status = "PASS" if result["ok"] else "FAIL"
+                print(f"Export compliance — sheet={result['sheet']} rows={result['rows_scanned']} ({status})")
+                for v in result["violations"]:
+                    print(f"  [{v['kind']}] row {v['row']} {v['company']}: {v['detail']}")
+                if result["ok"]:
+                    print("OK — no demo/synthetic markers; every row is source-backed.")
+
+            _print_json_or(args, result, _print_export)
             return EXIT_OK if result["ok"] else EXIT_ISSUES
 
         if args.command == "quality":

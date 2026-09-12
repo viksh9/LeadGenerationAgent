@@ -8,49 +8,56 @@ import { ExportAllData } from './ExportAllData';
 vi.mock('@/services/export', () => ({
   fetchExportSummary: vi.fn(),
   downloadExcel: vi.fn(),
+  downloadFullIntelligence: vi.fn(),
 }));
 
-import { downloadExcel, fetchExportSummary } from '@/services/export';
+import { downloadExcel, downloadFullIntelligence, fetchExportSummary } from '@/services/export';
 
 const mockSummary = vi.mocked(fetchExportSummary);
-const mockDownload = vi.mocked(downloadExcel);
+const mockLeadData = vi.mocked(downloadExcel);
+const mockFull = vi.mocked(downloadFullIntelligence);
 
 describe('ExportAllData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSummary.mockResolvedValue({ counts: { Leads: 326 }, total_records: 2519 });
-    mockDownload.mockResolvedValue({ filename: 'leadgenerationagent_all_data_2026-09-08.xlsx', rows: 2519 });
+    mockLeadData.mockResolvedValue({ filename: 'leadgenerationagent_lead_data_2026-09-08.xlsx', rows: 326 });
+    mockFull.mockResolvedValue({ filename: 'leadgenerationagent_full_intelligence_2026-09-08.xlsx', rows: 326 });
   });
 
-  it('shows a prominent Export All Data button', () => {
+  it('shows an export button offering both formats', async () => {
     renderWithProviders(<ExportAllData />);
-    expect(screen.getByRole('button', { name: /export all data to excel/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /export data to excel/i }));
+    expect(screen.getByRole('menuitem', { name: /export lead data/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /export full intelligence/i })).toBeInTheDocument();
   });
 
-  it('opens a confirmation dialog with the real record count', async () => {
+  it('exports Lead Data (fixed report) on confirm', async () => {
     renderWithProviders(<ExportAllData />);
-    await userEvent.click(screen.getByRole('button', { name: /export all data to excel/i }));
-    expect(await screen.findByText(/Export All Lead Data/i)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/2,519 leads/i)).toBeInTheDocument());
-    expect(screen.getByText(/single Excel worksheet/i)).toBeInTheDocument();
-    // Never described as demo/sample.
-    expect(screen.queryByText(/demo|sample|dummy/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /export data to excel/i }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /export lead data/i }));
+    await waitFor(() => expect(screen.getByText(/2,519/)).toBeInTheDocument());
+    await userEvent.click(await screen.findByRole('button', { name: /export excel/i }));
+    await waitFor(() => expect(mockLeadData).toHaveBeenCalledWith('all'));
+    expect(mockFull).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Lead Data export is ready/i)).toBeInTheDocument();
   });
 
-  it('downloads the workbook on confirm and reports the real filename + count', async () => {
+  it('exports Full Intelligence on confirm', async () => {
     renderWithProviders(<ExportAllData />);
-    await userEvent.click(screen.getByRole('button', { name: /export all data to excel/i }));
-    const confirm = await screen.findByRole('button', { name: /export excel/i });
-    await userEvent.click(confirm);
-    await waitFor(() => expect(mockDownload).toHaveBeenCalledWith('all'));
-    expect(await screen.findByText(/Excel export is ready/i)).toBeInTheDocument();
-    expect(screen.getByText(/leadgenerationagent_all_data_2026-09-08\.xlsx/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /export data to excel/i }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /export full intelligence/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /export excel/i }));
+    await waitFor(() => expect(mockFull).toHaveBeenCalled());
+    expect(mockLeadData).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Full Intelligence export is ready/i)).toBeInTheDocument();
   });
 
   it('shows an honest error on failure (no fake fallback)', async () => {
-    mockDownload.mockRejectedValueOnce({ message: 'Unable to generate the Excel export.' });
+    mockFull.mockRejectedValueOnce({ message: 'Unable to generate the Excel export.' });
     renderWithProviders(<ExportAllData />);
-    await userEvent.click(screen.getByRole('button', { name: /export all data to excel/i }));
+    await userEvent.click(screen.getByRole('button', { name: /export data to excel/i }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /export full intelligence/i }));
     await userEvent.click(await screen.findByRole('button', { name: /export excel/i }));
     expect(await screen.findByText(/Unable to generate the Excel export/i)).toBeInTheDocument();
   });

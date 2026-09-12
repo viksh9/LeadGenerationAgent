@@ -36,6 +36,8 @@ _GUARD_MODULES = (
     "app/quality_audit.py", "app/source_inventory.py", "app/live_audit.py",
     "config/validation.py", "config/settings.py", "database/integrity.py",
     "collectors/source_status.py", "collectors/source_registry.py", "scripts/db_audit.py",
+    # Export compliance scanner legitimately lists demo/synthetic markers to DETECT them.
+    "export/compliance.py",
     # Frontend components that LABEL synthetic/dev data honestly (provenance
     # warnings) rather than fabricate it — part of the real-data-honesty UX.
     "frontend/src/components/ui/Badge.tsx",
