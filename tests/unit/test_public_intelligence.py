@@ -196,3 +196,44 @@ def test_provider_error_yields_status_not_fabrication():
         lambda r: httpx.Response(500))), sleep=lambda s: None)
     res = prov.discover(CTX, ["VP Engineering"])
     assert res.status in ("UNAVAILABLE", "ERROR") and res.people == []
+
+
+def test_github_includes_public_org_members_as_verified_pocs():
+    """Expansion: PUBLIC members of the company's official GitHub org are authoritative
+    employees -> VERIFIED POCs, merged with self-declared profiles and deduped."""
+    import json as _json
+
+    def h(req):
+        path = req.url.path
+        q = req.url.params.get("q", "")
+        if path == "/search/users":
+            if "type:org" in q:
+                return httpx.Response(200, json={"items": [{"login": "acme"}]})
+            return httpx.Response(200, json={"items": [{"login": "selfuser"}]})   # self-listed
+        if path == "/orgs/acme/public_members":
+            return httpx.Response(200, json=[{"login": "eng1"}, {"login": "eng2"}])
+        if path == "/orgs/acme":
+            return httpx.Response(200, json={"login": "acme", "name": "Acme Corp",
+                                             "blog": "https://acme.com", "html_url": "https://github.com/acme"})
+        if path == "/users/selfuser":
+            return httpx.Response(200, json={"login": "selfuser", "name": "Self Lister",
+                "company": "Acme Corp", "blog": "https://acme.com", "id": 9,
+                "html_url": "https://github.com/selfuser", "bio": "VP Engineering"})
+        if path == "/users/eng1":
+            return httpx.Response(200, json={"login": "eng1", "name": "Ravi Kumar", "company": None,
+                "id": 1, "html_url": "https://github.com/eng1", "bio": "Staff Software Engineer"})
+        if path == "/users/eng2":
+            return httpx.Response(200, json={"login": "eng2", "name": "Anita Rao", "company": "@acme",
+                "id": 2, "html_url": "https://github.com/eng2"})
+        return httpx.Response(404)
+
+    prov = GitHubProvider(http=httpx.Client(transport=httpx.MockTransport(h)), sleep=lambda s: None)
+    people = prov.discover_people(CTX, roles=[])
+    by_name = {p.full_name: p for p in people}
+    assert {"Self Lister", "Ravi Kumar", "Anita Rao"} <= set(by_name)     # self-lister + 2 org members
+    # Org members are VERIFIED + marked current (membership is authoritative).
+    assert by_name["Ravi Kumar"].company_match_status == MATCH_VERIFIED
+    assert by_name["Ravi Kumar"].is_current is True
+    assert by_name["Ravi Kumar"].company_name == "Acme Corp"   # filled from the org when profile lacks it
+    # No dedup issue if a member also self-listed (login-based dedup).
+    assert len([p for p in people if p.full_name == "Ravi Kumar"]) == 1
