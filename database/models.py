@@ -13,6 +13,7 @@ from enum import Enum
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     Enum as SAEnum,
@@ -840,6 +841,16 @@ class DecisionMaker(Base):
     contact_confidence: Mapped[int] = mapped_column(Integer, default=0)
     evidence_confidence: Mapped[int] = mapped_column(Integer, default=0)
     freshness_score: Mapped[int] = mapped_column(Integer, default=0)
+
+    # ContactOut POC enrichment (Prompt 44) — additive. Ranking match score and the
+    # contact TRUST (reliability of the contact match) are kept distinct from the
+    # business lead score. company_domain aids current-employment validation.
+    company_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    match_score: Mapped[int] = mapped_column(Integer, default=0)
+    contact_trust_score: Mapped[int] = mapped_column(Integer, default=0)
+    contact_trust_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+
     verification_status: Mapped[VerificationStatus] = mapped_column(
         SAEnum(VerificationStatus, native_enum=False, length=24),
         default=VerificationStatus.UNVERIFIED, index=True,

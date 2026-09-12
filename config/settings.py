@@ -118,6 +118,37 @@ class Settings(BaseSettings):
     webhook_tolerance_seconds: int = Field(
         default=300, validation_alias=AliasChoices("WEBHOOK_TOLERANCE_SECONDS"))
 
+    # --- ContactOut POC / decision-maker enrichment (Prompt 44) ------------ #
+    # Real contact enrichment only. NOT_CONFIGURED unless a token is present; no
+    # call is ever made without it. The token is read from the environment only and
+    # is never exposed in API responses, logs, Excel, the DB, or audit payloads.
+    contactout_api_token: str | None = Field(
+        default=None, validation_alias=AliasChoices("CONTACTOUT_API_TOKEN"))
+    contactout_base_url: str = Field(
+        default="https://api.contactout.com", validation_alias=AliasChoices("CONTACTOUT_BASE_URL"))
+    contactout_enabled: bool | None = Field(
+        default=None, validation_alias=AliasChoices("CONTACTOUT_ENABLED"))
+    contactout_timeout_seconds: float = Field(
+        default=20.0, validation_alias=AliasChoices("CONTACTOUT_TIMEOUT_SECONDS"))
+    # Client-side rate limits (ContactOut documents 60/min for People Search and
+    # 1000/min for other APIs). Configurable — never hard-coded through the app.
+    contactout_people_search_rate_per_minute: int = Field(
+        default=60, validation_alias=AliasChoices("CONTACTOUT_PEOPLE_SEARCH_RATE_PER_MINUTE"))
+    contactout_other_rate_per_minute: int = Field(
+        default=1000, validation_alias=AliasChoices("CONTACTOUT_OTHER_RATE_PER_MINUTE"))
+    contactout_max_retries: int = Field(
+        default=3, validation_alias=AliasChoices("CONTACTOUT_MAX_RETRIES"))
+    contactout_backoff_cap_seconds: float = Field(
+        default=30.0, validation_alias=AliasChoices("CONTACTOUT_BACKOFF_CAP_SECONDS"))
+    # Credit-aware execution — conservative, configurable ceilings per opportunity.
+    contactout_max_poc_searches_per_opportunity: int = Field(
+        default=3, validation_alias=AliasChoices("CONTACTOUT_MAX_POC_SEARCHES_PER_OPPORTUNITY"))
+    contactout_max_enrichments_per_opportunity: int = Field(
+        default=2, validation_alias=AliasChoices("CONTACTOUT_MAX_ENRICHMENTS_PER_OPPORTUNITY"))
+    # Reuse recent verified POC data instead of spending another credit.
+    contactout_cache_ttl_hours: int = Field(
+        default=168, validation_alias=AliasChoices("CONTACTOUT_CACHE_TTL_HOURS"))
+
     # --- Production hardening (Prompt 40) ---------------------------------- #
     # Observability: structured JSON logs (opt-in), request/correlation IDs.
     log_format: str = Field(default="text", validation_alias=AliasChoices("LOG_FORMAT"))  # text | json
@@ -137,6 +168,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "show_synthetic_leads", "enforce_real_data", "ai_enabled", "scheduler_enabled",
+        "contactout_enabled",
         mode="before",
     )
     @classmethod
@@ -212,6 +244,17 @@ class Settings(BaseSettings):
         if self.ai_api_key and self.ai_model and (self.ai_provider or self.ai_api_base_url):
             return "CONFIGURED"
         return "NOT_CONFIGURED"
+
+    @property
+    def contactout_config_status(self) -> str:
+        """Config-level ContactOut status (NOT a live connectivity check).
+
+        DISABLED when explicitly off; CONFIGURED when an API token is present;
+        else NOT_CONFIGURED. A CONNECTED/LIVE result only comes from a real call to
+        the ContactOut test endpoint — never inferred from config alone."""
+        if self.contactout_enabled is False:
+            return "DISABLED"
+        return "CONFIGURED" if self.contactout_api_token else "NOT_CONFIGURED"
 
 
 @lru_cache

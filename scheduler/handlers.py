@@ -259,6 +259,52 @@ def handle_source_health_check(session: Session, job: ScheduledJob, now: datetim
             "alerts_generated": emit.created_count}
 
 
+def handle_company_reenrichment(session: Session, job: ScheduledJob, now: datetime) -> dict:
+    """Change-driven ContactOut POC re-enrichment (§30). Runs ONLY when ContactOut is
+    configured, and only for HOT/WARM real leads with a recent material change AND no
+    fresh POC within the freshness window. Skips entirely (no network, no credits) when
+    nothing qualifies or ContactOut is not configured — never enriches every cycle."""
+    from datetime import timedelta
+
+    from config import get_settings
+    from database.models import LeadChangeEvent
+    from enrichment.contactout_poc import discover_pocs_for_lead
+
+    if get_settings().contactout_config_status != "CONFIGURED":
+        raise SkipJob("ContactOut is not configured; POC re-enrichment skipped.")
+
+    cfg = job.config or {}
+    lookback = timedelta(seconds=int(cfg.get("lookback_seconds", 86400)))
+    max_companies = int(cfg.get("max_companies_per_cycle", 25))   # credit-aware cap
+    since = now - lookback
+    recent_lead_ids = session.execute(
+        select(LeadChangeEvent.lead_id).where(LeadChangeEvent.detected_at >= since).distinct()
+    ).scalars().all()
+
+    enriched = 0
+    considered = 0
+    for lead_id in recent_lead_ids:
+        if considered >= max_companies:
+            break
+        lead = session.get(Lead, lead_id)
+        if lead is None or lead.data_provenance != DataProvenance.REAL:
+            continue
+        if lead.lead_priority not in (LeadPriority.HOT, LeadPriority.WARM):
+            continue
+        considered += 1
+        try:
+            # force=False → the service reuses fresh cached POCs and only spends a
+            # credit when the freshness window has expired.
+            summary = discover_pocs_for_lead(session, lead, actor="SCHEDULER", now=now)
+            if summary.status in ("ENRICHED",):
+                enriched += 1
+        except Exception:  # ContactOut never breaks the scheduler
+            logger.warning("ContactOut re-enrichment failed for lead %s (non-fatal)", lead_id)
+    if considered == 0:
+        raise SkipJob("No changed HOT/WARM leads to re-enrich this cycle.")
+    return {"leads_changed": enriched, "notes": {"pocs_reenriched": enriched, "considered": considered}}
+
+
 HANDLERS = {
     JobType.SOURCE_COLLECTION: handle_source_collection,
     JobType.EVIDENCE_REVERIFICATION: handle_evidence_reverification,
@@ -268,7 +314,7 @@ HANDLERS = {
     JobType.NOTIFICATION_DISPATCH: handle_monitoring_cycle,
     JobType.SOURCE_HEALTH_CHECK: handle_source_health_check,
     JobType.TENDER_DEADLINE_SCAN: handle_tender_scan,
-    JobType.COMPANY_ENRICHMENT: handle_monitoring_cycle,  # placeholder → safe no-network sweep
+    JobType.COMPANY_ENRICHMENT: handle_company_reenrichment,  # ContactOut POC re-enrichment (§30)
 }
 
 

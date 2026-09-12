@@ -17,6 +17,7 @@ import api.main
 from api.dependencies import get_session
 from database.models import (
     AuditLog,
+    Company,
     ContactType,
     DataProvenance,
     DecisionMaker,
@@ -135,6 +136,30 @@ def test_poc_and_contacts_use_verified_person(seed_session):
     assert row["Target POC Details"] == "Jane Doe — VP Engineering"
     assert row["Contact Number"] == "+91-80-1234-5678"   # genuine phone kept clean, still safe
     assert row["Email"] == "jane@acme.example"
+
+
+def test_contactout_poc_attached_by_company_name(seed_session):
+    # Leads carry no company_id; a ContactOut POC must still attach via normalized
+    # company name, appear in Target POC Details, and note ContactOut in Source (§33).
+    seed_session.add(Company(canonical_name="Acme Tech", normalized_name="acme tech",
+                             primary_domain="acme.com", data_provenance=DataProvenance.REAL))
+    seed_session.flush()
+    company = seed_session.query(Company).first()
+    _lead(seed_session, company="Acme Tech", company_id=None)   # company_id None (real-world case)
+    seed_session.add(DecisionMaker(
+        company_id=company.id, company_name="Acme Tech", full_name="Priya Rao",
+        normalized_name="priya rao", job_title="VP Engineering", business_email="priya@acme.com",
+        business_phone="+91-80-5555-0000", professional_network_url="https://linkedin.com/in/priyarao",
+        contact_type=ContactType.BUSINESS_EMAIL, email_status=EmailStatus.VERIFIED_SOURCE,
+        verification_status=VerificationStatus.VERIFIED, contact_source="ContactOut",
+        source_type="contact_enrichment", match_score=97, contact_trust_score=100,
+        contact_trust_status="VERIFIED", is_current=True, data_provenance=DataProvenance.REAL))
+    seed_session.commit()
+    row = _row(seed_session)
+    assert row["Target POC Details"] == "Priya Rao — VP Engineering"
+    assert row["Email"] == "priya@acme.com"
+    assert row["Contact Number"] == "+91-80-5555-0000"
+    assert "ContactOut" in (row["Source"] or "")
 
 
 def test_signal_mirrors_opportunities_tab(seed_session):

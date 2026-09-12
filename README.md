@@ -44,6 +44,7 @@ been implemented, configured, and verified against the live source. See
 | Source matrix & integration status | [docs/source-matrix.md](docs/source-matrix.md) |
 | **Real data sources** (all 7 categories, truthful status) | [docs/REAL_DATA_SOURCES.md](docs/REAL_DATA_SOURCES.md) |
 | **Official company career sources** (domain + ATS discovery) | [docs/OFFICIAL_CAREER_SOURCES.md](docs/OFFICIAL_CAREER_SOURCES.md) |
+| **ContactOut POC enrichment** (real decision-maker discovery, credit-aware, no fabrication) | [docs/CONTACTOUT_INTEGRATION.md](docs/CONTACTOUT_INTEGRATION.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
 | Operations (daily checks, incidents, backup) | [OPERATIONS.md](OPERATIONS.md) · [docs/operations-runbook.md](docs/operations-runbook.md) |
 | Production-readiness checklist | [docs/production-readiness-checklist.md](docs/production-readiness-checklist.md) |

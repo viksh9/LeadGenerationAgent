@@ -11,6 +11,7 @@ contacts/emails are only ever the source-verified values (never guessed).
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
 
@@ -21,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from database.models import (
+    Company,
     ContactType,
     DataProvenance,
     DecisionMaker,
@@ -133,6 +135,14 @@ def _humanize_signal(value) -> str:
     return _SIGNAL_LABELS.get(v, v) if v else ""
 
 
+def _source_text(lead: Lead, used_contactout: bool) -> str:
+    """Cleaned source, noting ContactOut when it materially backs the POC/contact (§33)."""
+    base = _clean_source(lead.source_name)
+    if used_contactout and "contactout" not in base.lower():
+        return f"{base} | ContactOut" if base else "ContactOut"
+    return base
+
+
 def _signal_text(lead: Lead) -> str:
     """Signal cell mirroring the Opportunities tab 'Signal' representation:
     the readable signal type, the specific signal title, and confidence.
@@ -151,11 +161,16 @@ def _tech_text(lead: Lead) -> str:
     return " | ".join(dict.fromkeys(techs))   # de-dup, preserve order
 
 
-def _poc_text(lead: Lead, contact: DecisionMaker | None) -> str:
-    # A verified real person wins; otherwise a clearly-labelled recommended role.
-    if contact is not None and contact.full_name:
-        role = contact.job_title or contact.normalized_role
-        return f"{contact.full_name} — {role}" if role else contact.full_name
+def _poc_text(lead: Lead, people: list[DecisionMaker]) -> str:
+    """Real people win (up to two — Primary/Secondary, §22/§33); otherwise a
+    clearly-labelled recommended role. A person's name is NEVER fabricated (§19)."""
+    named = [p for p in people if p.full_name][:2]
+    if named:
+        lines = []
+        for p in named:
+            role = p.job_title or p.normalized_role
+            lines.append(f"{p.full_name} — {role}" if role else p.full_name)
+        return "\n".join(lines)
     if lead.poc_name:
         return f"{lead.poc_name} — {lead.poc_title}" if lead.poc_title else lead.poc_name
     role = lead.primary_target_role
@@ -190,23 +205,58 @@ def workbook_counts(session: Session) -> dict:
     return {"Leads": n}
 
 
-def _verified_contacts_by_company(session: Session, company_ids: set[int]) -> dict[int, DecisionMaker]:
-    """Preload one source-verified business contact per company (§35 — no N+1)."""
-    if not company_ids:
+@dataclass
+class _POCBundle:
+    """The real contacts available for one company: ranked people (for Target POC
+    Details) plus the best email/phone carriers (which may be the same people)."""
+
+    people: list[DecisionMaker]
+    email_contact: DecisionMaker | None
+    phone_contact: DecisionMaker | None
+
+
+_VERIF_RANK = {VerificationStatus.VERIFIED: 2, VerificationStatus.PARTIALLY_VERIFIED: 1}
+
+
+def _person_key(d: DecisionMaker) -> tuple:
+    return (d.match_score or 0, d.contact_trust_score or 0,
+            _VERIF_RANK.get(d.verification_status, 0), d.identity_confidence or 0)
+
+
+def _company_id_map(session: Session) -> dict[str, int]:
+    """normalized_company_name -> Company.id (leads carry no company_id, so the
+    export must resolve the link by normalized name)."""
+    rows = session.execute(select(Company.id, Company.normalized_name)).all()
+    return {name: cid for cid, name in rows if name}
+
+
+def _contacts_by_company(session: Session, company_ids: set[int]) -> dict[int, _POCBundle]:
+    """Preload real contacts per company (§35 — no N+1): ranked named people, the best
+    real business email, and the best real phone. Only actual stored values are used."""
+    ids = {cid for cid in company_ids if cid}
+    if not ids:
         return {}
     rows = session.execute(
-        select(DecisionMaker).where(DecisionMaker.company_id.in_(company_ids))
+        select(DecisionMaker).where(DecisionMaker.company_id.in_(ids),
+                                    DecisionMaker.data_provenance == DataProvenance.REAL)
     ).scalars().all()
-    best: dict[int, DecisionMaker] = {}
+    by_co: dict[int, list[DecisionMaker]] = {}
     for dm in rows:
-        verified = (
-            dm.email_status == EmailStatus.VERIFIED_SOURCE
-            and dm.contact_type == ContactType.BUSINESS_EMAIL
-            and dm.verification_status in _VERIFIED
+        by_co.setdefault(dm.company_id, []).append(dm)
+    bundles: dict[int, _POCBundle] = {}
+    for cid, dms in by_co.items():
+        people = sorted([d for d in dms if d.full_name and d.is_current is not False],
+                        key=_person_key, reverse=True)
+        emailers = sorted(
+            [d for d in dms if d.business_email and d.contact_type == ContactType.BUSINESS_EMAIL],
+            key=lambda d: ((d.email_status == EmailStatus.VERIFIED_SOURCE,) + _person_key(d)), reverse=True)
+        phoners = sorted([d for d in dms if d.business_phone], key=_person_key, reverse=True)
+        bundles[cid] = _POCBundle(
+            people=people,
+            email_contact=emailers[0] if emailers else None,
+            phone_contact=phoners[0] if phoners else None,
         )
-        if verified and dm.company_id not in best:
-            best[dm.company_id] = dm
-    return best
+    return bundles
 
 
 def build_workbook(session: Session, *, scope: str = "all", now: datetime | None = None,
@@ -230,12 +280,23 @@ def build_workbook(session: Session, *, scope: str = "all", now: datetime | None
         (_signal_date(l) or datetime.min),
     ), reverse=True)
 
-    contacts = _verified_contacts_by_company(
-        session, {l.company_id for l in leads if l.company_id})
+    # Resolve each lead to its Company entity by normalized name (leads carry no
+    # company_id), then preload real contacts for those companies.
+    name_map = _company_id_map(session)
+    lead_company_id = {
+        l.id: (l.company_id or name_map.get(l.normalized_company_name)) for l in leads
+    }
+    contacts = _contacts_by_company(session, set(lead_company_id.values()))
 
     row_count = 0
     for idx, lead in enumerate(leads, start=1):
-        contact = contacts.get(lead.company_id) if lead.company_id else None
+        bundle = contacts.get(lead_company_id.get(lead.id))
+        people = bundle.people if bundle else []
+        email_dm = bundle.email_contact if bundle else None
+        phone_dm = bundle.phone_contact if bundle else None
+        # Source hint: note ContactOut when it materially backs the shown POC/contact (§33).
+        shown = people[:2] + [d for d in (email_dm, phone_dm) if d is not None]
+        used_contactout = any(getattr(d, "contact_source", None) == "ContactOut" for d in shown)
         openings = lead.it_job_count if (lead.it_job_count and lead.it_job_count > 0) else None
         sig_date = _signal_date(lead)
         # Opportunity column: same values as the Opportunity tab (§26) — Type,
@@ -250,15 +311,15 @@ def build_workbook(session: Session, *, scope: str = "all", now: datetime | None
             _enum(lead.hiring_intensity) or "UNKNOWN",
             _safe(_signal_text(lead)),
             _safe(_tech_text(lead)),
-            _safe(_poc_text(lead, contact)),
+            _safe(_poc_text(lead, people)),
             round(float(lead.lead_score or 0)),
             _enum(lead.lead_priority),
             _enum(lead.status),
-            _safe(contact.business_phone if contact else None),   # verified only, else blank
-            _safe(contact.business_email if contact else None),   # verified only, else blank
+            _safe(phone_dm.business_phone if phone_dm else None),   # real returned phone, else blank
+            _safe(email_dm.business_email if email_dm else None),   # real business email, else blank
             _safe(opportunity_cell(oview)),                  # multi-line: Type / Staffing / Est. Team / Urgency
             sig_date,                                        # real date object → formatted below
-            _safe(_clean_source(lead.source_name)),
+            _safe(_source_text(lead, used_contactout)),
         ]
         ws.append(values)
         row_count += 1

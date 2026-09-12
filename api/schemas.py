@@ -769,6 +769,63 @@ class LeadStakeholdersResponse(BaseModel):
     outreach_reasons: list[str] = Field(default_factory=list)
 
 
+# --- ContactOut POC discovery/enrichment (Prompt 44) ----------------------- #
+class POCResponse(DecisionMakerResponse):
+    """A ContactOut-discovered POC. Adds the ranking match score and the contact
+    TRUST (reliability of the contact match — distinct from the business lead score).
+    Contact fields are only ever the real values ContactOut returned (never fabricated)."""
+
+    company_domain: Optional[str] = None
+    match_score: int = 0
+    contact_trust_score: int = 0
+    contact_trust_status: Optional[str] = None
+    is_current: bool = True
+
+
+class POCDiscoveryResponse(BaseModel):
+    """Result of a company-level POC discovery run. Honest states only — a failure
+    never yields a fabricated POC."""
+
+    lead_id: Optional[int] = None
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    status: str                       # ENRICHED | CACHED | NO_POC_FOUND | NOT_CONFIGURED | RATE_LIMITED | UNAVAILABLE
+    candidates_found: int = 0
+    searches_used: int = 0
+    enrichments_used: int = 0
+    persisted: int = 0
+    reason: str = ""
+    error_code: Optional[str] = None
+    pocs: list[POCResponse] = Field(default_factory=list)
+
+
+class POCListResponse(BaseModel):
+    """POCs for a lead: real people (when discovered/verified) plus role-only
+    recommendations (never presented as real people)."""
+
+    lead_id: int
+    company_name: Optional[str] = None
+    contactout_status: str            # config status (NOT a live check)
+    pocs: list[POCResponse] = Field(default_factory=list)
+    recommended_roles: list[StakeholderRoleResponse] = Field(default_factory=list)
+    recommendation_confidence: int = 0
+    note: Optional[str] = None
+
+
+class ContactOutStatusResponse(BaseModel):
+    """ContactOut integration config status for the Settings UI. Never exposes the
+    token or base URL."""
+
+    status: str                       # NOT_CONFIGURED | CONFIGURED | DISABLED
+    configured: bool
+    note: str
+    people_search_rate_per_minute: int
+    other_rate_per_minute: int
+    max_poc_searches_per_opportunity: int
+    max_enrichments_per_opportunity: int
+    cache_ttl_hours: int
+
+
 class EnrichRunResponse(BaseModel):
     """Result of a real official-source enrichment run for one company."""
 

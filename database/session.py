@@ -43,6 +43,14 @@ _ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
     "leads": {
         "location_all": "VARCHAR(1024)",   # full hiring-city list for the Excel export
     },
+    "decision_makers": {
+        # ContactOut POC enrichment (Prompt 44) — additive, all nullable/defaulted.
+        "company_domain": "VARCHAR(255)",
+        "match_score": "INTEGER DEFAULT 0",
+        "contact_trust_score": "INTEGER DEFAULT 0",
+        "contact_trust_status": "VARCHAR(24)",
+        "is_current": "BOOLEAN DEFAULT 1",
+    },
     "source_health": {
         "requests_used": "INTEGER DEFAULT 0",
         "request_budget": "INTEGER",
