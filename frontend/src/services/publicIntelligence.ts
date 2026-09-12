@@ -60,6 +60,7 @@ export interface CompanyPublicIntelligence {
   company_name: string;
   website: string | null;
   linkedin_url: string | null;
+  github_url: string | null;
   industry: string | null;
   city: string | null;
   state: string | null;

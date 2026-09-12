@@ -45,7 +45,7 @@ describe('TargetPOCPanel', () => {
         seniority: null, company_domain: 'acme.com', professional_network_url: 'https://linkedin.com/in/jane',
         business_email: 'jane@acme.com', business_phone: '+91-80-1234', email_status: 'VERIFIED_SOURCE',
         contact_source: 'ContactOut', source_url: 'https://linkedin.com/in/jane', match_score: 98,
-        contact_trust_score: 100, contact_trust_status: 'VERIFIED', is_current: true,
+        contact_trust_score: 100, contact_trust_status: 'VERIFIED', is_current: true, employment_status: 'CURRENT_VERIFIED',
         verification_status: 'VERIFIED', last_verified_at: '2026-09-12T10:00:00',
       }],
     });

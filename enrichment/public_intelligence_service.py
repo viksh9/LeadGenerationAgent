@@ -345,7 +345,7 @@ def _merge_company_facts(facts_list: list[PublicCompanyFacts]) -> Optional[Publi
     ordered = sorted(facts_list, key=lambda f: SOURCE_PRIORITY.get(f.source, 99))
     merged = PublicCompanyFacts(source="public_intelligence", source_label="Public sources")
     for f in ordered:
-        for attr in ("website", "linkedin_url", "country", "industry", "wikidata_id",
+        for attr in ("website", "linkedin_url", "github_url", "country", "industry", "wikidata_id",
                      "contact_url", "careers_url", "leadership_url", "company_phone",
                      "company_email", "address_line_1", "address_line_2", "city",
                      "state_or_region", "postal_code", "full_address",
@@ -410,6 +410,7 @@ def _persist_company_facts(session: Session, company: Company, facts: PublicComp
 
     set_field("website", facts.website, official_of="website_url")
     set_field("linkedin_url", facts.linkedin_url, official_of="linkedin_url")
+    set_field("github_url", facts.github_url, fill_only=True)   # GitHub org — supporting
     set_field("company_phone", facts.company_phone, official_of="company_phone")
     set_field("company_email", facts.company_email, official_of="company_email")
     set_field("contact_url", facts.contact_url, official_of="contact_url")
@@ -438,10 +439,11 @@ def _persist_company_facts(session: Session, company: Company, facts: PublicComp
     # India entity type — refine with the company's known India presence (§2).
     if facts.india_entity_type:
         from integrations.public_intelligence.opencorporates.matching import (
-            INDIA_ENTITY, INDIA_OFFICE)
+            GLOBAL_WITH_INDIA_PRESENCE, INDIA_ENTITY)
         india_type = facts.india_entity_type
+        # A non-India legal entity with a known India office is GLOBAL_WITH_INDIA_PRESENCE.
         if india_type != INDIA_ENTITY and company.india_presence:
-            india_type = INDIA_OFFICE
+            india_type = GLOBAL_WITH_INDIA_PRESENCE
         set_field("india_entity_type", india_type)
 
     # 3) Locations (multi-office) — dedup by normalized key; HQ only on evidence.
@@ -561,6 +563,16 @@ def _upsert_public_person(session: Session, ctx: CompanyContext, person: PublicP
     if person.business_phone:
         target.business_phone = person.business_phone
     target.is_current = person.is_current if person.is_current is not None else True
+    # Current-employment verification (§18/§19): official company source is the only
+    # thing that yields CURRENT_VERIFIED; GitHub/Wikidata alone are CURRENT_LIKELY.
+    if person.is_current is False:
+        target.employment_status = "FORMER"
+    elif person.source == "official_company" and person.company_match_status == MATCH_VERIFIED:
+        target.employment_status = "CURRENT_VERIFIED"
+    elif person.company_match_status in (MATCH_VERIFIED, MATCH_LIKELY):
+        target.employment_status = "CURRENT_LIKELY"
+    else:
+        target.employment_status = "UNKNOWN"
     target.match_score = match_score
     target.contact_trust_score = trust
     target.contact_trust_status = status

@@ -17,12 +17,15 @@ LIKELY_MATCH = "LIKELY_MATCH"
 MULTIPLE_MATCHES = "MULTIPLE_MATCHES"
 NO_MATCH = "NO_MATCH"
 
-# India entity classification (§2).
-GLOBAL_COMPANY = "GLOBAL_COMPANY"
+# India presence classification (§15). GLOBAL_COMPANY kept as a back-compat alias of
+# NON_INDIA for callers/tests that referenced the earlier name.
 INDIA_ENTITY = "INDIA_ENTITY"
-INDIA_OFFICE = "INDIA_OFFICE"
 INDIA_OPERATION = "INDIA_OPERATION"
+INDIA_OFFICE = "INDIA_OFFICE"
+GLOBAL_WITH_INDIA_PRESENCE = "GLOBAL_WITH_INDIA_PRESENCE"
+NON_INDIA = "NON_INDIA"
 UNKNOWN = "UNKNOWN"
+GLOBAL_COMPANY = NON_INDIA   # backwards-compatible alias
 
 
 def _is_india(jc: Optional[str]) -> bool:
@@ -58,11 +61,16 @@ def match_entity(*, company_name: str, candidates: list[OCCompany],
 
 
 def classify_india_entity(oc: Optional[OCCompany], *, india_presence: bool) -> str:
-    """Distinguish an Indian legal entity from a global company with an India office."""
+    """Classify India presence from EVIDENCE only (§15):
+    - Indian-jurisdiction legal entity      -> INDIA_ENTITY
+    - non-India legal entity + India office  -> GLOBAL_WITH_INDIA_PRESENCE
+    - India presence but no legal entity     -> INDIA_OPERATION
+    - non-India legal entity, no India office -> NON_INDIA
+    - otherwise                              -> UNKNOWN"""
     if oc and _is_india(oc.jurisdiction_code):
         return INDIA_ENTITY
     if india_presence:
-        return INDIA_OFFICE if oc else INDIA_OPERATION
+        return GLOBAL_WITH_INDIA_PRESENCE if oc else INDIA_OPERATION
     if oc:
-        return GLOBAL_COMPANY
+        return NON_INDIA
     return UNKNOWN

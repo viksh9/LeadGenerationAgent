@@ -24,9 +24,9 @@ from integrations.public_intelligence.opencorporates.mapper import (
     parse_search,
 )
 from integrations.public_intelligence.opencorporates.matching import (
-    GLOBAL_COMPANY,
+    GLOBAL_WITH_INDIA_PRESENCE,
     INDIA_ENTITY,
-    INDIA_OFFICE,
+    NON_INDIA,
     LIKELY_MATCH,
     MULTIPLE_MATCHES,
     NO_MATCH,
@@ -120,8 +120,9 @@ def test_india_first_prefers_indian_entity():
 # --- India classification --------------------------------------------------- #
 def test_india_classification():
     assert classify_india_entity(_oc("X", "in_ka", "1"), india_presence=True) == INDIA_ENTITY
-    assert classify_india_entity(_oc("X", "us_de", "1"), india_presence=True) == INDIA_OFFICE
-    assert classify_india_entity(_oc("X", "us_de", "1"), india_presence=False) == GLOBAL_COMPANY
+    # non-India legal entity + India office -> GLOBAL_WITH_INDIA_PRESENCE (§15)
+    assert classify_india_entity(_oc("X", "us_de", "1"), india_presence=True) == GLOBAL_WITH_INDIA_PRESENCE
+    assert classify_india_entity(_oc("X", "us_de", "1"), india_presence=False) == NON_INDIA
 
 
 # --- Data Trust (§18) ------------------------------------------------------- #

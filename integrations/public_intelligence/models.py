@@ -141,6 +141,7 @@ class PublicCompanyFacts:
 
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None      # official GitHub organization URL (evidence-matched)
     country: Optional[str] = None
     industry: Optional[str] = None
     aliases: list[str] = field(default_factory=list)

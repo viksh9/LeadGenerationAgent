@@ -64,6 +64,9 @@ export function OfficialCompanyPanel({ companyName }: { companyName: string }) {
             <Field label="Careers">
               <ExternalLinkValue href={data.careers_url} stripScheme />
             </Field>
+            <Field label="GitHub (org)">
+              <ExternalLinkValue href={data.github_url} stripScheme />
+            </Field>
           </dl>
 
           {/* Operating vs Registered address kept visibly distinct (§29). */}

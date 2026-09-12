@@ -14,10 +14,18 @@ import httpx
 
 from integrations.public_intelligence.base import PublicIntelligenceProvider
 from integrations.public_intelligence.github.client import GitHubClient
-from integrations.public_intelligence.matching import company_match, is_technical, normalize_company
+from integrations.public_intelligence.matching import (
+    company_match,
+    domain_root,
+    is_technical,
+    normalize_company,
+)
 from integrations.public_intelligence.models import (
     MATCH_UNKNOWN,
+    MATCH_VERIFIED,
     CompanyContext,
+    CompanyFieldEvidenceRecord,
+    PublicCompanyFacts,
     PublicPerson,
 )
 
@@ -45,6 +53,38 @@ class GitHubProvider(PublicIntelligenceProvider):
             return HealthStatus.RATE_LIMITED, "GitHub rate limit reached."
         except ProviderUnavailable as exc:
             return HealthStatus.UNAVAILABLE, str(exc)
+
+    def discover_company(self, ctx: CompanyContext) -> Optional[PublicCompanyFacts]:
+        """Find the company's official GitHub ORGANIZATION — only when corroborated by
+        an exact normalized-name match AND (blog domain == company domain OR exact
+        name). Never guessed from the company name (§4/§5). Supporting evidence only."""
+        items = self._client.search_users(f'"{ctx.company_name}" type:org', per_page=5)
+        tgt_name = normalize_company(ctx.company_name)
+        tgt_domain = domain_root(ctx.domain) or domain_root(ctx.website)
+        for item in items[:5]:
+            login = item.get("login")
+            if not login:
+                continue
+            org = self._client.get_org(login)
+            if not isinstance(org, dict):
+                continue
+            org_name = normalize_company(org.get("name") or org.get("login"))
+            blog_domain = domain_root(org.get("blog"))
+            name_ok = bool(org_name) and org_name == tgt_name
+            domain_ok = bool(tgt_domain) and blog_domain == tgt_domain
+            if name_ok and (domain_ok or bool(tgt_domain) is False):
+                url = org.get("html_url")
+                if not url:
+                    continue
+                facts = PublicCompanyFacts(source=self.name, source_label=self.source_label,
+                                           source_url=url, github_url=url)
+                facts.field_evidence.append(CompanyFieldEvidenceRecord(
+                    field="github_url", value=url, source=self.source_label,
+                    source_type=self.source_type, source_url=url,
+                    evidence_text="Public GitHub organization matched by name/domain",
+                    source_priority=6, trust_score=80))
+                return facts
+        return None
 
     def discover_people(self, ctx: CompanyContext, roles: list[str]) -> list[PublicPerson]:
         query = f'"{ctx.company_name}" in:company type:user'

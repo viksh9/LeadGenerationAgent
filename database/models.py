@@ -850,6 +850,9 @@ class DecisionMaker(Base):
     contact_trust_score: Mapped[int] = mapped_column(Integer, default=0)
     contact_trust_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Current-employment verification (Prompt 48, §18): CURRENT_VERIFIED / CURRENT_LIKELY
+    # / FORMER / UNKNOWN. GitHub's company field alone never proves current employment.
+    employment_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
 
     verification_status: Mapped[VerificationStatus] = mapped_column(
         SAEnum(VerificationStatus, native_enum=False, length=24),
@@ -1334,6 +1337,8 @@ class Company(Base):
     # Public-intelligence identity (Prompt 45) — additive; filled from public sources.
     linkedin_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     wikidata_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Public technical presence (Prompt 48) — official GitHub organization URL when matched.
+    github_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     # Official company intelligence (Prompt 46) — additive.
     contact_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     careers_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)

@@ -112,10 +112,16 @@ function PocRow({ poc, rank }: { poc: POC; rank: string }) {
       </p>
       {poc.job_title && <p className="text-sm text-slate-600 dark:text-slate-300">{poc.job_title}</p>}
       <dl className="mt-3 grid grid-cols-2 gap-3">
-        <Field label="Work Email">{poc.business_email || 'Not Available'}</Field>
-        <Field label="Business Phone">{poc.business_phone || 'Not Available'}</Field>
+        <Field label="Work Email">{poc.business_email || 'Not Publicly Available'}</Field>
+        <Field label="Business Phone">{poc.business_phone || 'Not Publicly Available'}</Field>
         <Field label="LinkedIn">
           <ExternalLinkValue href={poc.professional_network_url} stripScheme />
+        </Field>
+        <Field label="GitHub">
+          <ExternalLinkValue href={poc.contact_source === 'GitHub' ? poc.source_url : null} stripScheme />
+        </Field>
+        <Field label="Employment">
+          {poc.employment_status ? poc.employment_status.replace(/_/g, ' ') : '—'}
         </Field>
         <Field label="Source">{poc.contact_source || '—'}</Field>
         <Field label="Last Verified">{formatDateTime(poc.last_verified_at)}</Field>

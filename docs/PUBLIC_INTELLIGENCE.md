@@ -206,6 +206,28 @@ The same `Company` + `DecisionMaker` + `CompanyFieldEvidence` model and source
 priority let ContactOut/Lusha/Apollo/Hunter/Prospeo enrich the same company/person
 later without overwriting official data — field-level provenance is preserved.
 
+## GitHub / Wikidata technical-POC hardening (Prompt 48)
+
+- **Current-employment verification** (§18): every persisted POC carries an
+  `employment_status` — `CURRENT_VERIFIED` (official company source + verified company
+  match), `CURRENT_LIKELY` (GitHub/Wikidata or a company match — GitHub's `company`
+  field alone never proves current employment), `FORMER`, or `UNKNOWN`. Kept separate
+  from Contact Trust and the business lead score.
+- **India presence** (§15) now uses the fuller state set: `INDIA_ENTITY` /
+  `INDIA_OPERATION` / `INDIA_OFFICE` / `GLOBAL_WITH_INDIA_PRESENCE` / `NON_INDIA` /
+  `UNKNOWN`, derived from evidence only (never from an employee profile merely
+  containing "India").
+- **GitHub organization** (§4/§9): the GitHub provider resolves a company's official
+  GitHub **organization** URL only when corroborated by an exact normalized-name match
+  AND a blog-domain match — never guessed from the name. Stored on `Company.github_url`
+  (supporting evidence, priority below official sources). Repository activity is
+  supporting technical context only — never converted into a hiring signal.
+- **Full-intelligence export** now includes **GitHub Company/Organization URL** and
+  **POC GitHub** columns (the fixed 16-column business export remains unchanged).
+- **UI**: the Target POC panel shows the POC's GitHub link + employment status; the
+  Official Company panel shows the company GitHub org link.
+- **Freshness** uses `last_verified_at` + `PUBLIC_INTELLIGENCE_CACHE_TTL_HOURS`.
+
 ## Testing
 
 Offline (mocked transports): `tests/unit/test_public_intelligence.py`,
