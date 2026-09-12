@@ -305,6 +305,51 @@ def handle_company_reenrichment(session: Session, job: ScheduledJob, now: dateti
     return {"leads_changed": enriched, "notes": {"pocs_reenriched": enriched, "considered": considered}}
 
 
+def handle_career_source_collection(session: Session, job: ScheduledJob, now: datetime) -> dict:
+    """Collect every ENABLED registered ATS board (Greenhouse/Lever) and fold the real
+    jobs into company-level leads. Boards live in the DB (CompanyCareerSource), not env —
+    this is what makes a wired board (e.g. Postman) refresh on a schedule. India-first
+    filtering is applied by the collectors. A per-board failure is recorded and never
+    breaks the run; the company pipeline runs once at the end only if anything collected."""
+    from collectors.base import FetchRequest
+    from collectors.career_source_registry import list_career_sources, register_career_source
+    from collectors.company.ats import GreenhouseATSProvider, LeverATSProvider
+    from collectors.service import JobCollectionService
+    from database.models import AtsProvider, CareerSourceStatus
+    from ingestion.job_pipeline import run_company_pipeline
+
+    builders = {AtsProvider.GREENHOUSE: GreenhouseATSProvider(), AtsProvider.LEVER: LeverATSProvider()}
+    boards = [c for c in list_career_sources(session) if c.enabled and c.board_identifier]
+    if not boards:
+        raise SkipJob("No enabled ATS career sources to collect.")
+
+    collected = 0
+    accepted = 0
+    errors = 0
+    for cs in boards:
+        builder = builders.get(cs.ats_provider)
+        if builder is None:
+            continue
+        try:
+            collector = builder.build_collector(cs.board_identifier)
+            summary = JobCollectionService(session).collect(
+                collector, [FetchRequest(board=cs.board_identifier)])
+            collected += 1
+            accepted += int(getattr(summary, "accepted", 0) or 0)
+            register_career_source(
+                session, ats_provider=cs.ats_provider, board_identifier=cs.board_identifier,
+                status=CareerSourceStatus.CONNECTED, company_name=cs.company_name)
+        except Exception as exc:  # a bad board never breaks the scheduler
+            errors += 1
+            cs.last_checked_at = now
+            cs.last_error = str(exc)[:512]   # keep enabled — retry next cycle (transient-safe)
+            logger.warning("ATS collect failed board=%s (non-fatal): %s", cs.board_identifier, exc)
+    if collected:
+        run_company_pipeline(session, provenance=DataProvenance.REAL)
+    return {"records_processed": accepted,
+            "notes": {"boards_collected": collected, "records_accepted": accepted, "errors": errors}}
+
+
 HANDLERS = {
     JobType.SOURCE_COLLECTION: handle_source_collection,
     JobType.EVIDENCE_REVERIFICATION: handle_evidence_reverification,
@@ -315,6 +360,7 @@ HANDLERS = {
     JobType.SOURCE_HEALTH_CHECK: handle_source_health_check,
     JobType.TENDER_DEADLINE_SCAN: handle_tender_scan,
     JobType.COMPANY_ENRICHMENT: handle_company_reenrichment,  # ContactOut POC re-enrichment (§30)
+    JobType.CAREER_SOURCE_COLLECTION: handle_career_source_collection,  # registered ATS boards
 }
 
 

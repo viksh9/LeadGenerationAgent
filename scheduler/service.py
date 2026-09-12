@@ -105,6 +105,7 @@ class SchedulerService:
             ("ai:reanalyze", JobType.AI_REANALYSIS),
             ("health:sources", JobType.SOURCE_HEALTH_CHECK),
             ("tenders:deadlines", JobType.TENDER_DEADLINE_SCAN),
+            ("collect:career-sources", JobType.CAREER_SOURCE_COLLECTION),
         ]
         for name, jtype in maintenance:
             interval = DEFAULT_JOB_INTERVALS.get(jtype, 12 * 3600)
