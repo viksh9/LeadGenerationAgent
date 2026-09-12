@@ -14,6 +14,9 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_session
 from api.schemas import (
+    CompanyFieldSourceResponse,
+    CompanyIntelDiscoveryResponse,
+    CompanyLocationResponse,
     CompanyPublicIntelligenceResponse,
     POCResponse,
     PublicIntelligenceDiscoveryResponse,
@@ -27,6 +30,7 @@ from database.models import Company, Lead, UserRole, utcnow
 from enrichment.contactout_poc import get_pocs_for_lead
 from enrichment.public_intelligence_service import (
     PUBLIC_SOURCE_TYPES,
+    discover_company_intelligence,
     discover_public_intelligence_for_lead,
     get_public_pocs_for_lead,
 )
@@ -73,16 +77,36 @@ def discover_public_intelligence(lead_id: int, force: bool = False,
     )
 
 
+@router.post("/companies/{company_id}/public-intelligence/discover",
+             response_model=CompanyIntelDiscoveryResponse,
+             summary="Discover official company intelligence (website/address/contacts)")
+def discover_company_public_intelligence(company_id: int, force: bool = False,
+                                         session: Session = Depends(get_session),
+                                         role=Depends(_pi_role), _rl=Depends(_discover_limit)
+                                         ) -> CompanyIntelDiscoveryResponse:
+    company = session.get(Company, company_id)
+    if company is None:
+        raise NotFoundError(f"Company {company_id} not found.")
+    summary = discover_company_intelligence(session, company, force=force,
+                                            actor=getattr(role, "value", str(role)))
+    return CompanyIntelDiscoveryResponse(
+        company_id=summary.company_id, company_name=summary.company_name, status=summary.status,
+        provider_status=summary.provider_status, fields_updated=summary.fields_updated,
+        people_persisted=summary.people_persisted, data_trust_score=summary.data_trust_score,
+        reason=summary.reason)
+
+
 @router.get("/companies/{company_id}/public-intelligence",
             response_model=CompanyPublicIntelligenceResponse,
-            summary="Company profile + real public leadership")
+            summary="Company profile (with field sources) + real public leadership")
 def company_public_intelligence(company_id: int, session: Session = Depends(get_session)
                                 ) -> CompanyPublicIntelligenceResponse:
     company = session.get(Company, company_id)
     if company is None:
         raise NotFoundError(f"Company {company_id} not found.")
     from sqlalchemy import select
-    from database.models import DataProvenance, DecisionMaker
+    from database.models import (CompanyFieldEvidence, CompanyLocation, DataProvenance,
+                                 DecisionMaker)
     people = session.scalars(select(DecisionMaker).where(
         DecisionMaker.company_id == company.id,
         DecisionMaker.source_type.in_(PUBLIC_SOURCE_TYPES),
@@ -90,13 +114,44 @@ def company_public_intelligence(company_id: int, session: Session = Depends(get_
         DecisionMaker.data_provenance == DataProvenance.REAL,
     )).all()
     people = sorted(people, key=lambda d: (d.match_score or 0, d.contact_trust_score or 0), reverse=True)
+    locations = session.scalars(select(CompanyLocation).where(
+        CompanyLocation.company_id == company.id)).all()
+    # Canonical field source = highest-priority evidence per field.
+    ev_rows = session.scalars(select(CompanyFieldEvidence).where(
+        CompanyFieldEvidence.company_id == company.id)).all()
+    best_by_field: dict[str, CompanyFieldEvidence] = {}
+    for e in sorted(ev_rows, key=lambda x: x.source_priority):
+        best_by_field.setdefault(e.field, e)
     return CompanyPublicIntelligenceResponse(
         company_id=company.id, company_name=company.canonical_name,
-        website=company.website, linkedin_url=company.linkedin_url,
-        country=company.headquarters_country, industry=company.industry,
-        wikidata_id=company.wikidata_id, india_locations=list(company.india_locations or []),
+        website=company.website, linkedin_url=company.linkedin_url, industry=company.industry,
+        city=company.headquarters_city, state=company.headquarters_state,
+        country=company.headquarters_country, full_address=company.full_address,
+        postal_code=company.postal_code, company_phone=company.company_phone,
+        company_email=company.company_email, contact_url=company.contact_url,
+        careers_url=company.careers_url, leadership_url=company.leadership_url,
+        wikidata_id=company.wikidata_id, data_trust_score=company.data_trust_score or 0,
+        official_verified_at=company.official_verified_at,
+        india_locations=list(company.india_locations or []),
+        locations=[CompanyLocationResponse.model_validate(l) for l in locations],
+        field_sources=[CompanyFieldSourceResponse.model_validate(e) for e in best_by_field.values()],
         public_leadership=[POCResponse.model_validate(p) for p in people],
     )
+
+
+@router.get("/companies/{company_id}/sources",
+            response_model=list[CompanyFieldSourceResponse],
+            summary="All field-level company evidence (provenance, conflicts retained)")
+def company_sources(company_id: int, session: Session = Depends(get_session)
+                    ) -> list[CompanyFieldSourceResponse]:
+    if session.get(Company, company_id) is None:
+        raise NotFoundError(f"Company {company_id} not found.")
+    from sqlalchemy import select
+    from database.models import CompanyFieldEvidence
+    rows = session.scalars(select(CompanyFieldEvidence).where(
+        CompanyFieldEvidence.company_id == company_id).order_by(
+        CompanyFieldEvidence.field, CompanyFieldEvidence.source_priority)).all()
+    return [CompanyFieldSourceResponse.model_validate(e) for e in rows]
 
 
 @router.post("/public-intelligence/test", response_model=PublicIntelligenceTestResponse,

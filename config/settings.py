@@ -181,6 +181,15 @@ class Settings(BaseSettings):
         default=20.0, validation_alias=AliasChoices("PUBLIC_INTELLIGENCE_TIMEOUT_SECONDS"))
     public_intelligence_cache_ttl_hours: int = Field(
         default=168, validation_alias=AliasChoices("PUBLIC_INTELLIGENCE_CACHE_TTL_HOURS"))
+    # Official-company website crawl safety (conservative; never floods a site).
+    official_company_max_requests_per_minute: int = Field(
+        default=20, validation_alias=AliasChoices("OFFICIAL_COMPANY_MAX_REQUESTS_PER_MINUTE"))
+    official_company_request_timeout_seconds: float = Field(
+        default=15.0, validation_alias=AliasChoices("OFFICIAL_COMPANY_REQUEST_TIMEOUT_SECONDS"))
+    official_company_max_pages_per_company: int = Field(
+        default=8, validation_alias=AliasChoices("OFFICIAL_COMPANY_MAX_PAGES_PER_COMPANY"))
+    official_company_data_ttl_days: int = Field(
+        default=30, validation_alias=AliasChoices("OFFICIAL_COMPANY_DATA_TTL_DAYS"))
 
     # --- Production hardening (Prompt 40) ---------------------------------- #
     # Observability: structured JSON logs (opt-in), request/correlation IDs.

@@ -827,18 +827,76 @@ class PublicIntelligenceDiscoveryResponse(BaseModel):
     pocs: list[POCResponse] = Field(default_factory=list)
 
 
+class CompanyLocationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
+    city: Optional[str] = None
+    state_or_region: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+    full_address: Optional[str] = None
+    location_type: str = "UNKNOWN"
+    is_headquarters: bool = False
+    source: Optional[str] = None
+    source_url: Optional[str] = None
+    trust_score: int = 0
+
+
+class CompanyFieldSourceResponse(BaseModel):
+    """Field-level provenance for the Company Intelligence / Sources UI (§28)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    field: str
+    value: Optional[str] = None
+    source: Optional[str] = None
+    source_type: Optional[str] = None
+    source_url: Optional[str] = None
+    evidence_text: Optional[str] = None
+    trust_score: int = 0
+    retrieved_at: Optional[datetime] = None
+
+
 class CompanyPublicIntelligenceResponse(BaseModel):
-    """Company profile facts + real public leadership discovered from free sources."""
+    """Company profile facts (with sources) + real public leadership (§27/§28)."""
 
     company_id: int
     company_name: str
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
-    country: Optional[str] = None
     industry: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    full_address: Optional[str] = None
+    postal_code: Optional[str] = None
+    company_phone: Optional[str] = None
+    company_email: Optional[str] = None
+    contact_url: Optional[str] = None
+    careers_url: Optional[str] = None
+    leadership_url: Optional[str] = None
     wikidata_id: Optional[str] = None
+    data_trust_score: int = 0
+    official_verified_at: Optional[datetime] = None
     india_locations: list[str] = Field(default_factory=list)
+    locations: list[CompanyLocationResponse] = Field(default_factory=list)
+    field_sources: list[CompanyFieldSourceResponse] = Field(default_factory=list)
     public_leadership: list[POCResponse] = Field(default_factory=list)
+
+
+class CompanyIntelDiscoveryResponse(BaseModel):
+    """Result of a company-level official-intelligence discovery run (§39)."""
+
+    company_id: int
+    company_name: str
+    status: str                       # SUCCESS | PARTIAL | SOURCE_UNAVAILABLE | ERROR
+    provider_status: dict[str, str] = Field(default_factory=dict)
+    fields_updated: list[str] = Field(default_factory=list)
+    people_persisted: int = 0
+    data_trust_score: int = 0
+    reason: str = ""
 
 
 class PublicIntelligenceTestResponse(BaseModel):
