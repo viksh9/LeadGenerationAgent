@@ -9,10 +9,10 @@ vi.mock('@/services/sources', async () => {
   return { ...actual, fetchSources: vi.fn() };
 });
 
-import { fetchSources } from '@/services/sources';
+import { fetchSources, type SourceStatusItem } from '@/services/sources';
 const mockFetch = vi.mocked(fetchSources);
 
-function makeItem(over: Record<string, unknown> = {}) {
+function makeItem(over: Partial<SourceStatusItem> = {}): SourceStatusItem {
   return {
     source_id: 'adzuna', name: 'Adzuna', category: 'JOB', source_type: 'API',
     collector_implemented: true, requires_api_key: true, status: 'CONNECTED', detail: '',
