@@ -27,9 +27,33 @@ from collectors.connectivity import check_source_connection, get_source_health
 from collectors.source_status import all_source_status
 from config.exceptions import NotFoundError
 from config.settings import get_settings
-from database.models import CollectionRun, CollectionRunStatus, SourceConnectionStatus, SourceHealth
+from database.models import (
+    AtsProvider,
+    CollectionRun,
+    CollectionRunStatus,
+    CompanyCareerSource,
+    SourceConnectionStatus,
+    SourceHealth,
+)
 
 router = APIRouter(prefix="/sources", tags=["sources"])
+
+# ATS sources are configured via DB-registered boards (CompanyCareerSource), not env.
+_ATS_SOURCE_PROVIDER = {"greenhouse": AtsProvider.GREENHOUSE, "lever": AtsProvider.LEVER}
+
+
+def _apply_ats_boards(item: SourceStatusResponse, boards: list[CompanyCareerSource]) -> None:
+    """Reflect wired ATS boards on a source row so the dashboard shows CONFIGURED/CONNECTED
+    (and how many boards) instead of the env-only DISCOVERY_REQUIRED. Connection is only
+    CONNECTED when a board actually had a real success."""
+    if not boards:
+        return
+    item.status = "CONFIGURED"
+    item.detail = f"{len(boards)} board(s) wired: {', '.join(b.board_identifier for b in boards[:5])}"
+    successes = [b.last_success_at for b in boards if b.last_success_at]
+    if successes and item.connection_status != SourceConnectionStatus.CONNECTED.value:
+        item.connection_status = SourceConnectionStatus.CONNECTED.value
+        item.last_success_at = item.last_success_at or max(successes)
 
 
 def _merge(report, health: SourceHealth | None, run: CollectionRun | None) -> SourceStatusResponse:
@@ -84,6 +108,15 @@ def _list(session: Session) -> SourceStatusListResponse:
     health_by_id = {h.source_id: h for h in session.query(SourceHealth).all()}
     runs_by_id = _latest_runs(session)
     items = [_merge(r, health_by_id.get(r.source_id), runs_by_id.get(r.source_id)) for r in reports]
+
+    # Reflect DB-registered ATS boards (Greenhouse/Lever) so the dashboard's Real Data
+    # Sources panel updates as boards are wired — not tied to the (empty) env vars.
+    ats_boards: dict[AtsProvider, list[CompanyCareerSource]] = {}
+    for cs in session.query(CompanyCareerSource).filter(CompanyCareerSource.enabled.is_(True)).all():
+        if cs.board_identifier:
+            ats_boards.setdefault(cs.ats_provider, []).append(cs)
+    for item in items:
+        _apply_ats_boards(item, ats_boards.get(_ATS_SOURCE_PROVIDER.get(item.source_id), []))
     # CONNECTED is only true from a persisted, verified check.
     connected = sum(1 for it in items if it.connection_status == SourceConnectionStatus.CONNECTED.value)
     configured = sum(1 for it in items if it.status == "CONFIGURED")

@@ -94,3 +94,24 @@ def test_source_inventory_reports_registered_ats_board(seed_session):
     assert gh_row["connection_status"] == "CONNECTED"           # board had a real success
     # Lever has no registered board -> stays honest.
     assert inv["lever"]["configuration_status"] != "CONFIGURED"
+
+
+def test_sources_endpoint_reflects_wired_ats_board(client):
+    """The dashboard's /sources feed must show a DB-registered Greenhouse board as
+    CONFIGURED/CONNECTED (updates as boards are wired), not env-only DISCOVERY_REQUIRED."""
+    import api.main
+    from api.dependencies import get_session
+    session = next(api.main.app.dependency_overrides[get_session]())
+    register_career_source(session, ats_provider=AtsProvider.GREENHOUSE, board_identifier="acme",
+                           status=CareerSourceStatus.CONNECTED, company_name="Acme Labs")
+    session.commit()
+    session.close()
+
+    body = client.get("/sources").json()
+    gh = next(i for i in body["items"] if i["source_id"] == "greenhouse")
+    assert gh["status"] == "CONFIGURED"
+    assert gh["connection_status"] == "CONNECTED"
+    assert "board(s) wired" in (gh.get("detail") or "")
+    # Lever has no board -> unaffected.
+    lever = next(i for i in body["items"] if i["source_id"] == "lever")
+    assert lever["status"] != "CONFIGURED"
