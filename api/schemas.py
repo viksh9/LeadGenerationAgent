@@ -175,7 +175,8 @@ class LeadResponse(BaseModel):
     company_domain: Optional[str] = None
     company_type: Optional[CompanyType] = None
     industry: Optional[str] = None
-    location: Optional[str] = None
+    location: Optional[str] = None          # compact "Top +N more" (narrow columns)
+    location_all: Optional[str] = None      # full city list (preferred for display)
 
     # Company-level hiring aggregation.
     it_job_count: int = 0

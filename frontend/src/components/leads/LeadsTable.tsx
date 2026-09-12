@@ -115,7 +115,12 @@ export function LeadsTable({ leads, params, onSort, onDelete }: LeadsTableProps)
                 <span className="font-medium text-slate-900 dark:text-slate-100">{lead.company_name}</span>
                 <ProvenanceBadge provenance={lead.data_provenance} />
               </span>
-              {lead.location && <span className="block text-xs text-slate-400 dark:text-slate-500">{lead.location}</span>}
+              {(lead.location_all || lead.location) && (
+                <span className="block text-xs text-slate-400 dark:text-slate-500"
+                      title={lead.location_all || lead.location || undefined}>
+                  {lead.location_all || lead.location}
+                </span>
+              )}
             </Td>
             <Td>
               <span className="font-medium text-slate-900 dark:text-slate-100">{lead.it_job_count}</span>

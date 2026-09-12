@@ -9,7 +9,7 @@ export function CompanySummaryCard({ lead }: { lead: Lead }) {
     <DetailCard title="Company summary">
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Field label="Industry">{lead.industry}</Field>
-        <Field label="Location">{lead.location}</Field>
+        <Field label="Location">{lead.location_all || lead.location}</Field>
         <Field label="Company size">{lead.company_size}</Field>
         <Field label="Project">{lead.project_name}</Field>
         <Field label="Estimated hiring">
